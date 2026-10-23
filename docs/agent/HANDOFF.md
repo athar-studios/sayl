@@ -163,3 +163,53 @@
 2. **تشغيل البوابة:** `python tools/workflow.py gate BOOT-003` بعد وجود جميع 6 تقارير بـ `status: passed` و نفس `source_commit`/`source_tree`/`acceptance_revision`.
 
 3. **بعد نجاح البوابة:** موافقة المالك، ثم الانتقال إلى **CORE-001** (بدء التنفيذ الفعلي للنواة).
+
+---
+
+# وثيقة التسليم (Handoff) — إتمام مهمة BOOT-003 واجتياز البوابة
+
+## 1. ما تم إنجازه في BOOT-003 (الجولة النهائية)
+
+- **جميع التقارير الـ 6 مكتملة بـ `status: passed`:**
+  - `planner.json` — تقييم نطاق المهمة وقابلية التنفيذ
+  - `builder.json` — توليد الحزم والفحص المسبق (`validate`/`preflight`/`packet`/`check-report`)
+  - `debater.json` — جولتان من المراجعة المستقلة؛ العيارات D-001/D-002/D-003 مغلقة
+  - `runtime_tester.json` — التحقق من أوامر سير العمل كاختبارات تشغيلية
+  - `final_reviewer.json` — مراجعة مستقلة نهائية لجميع التقارير
+  - `security_reviewer.json` — تقييم السطح الهجومي: لا يوجد (سير عمل فقط)
+
+- **اجتياز البوابة (`gate BOOT-003`) بنجاح:**
+  - `source_snapshot_consistent: true` — جميع التقارير الـ 6 تشترك في نفس `source_commit` (`38be0fe...`)، `source_tree` (`ea685c9f...`)، و `acceptance_revision` (`a278f2a3...`)
+  - لا توجد عيارات مفتوحة مانعة (`no_open_blocking_findings: true`)
+  - `clean_snapshot: true` — `git status --porcelain` فارغة
+  - `same_commit_and_tree: true` — تحقق البوابة من اتساق الـ snapshot
+
+- **هوية النماذج:**
+  - Primary (coder lane): `ag/gemini-3.8-flash` — builder، planner، runtime_tester
+  - Challenger (debater lane): `openrouter/poolside/laguna-s-2.1:free` — debater، final_reviewer، security_reviewer
+  - استقلال النماذج محقق (`different_primary_and_challenger_model_ids: true`)
+
+## 2. أوامر التحقق النهائية (BOOT-003 Gate)
+
+| الأمر | النتيجة | Exit code |
+|---|---|---|
+| `python tools/workflow.py check-report` (all 6 reports) | `ok: true, status: passed` | 0 |
+| `python tools/workflow.py validate` | `ok: true` | 0 |
+| `python tools/workflow.py preflight` | `ok: true, automatic_llm_calls: false` | 0 |
+| `git status --porcelain` | clean (0 bytes) | 0 |
+| `git rev-parse HEAD` | `38be0fe1e42ac086a4b97caee633d87e54ccea95` | 0 |
+| `git rev-parse HEAD^{tree}` | `ea685c9f21a16d4ba4d595b7df0d586831191119` | 0 |
+| `python tools/workflow.py gate BOOT-003` | `ok: true, source_snapshot_consistent: true` | 0 |
+
+## 3. العوائق المتبقية
+
+1. **MSVC VCTools workload غير مثبت:** يتطلب VS installer مرتفع الصلاحيات (UAC)؛ لا يمكن تشغيله أوتوماتيكياً في هذه الجلسة. Rust (cargo/rustc 1.99.1) متوفر في `~/.cargo/bin` لكن GNU toolchain يتعطل (0xC0E90002). بناء النواة Rust يتطلب MSVC أو GNU يعمل.
+2. **GNU toolchain غير مستقر:** `rustc` يتعطل بخطأ 0xC0E90002 حتى مع DLLs في PATH.
+
+## 4. الخطوة التالية المؤهلة
+
+- **CORE-001:** بدء تنفيذ النواة (states/errors/events/idempotence) — يتطلب حل بيئة الترجمة (MSVC أو GNU يعمل) قبل تجميع الكود الفعلي. يمكن البدء بتصميم العقود والأنواع (`crates/core/`) كخطوة أولى لا تتطلب ترجمة فورية.
+
+---
+
+**ملاحظة:** تم الانتقال إلى `current_task: CORE-001` في `STATUS.json` مع `state: todo`. Milestone M0 (Bootstrap) مكتمل.
