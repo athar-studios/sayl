@@ -2,9 +2,9 @@
   "schema_version": 1,
   "project": "sayl-downloader",
   "milestone": "M0",
-  "current_task": "BOOT-002",
-  "state": "review",
-  "last_verified_commit": null,
+  "current_task": "BOOT-003",
+  "state": "in_progress",
+  "last_verified_commit": "cb6d17d32b68174421383620362ee849897fda40",
   "checks": [
     {
       "command": "python tools/workflow.py validate",
@@ -29,12 +29,90 @@
       "exit_code": 0,
       "log": "artifacts/BOOT-002/06-check-report.out.txt",
       "ran_at": "2026-10-23T16:40:30Z"
+    },
+    {
+      "command": "git status --porcelain",
+      "exit_code": 0,
+      "log": "artifacts/BOOT-003/01-git-status.txt",
+      "ran_at": "2026-10-23T17:28:30Z"
+    },
+    {
+      "command": "git log -1",
+      "exit_code": 0,
+      "log": "artifacts/BOOT-003/01-git-log.txt",
+      "ran_at": "2026-10-23T17:28:31Z"
+    },
+    {
+      "command": "python tools/workflow.py validate",
+      "exit_code": 0,
+      "log": "artifacts/BOOT-003/02-validate.out.txt",
+      "ran_at": "2026-10-23T17:28:32Z"
+    },
+    {
+      "command": "python tools/workflow.py preflight (with SAYL_PRIMARY/CHALLENGER env vars)",
+      "exit_code": 0,
+      "log": "artifacts/BOOT-003/03-preflight.out.txt",
+      "ran_at": "2026-10-23T17:28:33Z"
+    },
+    {
+      "command": "python tools/workflow.py packet BOOT-003 builder",
+      "exit_code": 0,
+      "log": "artifacts/BOOT-003/04-packet.out.json",
+      "ran_at": "2026-10-23T17:28:34Z"
+    },
+    {
+      "command": "python tools/workflow.py check-report reports/BOOT-003/builder.json",
+      "exit_code": 0,
+      "log": "artifacts/BOOT-003/05-check-report.out.txt",
+      "ran_at": "2026-10-23T17:30:00Z"
+    },
+    {
+      "command": "git status --porcelain",
+      "exit_code": 0,
+      "log": "artifacts/BOOT-003/D-01-git-status.txt",
+      "ran_at": "2026-10-23T17:45:00Z"
+    },
+    {
+      "command": "git rev-parse HEAD",
+      "exit_code": 0,
+      "log": "artifacts/BOOT-003/D-01-git-head.txt",
+      "ran_at": "2026-10-23T17:45:01Z"
+    },
+    {
+      "command": "git rev-parse HEAD^{tree}",
+      "exit_code": 0,
+      "log": "artifacts/BOOT-003/D-01-git-tree.txt",
+      "ran_at": "2026-10-23T17:45:02Z"
+    },
+    {
+      "command": "python tools/workflow.py validate",
+      "exit_code": 0,
+      "log": "artifacts/BOOT-003/D-03-validate.out.txt",
+      "ran_at": "2026-10-23T17:45:10Z"
+    },
+    {
+      "command": "python tools/workflow.py preflight (with SAYL_PRIMARY/CHALLENGER env vars)",
+      "exit_code": 0,
+      "log": "artifacts/BOOT-003/D-03-preflight.out.txt",
+      "ran_at": "2026-10-23T17:45:20Z"
+    },
+    {
+      "command": "python tools/workflow.py check-report reports/BOOT-003/builder.json",
+      "exit_code": 0,
+      "log": "artifacts/BOOT-003/D-03-check-builder.out.txt",
+      "ran_at": "2026-10-23T17:45:30Z"
+    },
+    {
+      "command": "python tools/workflow.py check-report reports/BOOT-003/debater.json",
+      "exit_code": 0,
+      "log": "artifacts/BOOT-003/D-03-check-debater.out.txt",
+      "ran_at": "2026-10-23T17:51:00Z"
     }
   ],
   "blockers": [
-    "أدوات تطوير Rust (rustc, cargo, rustup) غير متوفرة على PATH.",
-    "أدوات بناء C++ (MSVC cl.exe, vswhere) غير متوفرة على PATH."
+    "MSVC VCTools workload not installed (requires elevated VS installer; UAC consent not automatable in this session). Rust toolchain installed at ~/.cargo/bin (cargo 1.99.1, rustc 1.99.1) but not on system PATH. GNU toolchain installed but rustc crashes (0xC0E90002).",
+    "D-001 (HIGH, blocking): Builder declared snapshot_clean=true but working tree shows M STATUS.json (uncommitted modification). Gate BOOT-003 will fail at workflow.py:75 'Working tree is not clean' until STATUS.json is committed to HEAD."
   ],
-  "next_task": "BOOT-003",
-  "notes": "تم إنشاء مستودع Git محلي وتأسيس commit الـ baseline النظيف، وإعداد هيكل المجلدات وحزمة Cargo workspace وملف rust-toolchain.toml وعينة الاختبار fixtures/sample.bin. تم توثيق غياب Rust و MSVC كعوائق لخطوات البناء القادمة."
+  "next_task": "Builder responds to debouncer objections (D-001, D-002, D-003); then final_reviewer and security_reviewer reports; then gate BOOT-003 can run once working tree is committed and all 6 role reports exist.",
+  "notes": "BOOT-002 complete: Git repo initialized, baseline commit cb6d17d, Cargo workspace with 8 crates, fixtures created. Rust available at ~/.cargo/bin; MSVC VCTools missing (elevation blocked). BOOT-003 builder report created (status=passed, check-report exit 0). BOOT-003 debouncer report created (status=failed, check-report exit 0) — one blocking finding D-001 (snapshot_clean=true falsely claimed; working tree dirty with M STATUS.json). Two non-blocking findings: D-002 (identity_verified=true self-attested via env-var string comparison), D-003 (git-status exit_code 0 does not signal tree cleanliness). Debouncer model: openrouter/poolside/laguna-s-2.1:free (challenger lane), identity_verified=false. Gate BOOT-003 cannot pass until STATUS.json is committed and all 6 required role reports (planner, builder, runtime_tester, debater, final_reviewer, security_reviewer) are in place. WARNING: modifying STATUS.json invalidates builder evidence hash for STATUS.json (was 5ee81c2c176887a1079649680eb69a5f6eb14418604f426d32de5b44fccc06b)."
 }
