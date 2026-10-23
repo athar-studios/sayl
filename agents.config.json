@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "project": "sayl-downloader",
+  "contract": "sayl-file-workflow-v1",
+  "execution": {
+    "mode": "file_handoff",
+    "automatic_llm_calls": false,
+    "parallel_agents": 1,
+    "adapter_required_before_automation": true,
+    "environment_autoload": false
+  },
+  "models": {
+    "primary": {
+      "identity_env": "SAYL_PRIMARY_MODEL",
+      "provider_env": "SAYL_PRIMARY_PROVIDER"
+    },
+    "challenger": {
+      "identity_env": "SAYL_CHALLENGER_MODEL",
+      "provider_env": "SAYL_CHALLENGER_PROVIDER"
+    }
+  },
+  "independence": {
+    "different_primary_and_challenger_model_ids": true,
+    "fresh_reviewer_context": true,
+    "builder_cannot_approve_own_work": true,
+    "unavailable_second_model": "block"
+  },
+  "paths": {
+    "plan": "docs/MASTER-PLAN.md",
+    "debate": "docs/DEBATER-SYSTEM.md",
+    "reports": "reports",
+    "artifacts": "artifacts",
+    "tasks": "docs/tasks",
+    "status": "STATUS.json"
+  },
+  "budget": {
+    "currency": "USD",
+    "monthly_planning_ceiling": 20,
+    "reserved_amount": 8,
+    "max_task_estimate": 0.5,
+    "max_debate_rounds": 2,
+    "max_fix_attempts": 3,
+    "unknown_price_action": "ask_owner_before_paid_calls",
+    "enforced_by_this_tool": false,
+    "provider_spend_limits_required": true
+  },
+  "permissions": {
+    "local_changes": "within_task_scope_only",
+    "local_commits": "if_environment_authorized",
+    "remote_push": false,
+    "public_publish": false,
+    "purchase": false,
+    "install_remote_skills": false,
+    "new_external_model_or_scanner": "requires_owner_approval",
+    "security_targets": "owned_local_or_explicitly_authorized_staging_only"
+  },
+  "roles": {
+    "planner": {
+      "model": "primary",
+      "permissions": "read_only_plus_own_report",
+      "prompt": "prompts/roles/planner.md",
+      "report": "reports/{task_id}/planner.json"
+    },
+    "builder": {
+      "model": "primary",
+      "permissions": "task_scoped_write",
+      "prompt": "prompts/roles/builder.md",
+      "report": "reports/{task_id}/builder.json"
+    },
+    "runtime_tester": {
+      "model": "primary",
+      "permissions": "execute_authorized_tests_plus_own_report",
+      "prompt": "prompts/roles/runtime_tester.md",
+      "report": "reports/{task_id}/runtime_tester.json"
+    },
+    "debater": {
+      "model": "challenger",
+      "permissions": "read_only_plus_own_report",
+      "prompt": "prompts/roles/debater.md",
+      "report": "reports/{task_id}/debater.json"
+    },
+    "final_reviewer": {
+      "model": "challenger",
+      "permissions": "read_only_plus_own_report",
+      "prompt": "prompts/roles/final_reviewer.md",
+      "report": "reports/{task_id}/final_reviewer.json"
+    },
+    "security_reviewer": {
+      "model": "challenger",
+      "permissions": "authorized_security_tests_plus_own_report",
+      "prompt": "prompts/roles/security_reviewer.md",
+      "report": "reports/{task_id}/security_reviewer.json"
+    },
+    "release_engineer": {
+      "model": "primary",
+      "permissions": "build_and_test_local_artifacts_plus_own_report",
+      "prompt": "prompts/roles/release_engineer.md",
+      "report": "reports/{task_id}/release_engineer.json"
+    }
+  },
+  "pipeline": [
+    "planner",
+    "builder",
+    "runtime_tester",
+    "debater",
+    "final_reviewer",
+    "security_reviewer",
+    "release_engineer"
+  ],
+  "required_task_reports": [
+    "planner",
+    "builder",
+    "runtime_tester",
+    "debater",
+    "final_reviewer",
+    "security_reviewer"
+  ],
+  "required_release_reports": [
+    "planner",
+    "builder",
+    "runtime_tester",
+    "debater",
+    "final_reviewer",
+    "security_reviewer",
+    "release_engineer"
+  ],
+  "gate": {
+    "same_commit_and_tree": true,
+    "clean_snapshot": true,
+    "acceptance_revision_required": true,
+    "require_human_deployment_approval": true,
+    "no_open_blocking_findings": true,
+    "security_not_applicable_requires_surface_justification": true
+  },
+  "strix": {
+    "enabled": true,
+    "official_repository": "https://github.com/usestrix/strix",
+    "pin_required": true,
+    "installation_approval_required": true,
+    "command_argv": null,
+    "skills_discovery": "verify names and invocation against pinned official docs; never invent flags",
+    "required_when": [
+      "attack_surface_changed",
+      "milestone",
+      "release"
+    ],
+    "missing_tool_for_required_scan": "block",
+    "cloud_mode_default": false
+  },
+  "evidence": {
+    "must_exist_locally": true,
+    "hash_algorithm": "sha256",
+    "no_secrets": true,
+    "agent_assertions_not_execution_proof": true
+  }
+}

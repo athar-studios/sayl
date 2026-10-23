@@ -1,0 +1,12 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/storage",
+    "crates/http",
+    "crates/app",
+    "crates/cli",
+    "crates/media",
+    "crates/torrent",
+    "crates/plugin-host",
+]

@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "project": "sayl-downloader",
+  "milestone": "M0",
+  "current_task": "BOOT-002",
+  "state": "review",
+  "last_verified_commit": null,
+  "checks": [
+    {
+      "command": "python tools/workflow.py validate",
+      "exit_code": 0,
+      "log": "artifacts/BOOT-002/03-validate.out.txt",
+      "ran_at": "2026-10-23T16:40:00Z"
+    },
+    {
+      "command": "$env:SAYL_PRIMARY_PROVIDER='p21566ec00365e463'; $env:SAYL_PRIMARY_MODEL='ag/gemini-3.8-flash-high'; $env:SAYL_CHALLENGER_PROVIDER='p21566ec00365e463'; $env:SAYL_CHALLENGER_MODEL='cmc/deepseek/deepseek-v4.1-flash'; python tools/workflow.py preflight",
+      "exit_code": 0,
+      "log": "artifacts/BOOT-002/04-preflight.out.txt",
+      "ran_at": "2026-10-23T16:40:10Z"
+    },
+    {
+      "command": "$env:PYTHONIOENCODING='utf-8'; python tools/workflow.py packet BOOT-002 builder",
+      "exit_code": 0,
+      "log": "artifacts/BOOT-002/05-packet.out.json",
+      "ran_at": "2026-10-23T16:40:20Z"
+    },
+    {
+      "command": "python tools/workflow.py check-report reports/BOOT-002/builder.json",
+      "exit_code": 0,
+      "log": "artifacts/BOOT-002/06-check-report.out.txt",
+      "ran_at": "2026-10-23T16:40:30Z"
+    }
+  ],
+  "blockers": [
+    "أدوات تطوير Rust (rustc, cargo, rustup) غير متوفرة على PATH.",
+    "أدوات بناء C++ (MSVC cl.exe, vswhere) غير متوفرة على PATH."
+  ],
+  "next_task": "BOOT-003",
+  "notes": "تم إنشاء مستودع Git محلي وتأسيس commit الـ baseline النظيف، وإعداد هيكل المجلدات وحزمة Cargo workspace وملف rust-toolchain.toml وعينة الاختبار fixtures/sample.bin. تم توثيق غياب Rust و MSVC كعوائق لخطوات البناء القادمة."
+}
