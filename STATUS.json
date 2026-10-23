@@ -3,8 +3,8 @@
   "project": "sayl-downloader",
   "milestone": "M0",
   "current_task": "CORE-001",
-  "state": "todo",
-  "last_verified_commit": "38be0fe1e42ac086a4b97caee633d87e54ccea95",
+  "state": "in_progress",
+  "last_verified_commit": "2bb1410fcb7b6c828e830813b2ce27ef0d5ef0d2",
   "checks": [
     {
       "command": "python tools/workflow.py validate",
@@ -191,11 +191,77 @@
       "exit_code": 0,
       "log": "artifacts/BOOT-003/gate.out.txt",
       "ran_at": "2026-10-23T23:35:00Z"
+    },
+    {
+      "command": "python tools/workflow.py packet CORE-001 planner",
+      "exit_code": 0,
+      "log": "artifacts/CORE-001/01-packet.out.json",
+      "ran_at": "2026-10-24T00:05:00Z"
+    },
+    {
+      "command": "python tools/workflow.py check-report reports/CORE-001/planner.json",
+      "exit_code": 0,
+      "log": "artifacts/CORE-001/planner-check.out.txt",
+      "ran_at": "2026-10-24T00:10:00Z"
+    },
+    {
+      "command": "python tools/workflow.py validate",
+      "exit_code": 0,
+      "log": "artifacts/CORE-001/02-validate.out.txt",
+      "ran_at": "2026-10-24T00:11:00Z"
+    },
+    {
+      "command": "python tools/workflow.py preflight (with SAYL_PRIMARY/CHALLENGER env vars)",
+      "exit_code": 0,
+      "log": "artifacts/CORE-001/03-preflight.out.txt",
+      "ran_at": "2026-10-24T00:12:00Z"
+    },
+    {
+      "command": "cargo check -p sayl-core",
+      "exit_code": 0,
+      "log": "artifacts/CORE-001/builder-cargo-check.err.txt",
+      "ran_at": "2026-10-24T00:30:00Z"
+    },
+    {
+      "command": "cargo check --tests -p sayl-core",
+      "exit_code": 0,
+      "log": "artifacts/CORE-001/builder-cargo-check-tests.err.txt",
+      "ran_at": "2026-10-24T00:30:10Z"
+    },
+    {
+      "command": "cargo test --no-run -p sayl-core",
+      "exit_code": 101,
+      "log": "artifacts/CORE-001/builder-cargo-test.err.txt",
+      "ran_at": "2026-10-24T00:30:20Z"
+    },
+    {
+      "command": "python tools/workflow.py validate",
+      "exit_code": 0,
+      "log": "artifacts/CORE-001/builder-validate.out.txt",
+      "ran_at": "2026-10-24T00:30:30Z"
+    },
+    {
+      "command": "python tools/workflow.py preflight (with SAYL_PRIMARY/CHALLENGER env vars)",
+      "exit_code": 0,
+      "log": "artifacts/CORE-001/builder-preflight.out.txt",
+      "ran_at": "2026-10-24T00:30:35Z"
+    },
+    {
+      "command": "python tools/workflow.py packet CORE-001 builder",
+      "exit_code": 0,
+      "log": "artifacts/CORE-001/builder-packet.out.json",
+      "ran_at": "2026-10-24T00:30:40Z"
+    },
+    {
+      "command": "python tools/workflow.py check-report reports/CORE-001/builder.json",
+      "exit_code": 0,
+      "log": "artifacts/CORE-001/builder-check-report.out.txt",
+      "ran_at": "2026-10-24T00:35:00Z"
     }
   ],
   "blockers": [
-    "MSVC VCTools workload not installed (requires elevated VS installer; UAC consent not automatable in this session). Rust toolchain installed at ~/.cargo/bin (cargo 1.99.1, rustc 1.99.1) but not on system PATH. GNU toolchain installed but rustc crashes (0xC0E90002)."
+    "MSVC VCTools workload not installed (requires elevated VS installer; UAC consent not automatable in this session). Rust toolchain installed at ~/.cargo/bin (cargo 1.99.1, rustc 1.99.1) but not on system PATH. cargo check -p sayl-core and cargo check --tests -p sayl-core pass (exit code 0); cargo test --no-run -p sayl-core fails with link.exe not found."
   ],
-  "next_task": "CORE-001",
-  "notes": "BOOT-002 complete: Git repo initialized, baseline commit cb6d17d, Cargo workspace with 8 crates, fixtures created. Rust available at ~/.cargo/bin; MSVC VCTools missing (elevation blocked). BOOT-003 COMPLETE: gate BOOT-003 passed with all 6 role reports (planner, builder, runtime_tester, debater, final_reviewer, security_reviewer) at status=passed, same source snapshot (HEAD=38be0fe, tree=ea685c9f). All D-findings resolved. Milestone M0 complete. Proceeding to CORE-001 (states/errors/events/idempotence) pending MSVC toolchain resolution for Rust compilation."
+  "next_task": "CORE-001 runtime_tester and debater review — builder implementation complete; cargo test deferred until MSVC link.exe available",
+  "notes": "BOOT-003 COMPLETE: gate passed with all 6 role reports. Milestone M0 complete. CORE-001 planner report created (status=blocked). CORE-001 builder implementation completed (state.rs, error.rs, event.rs, idempotency.rs, id.rs, lib.rs, integration tests, README.md). All type checking passes cleanly via cargo check and cargo check --tests (exit 0). Builder report reports/CORE-001/builder.json created (status=blocked due to MSVC linker for acceptance criterion #45)."
 }

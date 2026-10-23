@@ -213,3 +213,59 @@
 ---
 
 **ملاحظة:** تم الانتقال إلى `current_task: CORE-001` في `STATUS.json` مع `state: todo`. Milestone M0 (Bootstrap) مكتمل.
+
+---
+
+# وثيقة التسليم (Handoff) — إنجاز دور البناء (Builder) لمهمة CORE-001
+
+## 1. ما تم إنجازه في CORE-001 (دور Builder)
+- **تنفيذ آلة الحالات (`crates/core/src/state.rs`):**
+  - بناء تعداد `DownloadState` بكافة الحالات الـ 11: `Queued`, `Probing`, `Downloading`, `Verifying`, `Finalizing`, `Completed`, `Pausing`, `Paused`, `Cancelling`, `Cancelled`, `Failed`.
+  - تنفيذ دالة الانتقال الصريحة `transition(from, to) -> Result<DownloadState, StateTransitionError>`.
+  - إضافة الفحوصات الدلالية `is_terminal()`, `is_active()`, `can_pause()`, `can_resume()`, `can_cancel()`.
+  - كتابة اختبارات property-based لجميع الـ 121 انتقال الممكنة، والتحقق من عدم وجود انتقالات ذاتية أو انتقالات خارج الحالات النهائية.
+- **نظام الأخطاء (`crates/core/src/error.rs`):**
+  - بناء تعداد `CoreError` مغطياً الفئات السبع: `Http`, `Io`, `Storage`, `Scheduler`, `Validation`, `Cancelled`, `Internal`.
+  - تطبيق `std::error::Error`, `Display`, وتحويلات `From` من `std::io::Error`, `StateTransitionError`, `String`, `&str`.
+  - تنفيذ دوال التصنيف `is_retryable()`, `is_fatal()`, `is_user_cancelled()`.
+- **نظام الأحداث الناقلة (`crates/core/src/event.rs`):**
+  - بناء نوع `Event` يحمل رقم تسلسلي تصاعدي `id: u64`، ومعرف المهمة `task_id: TaskId`، وصنف الحدث `kind: EventKind` (8 أصناف)، وطابع زمني `timestamp: DateTime<Utc>`، وحمولة البيانات `payload: EventPayload`.
+  - توفير قناة `mpsc` محددة السعة غير محظورة عبر `event_channel` و `EventSender` و `EventReceiver`.
+  - توفير كاشف فجوات التسلسل `SequenceGapDetector` لاكتشاف الأحداث المفقودة بعد إعادة التشغيل.
+- **مفاتيح منع التكرار (`crates/core/src/idempotency.rs`):**
+  - بناء `IdempotencyKey` كغلاف لـ `Uuid`.
+  - مخزن في الذاكرة `IdempotencyStore` آمن للخيوط مع مدة صلاحية TTL (افتراضي 24 ساعة)، وطرق `get`, `insert`, و `cleanup`.
+- **معرفات المهام (`crates/core/src/id.rs`):**
+  - بناء نوع `TaskId` كغلاف حول `Uuid v7` المرتب زمنياً، مع تطبيقي `Display` و `FromStr`.
+- **هيكل الحزمة والتوثيق (`crates/core/src/lib.rs` و `README.md`):**
+  - تصدير واجهة برمجية متماسكة ونظيفة على جذر الحزمة `sayl_core`.
+  - توثيق شامل لكل نوع ودالة عامة بـ `///` doc comments.
+  - إعداد دليل `crates/core/README.md` يوضح المفاهيم المعمارية وأمثلة الاستخدام.
+- **اختبارات التكامل:**
+  - كتابة `crates/core/tests/core_state_machine.rs` و `tests/core_state_machine.rs`.
+  - كتابة `crates/core/tests/core_idempotency.rs` و `tests/core_idempotency.rs`.
+- **التحقق البرمجي وسير العمل:**
+  - `cargo check -p sayl-core` خرج 0 (نجاح كامل).
+  - `cargo check --tests -p sayl-core` خرج 0 (فحص نوعي واكتمال تركيبي للاختبارات).
+  - `python tools/workflow.py validate` خرج 0.
+  - `python tools/workflow.py preflight` مع متغيرات البيئة خرج 0.
+  - `python tools/workflow.py check-report reports/CORE-001/builder.json` خرج 0 (status: blocked).
+
+## 2. أوامر التحقق المنفذة ونتائجها
+| الأمر | النتيجة | Exit code | السجل |
+|---|---|---|---|
+| `cargo check -p sayl-core` | نجاح فحص الأنواع بدون تحذيرات | 0 | `artifacts/CORE-001/builder-cargo-check.err.txt` |
+| `cargo check --tests -p sayl-core` | فحص وحدات واختبارات التكامل | 0 | `artifacts/CORE-001/builder-cargo-check-tests.err.txt` |
+| `cargo test --no-run -p sayl-core` | فشل الرابط MSVC (link.exe not found) | 101 | `artifacts/CORE-001/builder-cargo-test.err.txt` |
+| `python tools/workflow.py validate` | `ok: true` | 0 | `artifacts/CORE-001/builder-validate.out.txt` |
+| `python tools/workflow.py preflight` | `ok: true, routes_configured: true` | 0 | `artifacts/CORE-001/builder-preflight.out.txt` |
+| `python tools/workflow.py packet CORE-001 builder` | `ok: true` | 0 | `artifacts/CORE-001/builder-packet.out.json` |
+| `python tools/workflow.py check-report reports/CORE-001/builder.json` | `ok: true, status: blocked` | 0 | `artifacts/CORE-001/builder-check-report.out.txt` |
+
+## 3. العوائق الحالية (Blockers)
+1. **غياب رابط MSVC `link.exe`:** يحجب تجميع الاختبارات التنفيذية لمعيار القبول #45 (`cargo test -p sayl-core`). الفحص النوعي عبر `cargo check` و `cargo check --tests` يمر بنجاح.
+2. **سياسة التحكم في التطبيقات (WDAC/SmartAppControl):** تمنع تشغيل الثنائيات المولدة حديثاً، مما يتطلب رابطاً موقعاً أو بيئة مطورين رسمية.
+
+## 4. الخطوة التالية المؤهلة
+- **CORE-001 runtime_tester:** تشغيل اختبارات التحقق من سير العمل وكتابة تقرير التشغيل.
+- **CORE-001 debater:** المراجعة النقدية المستقلة للأدلة والأنواع.
