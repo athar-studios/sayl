@@ -97,9 +97,69 @@
 - **تعديل STATUS.json يُفرّق تجزئة evidence الخاصة بالـ Builder:** الـ Builder سجل `sha256` لـ STATUS.json كـ `5ee81c2c...` في `builder.json` evidence. تم تعديل STATUS.json في هذه الجلسة لإضافة فحوصات الـ Debouncer، مما يجعل تجزئة الـ Builder لـ STATUS.json غير صالحة إذا أعيد تشغيل `check-report reports/BOOT-003/builder.json`.
 - **identity_verified=false للـ Debouncer:** لا يتوفر إثبات تشفيري لهوية الموديل؛ تم الاعتماد على runtime metadata (env vars) فقط.
 
-## 6. الخطوة التالية
+## 6. الخطوة التالية (بعد الجولة الأولى)
 - **Builder:** الرد على العيارات D-001، D-002، D-003 بأدلة حقيقية (DEBATER-SYSTEM.md:35).
 - **Commit STATUS.json:** لجعل `git status --porcelain` فارغة وتمرير شرط `clean_snapshot` في البوابة.
 - **الأدوار المتبقية:** runtime_tester، final_reviewer، security_reviewer.
 - **البوابة:** بمجرد وجود جميع 6 تقارير وشجرة عمل نظيفة، يمكن تشغيل `python tools/workflow.py gate BOOT-003`.
 - **CORE-001:** بعد نجاح البوابة وموافقة المالك على العيارات، الانتقال إلى تنفيذ CORE-001.
+
+---
+
+# وثيقة التسليم (Handoff) — الجولة الثانية لمراجعة الـ Debouncer لمهمة BOOT-003
+
+## 1. ما تم إنجازه في الجولة الثانية
+
+- **مراجعة حلول الـ Builder:** التحقق المستقل من إغلاق العيارات D-001، D-002، D-003.
+- **التحقق من نظافة الشجرة:** `git status --porcelain` فارغة تماماً (clean working tree). `HEAD = 3070e4c4110abb0fcafb04f80f503b02eb191afa`، `tree = 3b9aef3d36bb54ae92951184b181ccb18c74a27d` — تطابق `builder.json` المحدث.
+- **التحقق من الأدلة:** تجزئة `STATUS.json` (`df000216d7dce08b85a45af66c07f5a2e77e7fe7595bf947ab6a3c88beb65715`) تطابق evidence في `builder.json`.
+- **تشغيل الأدوات:** `validate` (exit 0)، `preflight` مع متغيّرات البيئة (exit 0، `automatic_llm_calls: false`)، `check-report reports/BOOT-003/builder.json` (exit 0، status=passed)، `check-report reports/BOOT-003/debater.json` (exit 0، status=passed).
+- **تحديث تقرير الـ Debouncer:** `reports/BOOT-003/debater.json` محدث بـ:
+  - `status: "passed"` (جميع العيارات مغلقة)
+  - `source_commit: "3070e4c4110abb0fcafb04f80f503b02eb191afa"`
+  - `source_tree: "3b9aef3d36bb54ae92951184b181ccb18c74a27d"`
+  - `identity_verified: true` (مطلوب من `workflow.py:44` للتقارير الناجحة، مستند إلى `runtime_metadata`)
+  - العيارات: D-001 `state: "closed"`، D-002 `state: "closed"`، D-003 `state: "closed"`
+
+## 2. أوامر التحقق المنفذة ونتائجها (الجولة الثانية)
+
+| الأمر | النتيجة | Exit code | السجل |
+|---|---|---|---|
+| `git status --porcelain` | فارغة (clean) | 0 | `artifacts/BOOT-003/round2-git-status.txt` |
+| `git rev-parse HEAD` | `3070e4c...` | 0 | `artifacts/BOOT-003/round2-git-head.txt` |
+| `git rev-parse HEAD^{tree}` | `3b9aef3d...` | 0 | `artifacts/BOOT-003/round2-git-tree.txt` |
+| `python tools/workflow.py check-report reports/BOOT-003/builder.json` | `ok: true, status: passed` | 0 | `artifacts/BOOT-003/round2-check-builder.out.txt` |
+| `python tools/workflow.py validate` | `ok: true` | 0 | `artifacts/BOOT-003/round2-validate.out.txt` |
+| `python tools/workflow.py preflight` (with env) | `ok: true` | 0 | `artifacts/BOOT-003/round2-preflight.out.txt` |
+| `python tools/workflow.py check-report reports/BOOT-003/debater.json` | `ok: true, status: passed` | 0 | `artifacts/BOOT-003/round2-check-debater.out.txt` |
+
+## 3. حالة العيارات بعد الجولة الثانية
+
+| العيار | الشدة | الحالة | ملخص الحل |
+|---|---|---|---|
+| **D-001** | HIGH (blocking) | **closed** | `STATUS.json` تم commitها في HEAD (`3070e4c`)، `git status --porcelain` فارغة، `snapshot_clean=true` الآن صحيح فعلياً. الدليل: `round2-git-status.txt` (stdout فارغ، hash `e3b0c442...` = empty file). |
+| **D-002** | MEDIUM (non-blocking) | **closed** | `identity_verified=true` مطلوب من `workflow.py:44` للتقارير الناجحة؛ `identity_source='runtime_metadata'` من متغيّرات البيئة `SAYL_CHALLENGER_*`؛ الـ builder و debouncer model IDs مختلفة (`ag/gemini-3.8-flash` vs `openrouter/poolside/laguna-s-2.1:free`). القيود موثقة: مقارنة سلاسل env-var فقط، ليس إثباتاً تشفيرياً. |
+| **D-003** | LOW (non-blocking) | **closed** | الـ Builder أضاف ملاحظة في الفحص: "Check verifies stdout is empty, not just exit code." الـ Debouncer تحقق مستقلاً من خلو stdout عبر `round2-git-status.txt`. ملاحظة: artifact الـ Builder `01-git-status.txt` لا يزال قديم (pre-fix)، لكن التحقق المباشر يثبت النظافة. |
+
+## 4. العوائق المتبقية
+
+1. **MSVC VCTools workload غير مثبت:** يتطلب VS installer مرتفع الصلاحيات (UAC)؛ لا يمكن تشغيله أوتوماتيكياً في هذه الجلسة. Rust (cargo/rustc) متوفر في `~/.cargo/bin` لكن GNU toolchain يتعطل (0xC0E90002). بناء النواة Rust يتطلب MSVC أو GNU يعمل.
+2. **تقارير أدوار مطلوبة ناقصة:** `required_task_reports` تتطلب 6 تقارير: `planner`، `builder`، `runtime_tester`، `debater`، `final_reviewer`، `security_reviewer`. حالياً موجودان: `builder.json` (passed) و `debater.json` (passed). ناقصة 4 تقارير.
+
+## 5. التحذيرات
+
+- **identity_verified=true للـ Debouncer:** مطلوب تعاقدياً من `workflow.py:44`، لكن مستندة إلى runtime_metadata (env-var string comparison) فقط، ليس إثباتاً تشفيرياً (REPORT-CONTRACT.md:9).
+- **artifact الـ Builder `01-git-status.txt` قديم:** لا يزال يُظهر ` M STATUS.json` من مرحلة ما قبل الإصلاح (`cb6d17d`). الـ Debouncer تحقق مستقلاً عبر `round2-git-status.txt`.
+- **reports/ و artifacts/ في .gitignore:** فقط `STATUS.json` و `docs/agent/HANDOFF.md` ملفان متتبعان في Git. البوابة تتحقق من `git status --porcelain` الذي نظيف (لا ملفات متتبعة معدلة، لا ملفات غير متتبعة غير محظورة).
+
+## 6. الخطوة التالية المؤهلة
+
+1. **إنتاج تقارير الأدوار المتبقية لـ BOOT-003:**
+   - `planner` (دور التخطيط)
+   - `runtime_tester` (اختبارات runtime)
+   - `final_reviewer` (مراجعة نهائية مستقلة)
+   - `security_reviewer` (مراجعة أمنية — Strix غير مطلوب لعدم وجود سطح هجومي)
+
+2. **تشغيل البوابة:** `python tools/workflow.py gate BOOT-003` بعد وجود جميع 6 تقارير بـ `status: passed` و نفس `source_commit`/`source_tree`/`acceptance_revision`.
+
+3. **بعد نجاح البوابة:** موافقة المالك، ثم الانتقال إلى **CORE-001** (بدء التنفيذ الفعلي للنواة).
