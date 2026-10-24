@@ -1,18 +1,13 @@
 <script>
   import { t, setLanguage } from "./i18n.js";
   import { safeInvoke } from "./tauri.js";
+  import { DEFAULT_SETTINGS, normalizeSettings } from "./settings.js";
   import { createEventDispatcher } from "svelte";
 
   export let open = false;
-  export let settings = {
-    download_dir: "",
-    max_concurrent_tasks: 3,
-    max_connections_per_task: 4,
-    theme: "system",
-    language: "ar",
-  };
+  export let settings = { ...DEFAULT_SETTINGS };
 
-  let localSettings = { ...settings };
+  let localSettings = normalizeSettings(settings);
   let saving = false;
   let saveSuccess = false;
   let saveError = null;
@@ -20,7 +15,7 @@
   const dispatch = createEventDispatcher();
 
   $: if (open) {
-    localSettings = { ...settings };
+    localSettings = normalizeSettings(settings);
     saveSuccess = false;
     saveError = null;
   }
@@ -52,7 +47,8 @@
     saveError = null;
     saveSuccess = false;
     try {
-      const updated = await safeInvoke("set_settings", { settings: localSettings });
+      const payload = normalizeSettings(localSettings);
+      const updated = await safeInvoke("set_settings", { settings: payload });
       settings = { ...updated };
       if (updated.language) {
         setLanguage(updated.language);
@@ -167,6 +163,32 @@
               <option value="en">English (الإنجليزية)</option>
             </select>
           </div>
+        </div>
+
+        <div class="form-group">
+          <label for="view-mode-select" class="form-label">{$t("settings.viewMode")}</label>
+          <select id="view-mode-select" class="form-control" bind:value={localSettings.view_mode}>
+            <option value="cards">{$t("settings.viewCards")}</option>
+            <option value="table">{$t("settings.viewTable")}</option>
+          </select>
+        </div>
+
+        <!-- Toggles Section (Sleep Prevention & Download Window) -->
+        <div class="toggles-section">
+          <label class="setting-toggle">
+            <input type="checkbox" class="toggle-checkbox" bind:checked={localSettings.prevent_sleep} />
+            <span class="toggle-label">{$t("settings.preventSleep")}</span>
+          </label>
+
+          <label class="setting-toggle">
+            <input type="checkbox" class="toggle-checkbox" bind:checked={localSettings.show_download_window} />
+            <span class="toggle-label">{$t("settings.showDownloadWindow")}</span>
+          </label>
+
+          <label class="setting-toggle">
+            <input type="checkbox" class="toggle-checkbox" bind:checked={localSettings.close_download_window_on_finish} />
+            <span class="toggle-label">{$t("settings.closeDownloadWindowOnFinish")}</span>
+          </label>
         </div>
 
         <!-- Keyboard Shortcuts Section (Item 8) -->
@@ -467,5 +489,36 @@
 
   .btn-primary:active {
     transform: scale(0.98);
+  }
+
+  .toggles-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    padding: 0.85rem 1rem;
+    background-color: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+
+  .setting-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.875rem;
+    color: var(--color-text);
+  }
+
+  .setting-toggle .toggle-checkbox {
+    width: 1.1rem;
+    height: 1.1rem;
+    cursor: pointer;
+    accent-color: var(--color-accent);
+  }
+
+  .setting-toggle .toggle-label {
+    font-weight: 500;
   }
 </style>

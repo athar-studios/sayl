@@ -9,6 +9,7 @@
     canResume,
     canCancel,
   } from "./format.js";
+  import { classifyFile } from "./classify.js";
   import StatusPill from "./StatusPill.svelte";
   import { createEventDispatcher } from "svelte";
 
@@ -19,26 +20,6 @@
 
   let confirmingCancel = false;
   let confirmTimeout = null;
-
-  function getFileCategory(filename) {
-    if (!filename) return "generic";
-    const dot = filename.lastIndexOf(".");
-    if (dot === -1) return "generic";
-    const ext = filename.slice(dot + 1).toLowerCase();
-
-    const videoExts = ["mp4", "mkv", "avi", "mov", "webm", "flv", "wmv", "m4v"];
-    const audioExts = ["mp3", "wav", "flac", "aac", "ogg", "m4a", "wma", "opus"];
-    const archiveExts = ["zip", "rar", "7z", "tar", "gz", "bz2", "xz", "iso", "dmg"];
-    const imageExts = ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "tiff"];
-    const docExts = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "md", "csv", "rtf"];
-
-    if (videoExts.includes(ext)) return "video";
-    if (audioExts.includes(ext)) return "audio";
-    if (archiveExts.includes(ext)) return "archive";
-    if (imageExts.includes(ext)) return "image";
-    if (docExts.includes(ext)) return "document";
-    return "generic";
-  }
 
   function handleCancelClick() {
     if (confirmingCancel) {
@@ -53,7 +34,7 @@
     }
   }
 
-  $: fileCategory = getFileCategory(task.filename);
+  $: fileCategory = classifyFile(task.filename, task.mime);
   $: writtenFormatted = formatBytes(task.written, $currentLang);
   $: totalFormatted = task.total_size ? formatBytes(task.total_size, $currentLang) : $t("task.unknownSize");
   $: speedFormatted = formatSpeed(task.speed_bps, $currentLang);
@@ -97,21 +78,21 @@
             <circle cx="6" cy="18" r="3" fill="currentColor" />
             <circle cx="18" cy="16" r="3" fill="currentColor" />
           </svg>
-        {:else if fileCategory === 'archive'}
+        {:else if fileCategory === 'archive' || fileCategory === 'compressed'}
           <!-- Archive Icon -->
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
             <path d="M4 4h16v4H4z" />
             <path d="M4 8v12a2 2 0 002 2h12a2 2 0 002-2V8" />
             <path d="M10 12h4m-2-2v4" />
           </svg>
-        {:else if fileCategory === 'image'}
-          <!-- Image Icon -->
+        {:else if fileCategory === 'programs'}
+          <!-- Program Icon -->
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
             <rect x="3" y="3" width="18" height="18" rx="2" />
-            <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" />
-            <polyline points="21 15 16 10 5 21" />
+            <path d="M3 9h18" />
+            <path d="M9 21V9" />
           </svg>
-        {:else if fileCategory === 'document'}
+        {:else if fileCategory === 'document' || fileCategory === 'documents'}
           <!-- Document Icon -->
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
             <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />

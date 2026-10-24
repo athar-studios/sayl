@@ -5,6 +5,9 @@
   import logoWhite from "../assets/logo-white.svg";
 
   export let theme = "system";
+  export let autoShutdown = false;
+
+  let menuOpen = false;
 
   const appVersion = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.1.0";
 
@@ -17,7 +20,30 @@
     else next = "system";
     dispatch("theme", next);
   }
+
+  function toggleMenu() {
+    menuOpen = !menuOpen;
+  }
+
+  function handleShutdownChange(e) {
+    const val = e.target.checked;
+    dispatch("toggleAutoShutdown", val);
+  }
+
+  function handleWindowKeydown(e) {
+    if (e.key === "Escape" && menuOpen) {
+      menuOpen = false;
+    }
+  }
+
+  function handleWindowClick(e) {
+    if (menuOpen && !e.target.closest(".menu-container")) {
+      menuOpen = false;
+    }
+  }
 </script>
+
+<svelte:window on:keydown={handleWindowKeydown} on:click={handleWindowClick} />
 
 <header class="app-toolbar">
   <div class="toolbar-start">
@@ -121,6 +147,39 @@
         <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
       </svg>
     </button>
+
+    <!-- Main Menu Dropdown (⋮) -->
+    <div class="menu-container">
+      <button
+        class="icon-button menu-btn"
+        class:active={menuOpen}
+        title={$t("toolbar.menu")}
+        aria-label={$t("toolbar.menu")}
+        aria-expanded={menuOpen}
+        aria-haspopup="true"
+        on:click|stopPropagation={toggleMenu}
+      >
+        <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18" aria-hidden="true">
+          <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+        </svg>
+      </button>
+
+      {#if menuOpen}
+        <div class="dropdown-menu" role="menu" on:click|stopPropagation>
+          <div class="menu-item-row">
+            <label class="menu-toggle-label">
+              <input
+                type="checkbox"
+                class="menu-checkbox"
+                checked={autoShutdown}
+                on:change={handleShutdownChange}
+              />
+              <span class="menu-toggle-text">{$t("shutdown.toggle")}</span>
+            </label>
+          </div>
+        </div>
+      {/if}
+    </div>
   </div>
 </header>
 
@@ -304,5 +363,72 @@
 
   .lang-toggle-btn:hover {
     background-color: var(--color-bg-alt);
+  }
+
+  .menu-container {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .menu-btn.active {
+    background-color: var(--color-bg-alt);
+    color: var(--color-text);
+  }
+
+  .dropdown-menu {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    inset-inline-end: 0;
+    min-width: 260px;
+    background-color: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    padding: 0.65rem 0.85rem;
+    z-index: 200;
+    animation: menu-in 150ms ease;
+  }
+
+  .menu-item-row {
+    display: flex;
+    align-items: center;
+  }
+
+  .menu-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.825rem;
+    font-weight: 500;
+    color: var(--color-text);
+    line-height: 1.4;
+  }
+
+  .menu-checkbox {
+    width: 1.1rem;
+    height: 1.1rem;
+    cursor: pointer;
+    accent-color: var(--color-accent);
+    flex-shrink: 0;
+  }
+
+  @keyframes menu-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dropdown-menu {
+      animation: none !important;
+    }
   }
 </style>

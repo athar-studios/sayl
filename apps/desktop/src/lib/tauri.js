@@ -1,4 +1,5 @@
 import { writable } from "svelte/store";
+import { DEFAULT_SETTINGS, normalizeSettings } from "./settings.js";
 
 export const toasts = writable([]);
 
@@ -63,6 +64,8 @@ const mockTasks = [
     speed_bps: 14500000,
     eta_secs: 200,
     error: null,
+    mime: "application/x-iso9660-image",
+    parts: 8,
   },
   {
     id: "01900000-0000-7000-8000-000000000002",
@@ -74,28 +77,70 @@ const mockTasks = [
     speed_bps: 0,
     eta_secs: null,
     error: null,
+    mime: "application/zip",
+    parts: 4,
   },
 ];
+
+let mockSettings = {
+  ...DEFAULT_SETTINGS,
+  download_dir: "C:\\Users\\User\\Downloads",
+};
+
+let mockShutdownStatus = {
+  armed: false,
+  seconds_left: null,
+  blocked_reason: null,
+};
+
+function normalizeUrl(url) {
+  if (!url) return "";
+  let clean = url.trim();
+  while (clean.endsWith("/")) {
+    clean = clean.slice(0, -1);
+  }
+  return clean.toLowerCase();
+}
 
 function handleBrowserMock(command, args) {
   switch (command) {
     case "list_tasks":
       return [...mockTasks];
+
     case "add_task": {
+      const cleanUrl = (args.url || "").trim();
+      if (!cleanUrl) {
+        throw new Error("URL cannot be empty");
+      }
+
+      if (args.force !== true) {
+        const norm = normalizeUrl(cleanUrl);
+        const existing = mockTasks.find(
+          (t) => normalizeUrl(t.url) === norm && t.state !== "Cancelled"
+        );
+        if (existing) {
+          return { kind: "duplicate", existing: { ...existing } };
+        }
+      }
+
+      const rawName = cleanUrl.split("/").pop()?.split(/[?#]/)[0] || "download.bin";
       const newTask = {
         id: "mock-" + Date.now(),
-        url: args.url,
-        filename: args.url.split("/").pop() || "download.bin",
+        url: cleanUrl,
+        filename: rawName,
         state: "Downloading",
         total_size: 104857600,
         written: 0,
         speed_bps: 1048576,
         eta_secs: 100,
         error: null,
+        mime: null,
+        parts: 4,
       };
       mockTasks.unshift(newTask);
-      return newTask;
+      return { kind: "added", task: newTask };
     }
+
     case "pause_task": {
       const task = mockTasks.find((t) => t.id === args.id);
       if (task) {
@@ -105,6 +150,7 @@ function handleBrowserMock(command, args) {
       }
       return null;
     }
+
     case "start_task": {
       const task = mockTasks.find((t) => t.id === args.id);
       if (task) {
@@ -113,6 +159,7 @@ function handleBrowserMock(command, args) {
       }
       return null;
     }
+
     case "cancel_task": {
       const task = mockTasks.find((t) => t.id === args.id);
       if (task) {
@@ -122,19 +169,41 @@ function handleBrowserMock(command, args) {
       }
       return null;
     }
+
     case "get_settings":
-      return {
-        download_dir: "C:\\Users\\User\\Downloads",
-        max_concurrent_tasks: 3,
-        max_connections_per_task: 4,
-        theme: "system",
-        language: "ar",
-      };
-    case "set_settings":
-      return args.settings;
+      return { ...mockSettings };
+
+    case "set_settings": {
+      mockSettings = normalizeSettings(args.settings);
+      return { ...mockSettings };
+    }
+
     case "open_download_folder":
     case "reveal_task":
+    case "open_task_file":
       return null;
+
+    case "arm_shutdown": {
+      mockShutdownStatus = {
+        armed: true,
+        seconds_left: args.seconds || 60,
+        blocked_reason: null,
+      };
+      return { ...mockShutdownStatus };
+    }
+
+    case "cancel_shutdown": {
+      mockShutdownStatus = {
+        armed: false,
+        seconds_left: null,
+        blocked_reason: null,
+      };
+      return { ...mockShutdownStatus };
+    }
+
+    case "get_shutdown_status":
+      return { ...mockShutdownStatus };
+
     default:
       return null;
   }

@@ -1,12 +1,14 @@
 <script>
   import { t } from "./i18n.js";
   import TaskCard from "./TaskCard.svelte";
+  import TaskTable from "./TaskTable.svelte";
   import EmptyState from "./EmptyState.svelte";
   import { createEventDispatcher } from "svelte";
 
   export let tasks = [];
   export let selectedId = null;
   export let totalTasksCount = 0;
+  export let viewMode = "cards"; // "cards" | "table"
 
   const dispatch = createEventDispatcher();
 </script>
@@ -17,6 +19,18 @@
   {:else if tasks.length === 0 && totalTasksCount > 0}
     <div class="empty-tab-notice">
       <p>{$t("tabs.empty")}</p>
+    </div>
+  {:else if viewMode === "table"}
+    <div class="table-view-wrapper">
+      <TaskTable
+        {tasks}
+        {selectedId}
+        on:select={(e) => dispatch("select", e.detail)}
+        on:pause={(e) => dispatch("pause", e.detail)}
+        on:resume={(e) => dispatch("resume", e.detail)}
+        on:cancel={(e) => dispatch("cancel", e.detail)}
+        on:reveal={(e) => dispatch("reveal", e.detail)}
+      />
     </div>
   {:else}
     <div class="task-grid" role="feed" aria-busy="false">
@@ -49,6 +63,12 @@
     flex-direction: column;
     gap: 0.75rem;
     max-width: 1000px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .table-view-wrapper {
+    max-width: 1100px;
     margin: 0 auto;
     width: 100%;
   }
