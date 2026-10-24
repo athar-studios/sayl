@@ -145,6 +145,7 @@ pub async fn run_parallel_download_with_options(
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false) // resume keeps the bytes already on disk
             .open(part_path)
             .map_err(|e| CoreError::io_with_context(e, "open part file for parallel resume"))?;
         if existing_len < total_size {

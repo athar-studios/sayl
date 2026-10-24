@@ -83,10 +83,13 @@ impl Journal {
     /// Opens or creates a journal at the specified file path.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
+        // The journal is append-only: an existing file is opened without
+        // truncation and new writes start after replay() seeks to the end.
         let file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(&path)?;
 
         let byte_len = file.metadata()?.len();
@@ -147,11 +150,13 @@ impl Journal {
 
         let (entries, stats) = Self::replay_path(&self.path)?;
 
-        // Re-open file in read/write mode
+        // Re-open file in read/write mode (never truncating: replay decides what
+        // stays, and a valid tail may be kept or trimmed below).
         let mut file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(&self.path)?;
 
         if stats.truncated_tail_ignored {

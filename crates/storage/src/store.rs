@@ -412,6 +412,7 @@ impl Store {
                 .read(true)
                 .write(true)
                 .create(true)
+                .truncate(false) // The lock file is a marker; its content is never read or kept
                 .share_mode(0) // Exclusive: prevents any other process or handle from opening
                 .open(lock_path)
             {
@@ -435,6 +436,7 @@ impl Store {
                 .read(true)
                 .write(true)
                 .create(true)
+                .truncate(false) // The lock file is a marker; its content is never read or kept
                 .open(lock_path)?;
             Ok(file)
         }

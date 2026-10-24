@@ -81,6 +81,7 @@ pub async fn run_sequential_download(
         let mut f = tokio::fs::OpenOptions::new()
             .write(true)
             .create(true)
+            .truncate(false) // resume keeps the bytes already on disk
             .open(part_path)
             .await
             .map_err(|e| CoreError::io_with_context(e, "open part file for resume"))?;
