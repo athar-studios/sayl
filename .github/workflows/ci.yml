@@ -128,3 +128,81 @@ jobs:
       - name: Run all workspace tests
         run: cargo test --workspace
         shell: pwsh
+
+  test-desktop-frontend:
+    name: Desktop Frontend (Vitest + Vite build)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/desktop
+        run: npm ci
+        shell: pwsh
+
+      - name: Run unit tests
+        working-directory: apps/desktop
+        run: npm test
+        shell: pwsh
+
+      - name: Build frontend bundle
+        working-directory: apps/desktop
+        run: npm run build
+        shell: pwsh
+
+  test-website-and-privacy:
+    name: Website Checks and Privacy Audit
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check website JavaScript syntax
+        run: node --check apps/website/app.js
+        shell: pwsh
+
+      - name: Check browser extension JavaScript syntax
+        run: |
+          node --check extensions/browser/chromium/background.js
+          node --check extensions/browser/chromium/popup.js
+        shell: pwsh
+
+      - name: Validate JSON manifests
+        run: |
+          python -c "import json,glob; [json.load(open(p,encoding='utf-8')) for p in glob.glob('extensions/browser/**/*.json', recursive=True) + ['apps/desktop/src-tauri/tauri.conf.json','STATUS.json']]; print('all manifests valid')"
+        shell: pwsh
+
+      - name: Run privacy audit
+        run: python tools/privacy_audit.py
+        shell: pwsh
+
+      - name: Validate release plan docs exist
+        run: |
+          $missing = @()
+          foreach ($v in @('v0.2.0','v0.3.0','v0.4.0','v0.5.0','v1.0.0')) {
+            foreach ($f in @('PLAN.md','STATUS.md')) {
+              $p = "docs/versions/$v/$f"
+              if (-not (Test-Path $p)) { $missing += $p }
+            }
+          }
+          if ($missing.Count -gt 0) { Write-Error "Missing release plan files: $($missing -join ', ')"; exit 1 }
+          Write-Host "All release plan files present"
+        shell: pwsh

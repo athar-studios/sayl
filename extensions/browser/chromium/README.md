@@ -9,10 +9,8 @@
 - `icons/`: Extension icons.
 
 ## ملاحظة حول الأيقونات / Icons Note
-As specified in the architecture instructions:
-- `32x32.png` and `128x128.png` are copied directly from `apps/desktop/src-tauri/icons/`.
+- `16x16.png`, `32x32.png`, `48x48.png` and `128x128.png` are copied from the project brand kit at `assets/brand/` (`icon-16.png`, `icon-32.png`, `icon-48.png`, `icon-128.png`), so each slot gets a real asset at its own size instead of a downscaled copy.
 - No new image assets were artificially generated.
-- In `manifest.json`, the 16x16 and 48x48 icon targets reuse `128x128.png` directly, as Chromium scales them cleanly down to display size.
 
 ## التثبيت اليدوي / Manual Installation
 1. Open Chrome/Edge and navigate to `chrome://extensions` or `edge://extensions`.
