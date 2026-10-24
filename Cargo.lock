@@ -801,6 +801,25 @@ checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 [[package]]
 name = "sayl-app"
 version = "0.1.0"
+dependencies = [
+ "bytes",
+ "chrono",
+ "futures-util",
+ "reqwest",
+ "sayl-core",
+ "sayl-http",
+ "sayl-storage",
+ "sayl-test-http",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "url",
+ "uuid",
+]
 
 [[package]]
 name = "sayl-cli"
