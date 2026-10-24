@@ -2,9 +2,9 @@
   "schema_version": 1,
   "project": "sayl-downloader",
   "milestone": "M0",
-  "current_task": "CORE-001",
+  "current_task": "TEST-001",
   "state": "in_progress",
-  "last_verified_commit": "2bb1410fcb7b6c828e830813b2ce27ef0d5ef0d2",
+  "last_verified_commit": "28013d8d58fd8a270b795fb729e8d6009401afa1",
   "checks": [
     {
       "command": "python tools/workflow.py validate",
@@ -257,11 +257,65 @@
       "exit_code": 0,
       "log": "artifacts/CORE-001/builder-check-report.out.txt",
       "ran_at": "2026-10-24T00:35:00Z"
+    },
+    {
+      "command": "cargo check -p sayl-test-http",
+      "exit_code": 0,
+      "log": "artifacts/TEST-001/builder-cargo-check.err.txt",
+      "ran_at": "2026-10-24T06:36:30Z"
+    },
+    {
+      "command": "cargo check --tests -p sayl-test-http",
+      "exit_code": 0,
+      "log": "artifacts/TEST-001/builder-cargo-check-tests.err.txt",
+      "ran_at": "2026-10-24T06:36:35Z"
+    },
+    {
+      "command": "cargo test --no-run -p sayl-test-http",
+      "exit_code": 101,
+      "log": "artifacts/TEST-001/builder-cargo-test.err.txt",
+      "ran_at": "2026-10-24T06:36:40Z"
+    },
+    {
+      "command": "cargo check -p sayl-core",
+      "exit_code": 0,
+      "log": "artifacts/TEST-001/builder-core-check.err.txt",
+      "ran_at": "2026-10-24T06:36:45Z"
+    },
+    {
+      "command": "cargo check --tests -p sayl-core",
+      "exit_code": 0,
+      "log": "artifacts/TEST-001/builder-core-check-tests.err.txt",
+      "ran_at": "2026-10-24T06:36:50Z"
+    },
+    {
+      "command": "python tools/workflow.py validate",
+      "exit_code": 0,
+      "log": "artifacts/TEST-001/builder-validate.out.txt",
+      "ran_at": "2026-10-24T06:36:15Z"
+    },
+    {
+      "command": "python tools/workflow.py preflight (with SAYL_PRIMARY/CHALLENGER env vars)",
+      "exit_code": 0,
+      "log": "artifacts/TEST-001/builder-preflight.out.txt",
+      "ran_at": "2026-10-24T06:36:20Z"
+    },
+    {
+      "command": "$env:PYTHONIOENCODING='utf-8'; python tools/workflow.py packet TEST-001 builder",
+      "exit_code": 0,
+      "log": "artifacts/TEST-001/builder-packet.out.json",
+      "ran_at": "2026-10-24T06:36:25Z"
+    },
+    {
+      "command": "python tools/workflow.py check-report reports/TEST-001/builder.json",
+      "exit_code": 0,
+      "log": "artifacts/TEST-001/builder-check-report.out.txt",
+      "ran_at": "2026-10-24T06:40:00Z"
     }
   ],
   "blockers": [
-    "MSVC VCTools workload not installed (requires elevated VS installer; UAC consent not automatable in this session). Rust toolchain installed at ~/.cargo/bin (cargo 1.99.1, rustc 1.99.1) but not on system PATH. cargo check -p sayl-core and cargo check --tests -p sayl-core pass (exit code 0); cargo test --no-run -p sayl-core fails with link.exe not found."
+    "MSVC VCTools workload not installed (requires elevated VS installer; UAC consent not automatable in this session). Rust toolchain installed at ~/.cargo/bin (cargo 1.99.1, rustc 1.99.1) but not on system PATH. cargo check -p sayl-test-http and cargo check --tests -p sayl-test-http pass cleanly (exit code 0); cargo test --no-run -p sayl-test-http fails with link.exe not found."
   ],
-  "next_task": "CORE-001 runtime_tester and debater review — builder implementation complete; cargo test deferred until MSVC link.exe available",
-  "notes": "BOOT-003 COMPLETE: gate passed with all 6 role reports. Milestone M0 complete. CORE-001 planner report created (status=blocked). CORE-001 builder implementation completed (state.rs, error.rs, event.rs, idempotency.rs, id.rs, lib.rs, integration tests, README.md). All type checking passes cleanly via cargo check and cargo check --tests (exit 0). Builder report reports/CORE-001/builder.json created (status=blocked due to MSVC linker for acceptance criterion #45)."
+  "next_task": "TEST-001 runtime_tester and debater review — builder implementation complete; cargo test deferred until MSVC link.exe available",
+  "notes": "TEST-001 planner report created (status=blocked). TEST-001 builder implementation completed: HttpFixtureServer in server.rs, all 27 failure modes in scenarios.rs, deterministic BodyGenerator in body_gen.rs, public API in lib.rs, comprehensive README.md, unit and integration tests. All type checking passes cleanly via cargo check -p sayl-test-http and cargo check --tests -p sayl-test-http (exit 0). Builder report reports/TEST-001/builder.json created (status=blocked due to MSVC linker for acceptance criterion #5)."
 }

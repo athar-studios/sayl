@@ -18,3 +18,7 @@ thiserror = { version = "1.0", optional = true }
 [features]
 default = []
 full = ["serde", "chrono", "thiserror"]
+
+[dev-dependencies]
+sayl-test-http = { path = "../test-http" }
+

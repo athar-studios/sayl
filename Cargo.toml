@@ -9,4 +9,5 @@ members = [
     "crates/media",
     "crates/torrent",
     "crates/plugin-host",
+    "crates/test-http",
 ]

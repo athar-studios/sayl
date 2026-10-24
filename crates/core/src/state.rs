@@ -176,6 +176,14 @@ impl std::error::Error for StateTransitionError {}
 /// assert!(transition(DownloadState::Completed, DownloadState::Queued).is_err());
 /// ```
 pub fn transition(from: DownloadState, to: DownloadState) -> Result<DownloadState, StateTransitionError> {
+    if from == to {
+        return if !from.is_terminal() {
+            Ok(from)
+        } else {
+            Err(StateTransitionError { from, to })
+        };
+    }
+
     let destinations = from.valid_destinations();
     if destinations.contains(&to) {
         Ok(to)
@@ -256,14 +264,23 @@ mod tests {
             for &to in &all {
                 let res = transition(from, to);
 
-                // Property 1: No self-transitions are ever valid
+                // Property 1: Self-transitions are valid only for nonterminal states and invalid for terminal states
                 if from == to {
-                    assert!(
-                        res.is_err(),
-                        "Self-transition from {:?} to {:?} must never be allowed",
-                        from,
-                        to
-                    );
+                    if from.is_terminal() {
+                        assert!(
+                            res.is_err(),
+                            "Terminal self-transition from {:?} to {:?} must never be allowed",
+                            from,
+                            to
+                        );
+                    } else {
+                        assert!(
+                            res.is_ok(),
+                            "Nonterminal self-transition from {:?} to {:?} must be allowed",
+                            from,
+                            to
+                        );
+                    }
                 }
 
                 // Property 2: Terminal states can NEVER transition to any state
@@ -276,9 +293,9 @@ mod tests {
                     );
                 }
 
-                // Property 3: Cancelling can only transition to Cancelled or Failed
+                // Property 3: Cancelling can only transition to Cancelled or Failed (or Cancelling self-transition)
                 if from == DownloadState::Cancelling {
-                    if to == DownloadState::Cancelled || to == DownloadState::Failed {
+                    if to == DownloadState::Cancelled || to == DownloadState::Failed || to == DownloadState::Cancelling {
                         assert!(res.is_ok());
                     } else {
                         assert!(res.is_err());
@@ -322,8 +339,9 @@ mod tests {
         // Cancelled: 0
         // Failed: 0
         // Total valid = 3 + 4 + 4 + 3 + 3 + 3 + 3 + 2 = 25
-        assert_eq!(valid_count, 25);
-        assert_eq!(invalid_count, 96);
+        // Plus 8 nonterminal self-loops (Queued, Probing, Downloading, Verifying, Finalizing, Pausing, Paused, Cancelling) = 33
+        assert_eq!(valid_count, 33);
+        assert_eq!(invalid_count, 88);
     }
 
     #[test]

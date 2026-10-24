@@ -269,3 +269,90 @@
 ## 4. الخطوة التالية المؤهلة
 - **CORE-001 runtime_tester:** تشغيل اختبارات التحقق من سير العمل وكتابة تقرير التشغيل.
 - **CORE-001 debater:** المراجعة النقدية المستقلة للأدلة والأنواع.
+
+---
+
+# وثيقة التسليم (Handoff) — إنجاز دور البناء (Builder) لمهمة TEST-001
+
+## 1. ما تم إنجازه في TEST-001 (دور Builder)
+- **إنشاء كريت `sayl-test-http` (`crates/test-http/`):**
+  - إنشاء `crates/test-http/Cargo.toml` مع تعريف التبعيات: `tokio`, `hyper`, `bytes`, `tracing`, `serde`, `uuid`, `chrono`.
+  - إضافة `crates/test-http` إلى مصفوفة أعضاء مساحة العمل `members` في `Cargo.toml` الرئيسي.
+  - إضافة `sayl-test-http = { path = "../test-http" }` كـ dev-dependency في `crates/core/Cargo.toml`.
+  - نسخ وتوثيق العينة المرجعية `sample.bin` (256 KiB) في `crates/core/fixtures/sample.bin` مع مطابقة SHA-256.
+- **تنفيذ خادم HTTP الحتمي (`crates/test-http/src/server.rs`):**
+  - بناء `HttpFixtureServer` يرتبط محلياً على `127.0.0.1:0`.
+  - واجهات التحكم: `start() -> Result<SocketAddr, FixtureServerError>` و `shutdown()` و `local_addr()` و `url()`.
+  - ضبط التأخير عبر `set_delay(Duration)` وحجم التجزئة عبر `set_chunk_size(usize)` وحجم المورد `set_resource_size(usize)`.
+  - تسجيل الطلبات القادمة `RecordedRequest` والتحقق التعاقدي من تسلسلها عبر `verify_requests(&[ExpectedRequest])`.
+  - دعم كامل لطلبات `GET` و `HEAD` ونطاقات البايت `Range` وحساب `Content-Range` واستجابات `206 Partial Content`.
+- **تنفيذ أنماط الفشل الـ 27 الإلزامية (`crates/test-http/src/scenarios.rs`):**
+  - تعداد `Scenario` يشمل كافة أنماط الفشل الـ 27 من MASTER-PLAN §8:
+    1. `Ok206`
+    2. `NoAcceptRanges`
+    3. `IgnoredRange200`
+    4. `BadContentRange`
+    5. `BodyTruncation`
+    6. `ConnectionReset`
+    7. `ETagChanged`
+    8. `WeakETagOnly`
+    9. `NoValidator`
+    10. `416RangeNotSatisfiable` (`RangeNotSatisfiable416`)
+    11. `HeadRejected`
+    12. `UnknownSize`
+    13. `EmptyFile`
+    14. `UnexpectedEncoding`
+    15. `429RetryAfter` (`RetryAfter429`)
+    16. `RedirectWithSecrets`
+    17. `NoSpace`
+    18. `PermissionDenied`
+    19. `MaliciousFilename`
+    20. `PauseCancelDuringProbe`
+    21. `SlowWorker`
+    22. `OldLease`
+    23. `RecoveryAtFinalize`
+    24. `ProxyTLS`
+    25. `LimitsOrigin`
+    26. `FileTruncation`
+    27. `Pooling`
+  - دعم مرن للتحويل النصي `from_str` يقبل التسميات المختلفة (مثل `416RangeNotSatisfiable` و `RangeNotSatisfiable416`).
+- **توليد جسم البيانات الحتمي (`crates/test-http/src/body_gen.rs`):**
+  - توليد تسلسل بايتات حتمي متكرر `0x00..=0xFF`.
+  - تقطيع النطاقات عبر `BodyGenerator::slice` و `slice_http_range`.
+  - التحقق من مطابقة النمط عبر `verify_pattern`.
+- **إعادة التصدير والتوثيق (`crates/test-http/src/lib.rs` و `README.md`):**
+  - إعادة تصدير الواجهات الأساسية على جذر الكريت.
+  - إعداد دليل `crates/test-http/README.md` بجدول تفصيلي يوضح رموز الحالة والرؤوس والسلوك المتوقع لكل سيناريو مع أمثلة كود واضحة.
+- **اختبارات الوحدة والتكامل:**
+  - كتابة اختبارات وحدة شاملة داخل `src/body_gen.rs`, `src/scenarios.rs`, `src/server.rs`.
+  - كتابة جناح اختبار تكاملي في `crates/test-http/tests/fixture_scenarios.rs` و `tests/fixture_scenarios.rs`.
+- **التحقق البرمجي وسير العمل:**
+  - `cargo check -p sayl-test-http` خرج 0 (نجاح كامل).
+  - `cargo check --tests -p sayl-test-http` خرج 0 (اكتمال فحص أنواع الاختبارات).
+  - `cargo check -p sayl-core` خرج 0 و `cargo check --tests -p sayl-core` خرج 0.
+  - `python tools/workflow.py validate` خرج 0.
+  - `python tools/workflow.py preflight` مع متغيرات البيئة خرج 0.
+  - `$env:PYTHONIOENCODING='utf-8'; python tools/workflow.py packet TEST-001 builder` خرج 0.
+  - `python tools/workflow.py check-report reports/TEST-001/builder.json` خرج 0 (status: blocked).
+
+## 2. أوامر التحقق المنفذة ونتائجها
+| الأمر | النتيجة | Exit code | السجل |
+|---|---|---|---|
+| `cargo check -p sayl-test-http` | نجاح فحص الأنواع بدون تحذيرات | 0 | `artifacts/TEST-001/builder-cargo-check.err.txt` |
+| `cargo check --tests -p sayl-test-http` | نجاح فحص أنواع الاختبارات | 0 | `artifacts/TEST-001/builder-cargo-check-tests.err.txt` |
+| `cargo test --no-run -p sayl-test-http` | فشل الرابط MSVC (link.exe not found) | 101 | `artifacts/TEST-001/builder-cargo-test.err.txt` |
+| `cargo check -p sayl-core` | نجاح فحص sayl-core مع dev-dependency | 0 | `artifacts/TEST-001/builder-core-check.err.txt` |
+| `cargo check --tests -p sayl-core` | نجاح فحص اختبارات sayl-core | 0 | `artifacts/TEST-001/builder-core-check-tests.err.txt` |
+| `python tools/workflow.py validate` | `ok: true` | 0 | `artifacts/TEST-001/builder-validate.out.txt` |
+| `python tools/workflow.py preflight` | `ok: true, routes_configured: true` | 0 | `artifacts/TEST-001/builder-preflight.out.txt` |
+| `python tools/workflow.py packet TEST-001 builder` | `ok: true` | 0 | `artifacts/TEST-001/builder-packet.out.json` |
+| `python tools/workflow.py check-report reports/TEST-001/builder.json` | `ok: true, status: blocked` | 0 | `artifacts/TEST-001/builder-check-report.out.txt` |
+
+## 3. العوائق الحالية (Blockers)
+1. **غياب رابط MSVC `link.exe`:** يمنع تجميع الاختبارات التنفيذية لمعيار القبول #5 (`cargo test -p sayl-test-http`). فحص الأنواع عبر `cargo check` و `cargo check --tests` يمر بنجاح تام.
+2. **عدم توفر إثبات تشفيري لهوية النموذج:** identity_verified معينة إلى `false` وفق REPORT-CONTRACT.md:9، مما يُلزم تعيين حالة التقرير إلى `blocked`.
+
+## 4. الخطوة التالية المؤهلة
+- **TEST-001 runtime_tester:** تشغيل اختبارات التحقق من سير العمل وتوثيق نتائج التشغيل.
+- **TEST-001 debater:** المراجعة النقدية المستقلة لمطابقة السيناريوهات الـ 27 وتصميم الخادم.
+
