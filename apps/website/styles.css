@@ -1626,3 +1626,12 @@ pre code {
         color: #000 !important;
     }
 }
+
+/* Content pages (docs, privacy, terms, about, support) */
+.doc-page{padding:7rem 0 4rem}
+.doc-container{max-width:760px}
+.doc-page h1{font-size:clamp(2rem,4vw,2.8rem);margin-bottom:2rem;background:linear-gradient(90deg,#4f8cff,#8a5cff,#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent}
+.doc-section{margin-bottom:2.2rem}
+.doc-section h2{font-size:1.35rem;margin-bottom:.8rem}
+.doc-section p,.doc-section li{line-height:1.9;opacity:.9;margin-bottom:.6rem}
+.doc-section li{margin-inline-start:1.2rem;list-style:disc}
