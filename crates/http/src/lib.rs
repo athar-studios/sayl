@@ -16,6 +16,8 @@ pub mod filename;
 pub mod probe;
 pub mod range;
 pub mod redirect;
+pub mod resume;
+pub mod retry;
 pub mod stream;
 
 pub use error::HttpError;
@@ -29,6 +31,13 @@ pub use probe::{
 pub use range::{format_byte_range, verify_range_probe_response, ContentRange, RangeSupport};
 pub use redirect::{
     RedirectPolicy, RedirectTracker, DEFAULT_MAX_REDIRECT_HOPS,
+};
+pub use resume::{
+    if_range_value, is_weak_etag, reconcile_partial_len, validator_kind, validate_resume,
+    ResumeDecision, ResumeInfo, ValidatorKind,
+};
+pub use retry::{
+    is_retryable_status, should_retry, status_of, RetryPolicy,
 };
 pub use stream::{
     stream_to_file, stream_to_file_with_options, CancellationToken, StreamOptions, StreamOutcome,

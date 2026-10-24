@@ -93,6 +93,7 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-traits",
+ "serde",
  "wasm-bindgen",
  "windows-link",
 ]
@@ -832,6 +833,7 @@ dependencies = [
  "sayl-core",
  "sayl-test-http",
  "serde",
+ "serde_json",
  "thiserror",
  "tokio",
  "tokio-util",
@@ -851,6 +853,16 @@ version = "0.1.0"
 [[package]]
 name = "sayl-storage"
 version = "0.1.0"
+dependencies = [
+ "chrono",
+ "sayl-core",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tracing",
+ "uuid",
+]
 
 [[package]]
 name = "sayl-test-http"
@@ -1254,6 +1266,7 @@ checksum = "3ea73390fe27785838dcbf75b91b1d84799e28f1ce71e6f372a5dc2200c80de5"
 dependencies = [
  "atomic",
  "getrandom 0.2.15",
+ "serde",
 ]
 
 [[package]]

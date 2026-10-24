@@ -3,6 +3,13 @@ name = "sayl-http"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+# Documented examples are kept in the source but not executed as doctests:
+# under the x86_64-pc-windows-gnu target this crate's doctest binary links
+# native-tls/SChannel and crashes at load (0xc0000005) before any example runs.
+# The same assertions are covered by the #[cfg(test)] unit tests in each module.
+doctest = false
+
 [dependencies]
 sayl-core = { path = "../core" }
 reqwest = { version = "0.12", default-features = false, features = ["stream", "native-tls"] }
@@ -20,3 +27,4 @@ chrono = "0.4"
 
 [dev-dependencies]
 sayl-test-http = { path = "../test-http" }
+serde_json = "1.0"
