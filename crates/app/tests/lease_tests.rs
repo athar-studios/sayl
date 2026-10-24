@@ -4,9 +4,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use sayl_app::lease::{LeaseReport, LeaseTable, DEFAULT_LEASE_TTL};
-use sayl_app::parallel::{
-    run_parallel_download_with_options, run_parallel_download_with_report, ParallelOptions,
-};
+use sayl_app::parallel::{run_parallel_download_with_options, run_parallel_download_with_report};
 use sayl_app::sequential::DownloadOutcome;
 use sayl_core::id::TaskId;
 use sayl_storage::Store;
@@ -129,7 +127,7 @@ fn test_chunk_math_chunk_size_greater_than_total_one_chunk() {
 
     assert!(table.claim_next(1, now, ttl).is_none());
 
-    assert!(table.complete(&chunk));
+    assert!(table.complete(chunk));
     assert!(table.is_complete());
 
     let report = table.report();
@@ -186,12 +184,12 @@ fn test_steal_expired_lease_and_reject_stale_completion() {
     assert_eq!(table.steals_performed(), 1);
 
     // Original owner (Worker 0) attempts completion later with stale lease -> REJECTED
-    let completed_stale = table.complete(&lease0);
+    let completed_stale = table.complete(lease0);
     assert!(!completed_stale, "stale completion must be rejected");
     assert!(!table.is_complete());
 
     // New owner (Worker 1) completes with valid lease -> ACCEPTED
-    let completed_valid = table.complete(&lease1);
+    let completed_valid = table.complete(lease1);
     assert!(
         completed_valid,
         "valid current owner completion must succeed"
@@ -249,7 +247,7 @@ fn test_release_on_cancel_makes_chunk_claimable_again() {
     assert!(table.claim_next(1, now, ttl).is_none());
 
     // Worker 0 cancels / errors and releases lease
-    let released = table.release(&lease0);
+    let released = table.release(lease0);
     assert!(released);
     assert_eq!(table.retries(), 1);
 
@@ -405,10 +403,7 @@ async fn test_slow_worker_triggers_steal_and_file_is_correct() {
 
                     let end_inclusive = end.min(size - 1);
                     let body = &expected_data[start..=end_inclusive];
-                    let headers = format!(
-                        "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {}-{}/{}\r\nContent-Length: {}\r\n\r\n",
-                        start, end_inclusive, size, body.len()
-                    );
+                    let headers = format!("HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {}-{}/{}\r\nContent-Length: {}\r\n\r\n", start, end_inclusive, size, body.len());
                     let _ = socket.write_all(headers.as_bytes()).await;
                     let _ = socket.write_all(body).await;
                 }
@@ -530,10 +525,7 @@ async fn test_worker_failing_mid_chunk_retried_by_another_worker_and_completes()
                     // Normal response
                     let end_inclusive = end.min(size - 1);
                     let body = &expected_data[start..=end_inclusive];
-                    let headers = format!(
-                        "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {}-{}/{}\r\nContent-Length: {}\r\n\r\n",
-                        start, end_inclusive, size, body.len()
-                    );
+                    let headers = format!("HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {}-{}/{}\r\nContent-Length: {}\r\n\r\n", start, end_inclusive, size, body.len());
                     let _ = socket.write_all(headers.as_bytes()).await;
                     let _ = socket.write_all(body).await;
                 }
