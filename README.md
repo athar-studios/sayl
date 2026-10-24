@@ -27,16 +27,18 @@
 |---------------|---------|------------------|--------|
 | `sayl-core` | نماذج المجال، آلة الحالات (11 حالة)، نظام الأخطاء، ناقل الأحداث، مفاتيح عدم التكرار | **33** | ✅ تمر |
 | `sayl-test-http` | خادم اختبارات HTTP حتمي، 27 وضع فشل، توليد بيانات حتمي | **25** | ✅ تمر |
-| `sayl-http` | عميل HTTP، تحقق النطاقات، تتبع إعادة توجيه آمن، استخراج أسماء ملفات آمنة | **65** | ✅ تمر |
+| `sayl-http` | عميل HTTP، تحقق النطاقات، تتبع إعادة توجيه آمن، استخراج أسماء ملفات آمنة | **132** | ✅ تمر |
 | `sayl-storage` | مخزن مهام WAL + لقطات ذرية، قفل دليل، استعادة بعد تعطل | **18** | ✅ تمر |
-| `sayl-app` | خدمات التطبيق، أوامر/أحداث Tauri | — | 🚧 قيد التطوير |
-| `sayl-cli` | واجهة سطر أوامر | — | 📋 مخطط |
-| `sayl-media` | مُحول yt-dlp/FFmpeg | — | 📋 مخطط |
-| `sayl-torrent` | محول librqbit | — | 📋 مخطط |
-| `sayl-plugin-host` | وقت تشغيل WASM، وسيط الصلاحيات | — | 📋 مخطط |
-| `apps/desktop` | Tauri + Svelte UI | — | 🚧 قيد التطوير |
-| `apps/website` | موقع تنزيل ثابت (هذا المستودع) | — | ✅ مكتمل |
-| `extensions/browser` | ملحقات Chromium/Firefox (Native Messaging) | — | 📋 مخطط |
+| `sayl-app` | المحرك، الجدولة، الإيجارات، الاسترداد بعد الانهيار | **46** | ✅ تمر |
+| `sayl-cli` | واجهة سطر أوامر | **12** | ✅ تمر |
+| `sayl-bridge` | بروتوكول Native Messaging + ثنائي `sayl-bridge` | **36** | ✅ تمر |
+| `sayl-bench` | منصة قياس أداء محلية | **2** | ✅ تمر |
+| `sayl-media` | مُحول yt-dlp/FFmpeg | — | 📋 مخطط (v0.2.0) |
+| `sayl-torrent` | محول librqbit | — | 📋 مخطط (v0.4.0) |
+| `sayl-plugin-host` | وقت تشغيل WASM، وسيط الصلاحيات | — | 📋 مخطط (v0.5.0) |
+| `apps/desktop` | واجهة Tauri + Svelte (عربي RTL/إنجليزي) | **26** (vitest) | ✅ تُبنى وتُختبر — لم تُشغَّل نافذة Tauri هنا |
+| `apps/website` | موقع تنزيل ثابت (هذا المستودع) | فحص ساكن + تدقيق خصوصية 4/4 | ✅ مكتمل |
+| `extensions/browser` | ملحق Chromium/Edge MV3 (Native Messaging) | — | ✅ مبني — لم يُحمَّل في متصفح فعلي |
 
 > **ملاحظة:** الأرقام أعلاه تعكس اختبارات الوحدة/التكامل الفعلية في المستودع. لا توجد اختبارات زائفة.
 
@@ -207,16 +209,25 @@ cargo +stable-x86_64-pc-windows-gnu test --workspace
 
 **SAYL** is an independent, open-source, privacy-respecting download manager for Windows, written in Rust with a Tauri 2 + Svelte desktop UI. Arabic-first, RTL, i18n-ready.
 
-### Current Status (Pre-M1)
+### Current Status (v0.1.0, Windows-only)
 
 | Crate | Description | Tests |
 |-------|-------------|-------|
 | `sayl-core` | Domain models, 11-state machine, error taxonomy, bounded event bus, idempotency keys | 33 |
 | `sayl-test-http` | Deterministic HTTP fixture server, 27 failure modes | 25 |
-| `sayl-http` | HTTP client, range validation, safe redirects, safe filenames | 65 |
+| `sayl-http` | HTTP client, range validation, safe redirects, safe filenames | 132 |
 | `sayl-storage` | Crash-safe task store (WAL + atomic snapshots), directory locking | 18 |
+| `sayl-app` | Engine, scheduler, leases, crash recovery | 46 |
+| `sayl-cli` | Command-line interface | 12 |
+| `sayl-bridge` | Native-messaging protocol and `sayl-bridge` host binary | 36 |
+| `sayl-bench` | Local performance harness | 2 |
+| `apps/desktop` | Tauri + Svelte UI (Arabic RTL / English) | 26 (vitest) |
+| `apps/website` | Static download site | static checks + privacy audit 4/4 |
+| `extensions/browser` | Chromium/Edge MV3 extension with native messaging | built, not yet loaded in a real browser |
 
-Desktop UI, browser integration, video/torrent, plugins, Android — **under development**.
+Video (`sayl-media`), torrent (`sayl-torrent`), WASM plugins (`sayl-plugin-host`) and Android are **not started** — each is planned in `docs/versions/`.
+
+Total verified Rust tests: **304**.
 
 ### Build (Test Environment)
 
