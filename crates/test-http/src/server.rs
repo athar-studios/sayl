@@ -399,25 +399,19 @@ impl HttpFixtureServer {
         let active_connections = Arc::clone(&self.active_connections);
 
         let handle = tokio::spawn(async move {
-            loop {
-                match listener.accept().await {
-                    Ok((stream, _peer_addr)) => {
-                        let cfg = Arc::clone(&config);
-                        let rec = Arc::clone(&recorded);
-                        let req_ctr = Arc::clone(&request_counter);
-                        let active = Arc::clone(&active_connections);
+            // An accept() error ends the loop; the listener is kept by the
+            // struct, so this is the same shutdown path as before.
+            while let Ok((stream, _peer_addr)) = listener.accept().await {
+                let cfg = Arc::clone(&config);
+                let rec = Arc::clone(&recorded);
+                let req_ctr = Arc::clone(&request_counter);
+                let active = Arc::clone(&active_connections);
 
-                        tokio::spawn(async move {
-                            active.fetch_add(1, Ordering::SeqCst);
-                            let _ =
-                                handle_connection(stream, cfg, rec, req_ctr, active.clone()).await;
-                            active.fetch_sub(1, Ordering::SeqCst);
-                        });
-                    }
-                    Err(_) => {
-                        break;
-                    }
-                }
+                tokio::spawn(async move {
+                    active.fetch_add(1, Ordering::SeqCst);
+                    let _ = handle_connection(stream, cfg, rec, req_ctr, active.clone()).await;
+                    active.fetch_sub(1, Ordering::SeqCst);
+                });
             }
         });
 
