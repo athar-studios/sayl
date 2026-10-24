@@ -277,7 +277,11 @@ if ($DryRun) {
 
     if ($Lines.Count -gt 0) {
         $content = ($Lines -join "`n") + "`n"
-        [System.IO.File]::WriteAllText($Sha256SumsPath, $content, [System.Text.Encoding]::UTF8)
+        # Plain UTF-8 without a BOM: `sha256sum -c SHA256SUMS.txt` treats a BOM as
+        # part of the first file name and fails. [IO.File]::WriteAllText without an
+        # encoding argument emits a BOM on Windows PowerShell 5.1, which is what the
+        # CI runner's `pwsh` wrapper may resolve to, so the encoding is explicit.
+        [System.IO.File]::WriteAllText($Sha256SumsPath, $content, [System.Text.UTF8Encoding]::new($false))
         Write-Host "Command: Write-SHA256SUMS -> $Sha256SumsPath | ExitCode: 0" -ForegroundColor DarkGray
         Write-Host "[نجاح / PASS] تم إنشاء ملف التجزئات بنجاح." -ForegroundColor Green
     }
