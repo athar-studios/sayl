@@ -1,3 +1,5 @@
+<img src="assets/brand/logo-full.svg" alt="SAYL" width="220">
+
 # سيل (SAYL)
 
 [![CI](https://github.com/athar-studios/sayl/actions/workflows/ci.yml/badge.svg)](https://github.com/athar-studios/sayl/actions)
@@ -58,8 +60,41 @@ Get-FileHash .\SAYL-Setup-x64-0.1.0.exe -Algorithm SHA256
 2. أدخل رابط الملف (URL) المطلوب تنزيله في الحقل المخصص.
 3. اضغط على زر **«بدء التنزيل»** للشروع في التحميل فوراً.
 
+### التعامل مع الروابط المكررة
+عند إدخال رابط تنزيل موجود مسبقاً في قائمة التنزيلات، يعرض التطبيق نافذة حوار تتيح ثلاثة خيارات واضحة:
+- **فتح الموجود:** الانتقال فوراً إلى مهمة التنزيل الحالية واستعراض تفاصيلها.
+- **تحميله مرة أخرى:** بدء مهمة تنزيل جديدة ومستقلة للرابط نفسه.
+- **إلغاء:** إغلاق نافذة الحوار والتراجع دون إضافة.
+
 ### السحب والإفلات (Drag and Drop)
 يمكنك سحب أي رابط تنزيل مباشرة من المتصفح أو أي تطبيق آخر وإفلاته داخل نافذة برنامج سيل، وسيتعرف البرنامج على الرابط تلقائياً لتبدأ عملية التنزيل بلمسة واحدة.
+
+### تصنيف الملفات والشريط الجانبي
+يوفر سيل شريطاً جانبياً قابلاً للطي والتوسيع لتنظيم الملفات وفق تصنيفاتها مع عداد فوري لعدد الملفات في كل تصنيف:
+- **التصنيفات المتاحة:** الكل، فيديو، صوت، مستندات، برامج، ملفات مضغوطة، أخرى.
+- **آلية التصنيف:** تُصنف الملفات تلقائياً وفق امتداد اسم الملف أولاً، مع اعتماد نوع المحتوى المستلم عبر ترويسات HTTP (`Content-Type` / MIME) كخيار بديل عند غياب الامتداد أو عدم وضوحه.
+
+### البحث وتصفية المهام
+- **البحث السريع:** حقل بحث فوري يتيح تصفية المهام بمطابقة اسم الملف أو جزء من رابط التنزيل (URL).
+- **تصفية الحالة:** أزرار سريعة لتصفية المهام حسب حالتها: الكل، يعمل، متوقف، مكتمل، فشل.
+
+### طرق العرض: البطاقات والجدول
+يتيح سيل نمطين لعرض قائمة التنزيلات:
+- **عرض البطاقات (افتراضي):** واجهة بصرية تعرض كل مهمة كبطاقة تفصيلية توضح نسبة التقدم والحجم وسرعة التحميل.
+- **عرض الجدول المضغوط:** جدول مدمج منظم يعرض (الاسم، الحجم، نسبة التقدم، السرعة، الوقت المتبقي، الحالة، وأزرار الإجراءات السريعة).
+- يتم حفظ نمط العرض المختار تلقائياً في الإعدادات ويظل ثابتاً عبر جلسات الاستخدام.
+
+### نافذة التحميل العائمة
+نافذة مستقلة وصغيرة تطفو على الشاشة لكل تنزيل نشط، تعرض اسم الملف، وحجمه، وشريط تقدم متدرج، والسرعة اللحظية، والوقت المتبقي، وعدد الأجزاء (`Parts`)، مع أزرار الإيقاف المؤقت والاستئناف والإلغاء؛ وعند اكتمال التنزيل تتيح خياري **«فتح الملف»** و**«فتح المجلد»**. وتخضع النافذة لإعدادين في شاشة الإعدادات: «إظهار نافذة التحميل عند بدء كل تحميل» (مفعّل افتراضياً) و«إغلاق النافذة تلقائيًا عند انتهاء التحميل» (معطّل افتراضياً).
+
+### منع نوم الجهاز أثناء التنزيلات
+طالما توجد مهام تنزيل نشطة، يطلب التطبيق من نظام التشغيل Windows البقاء في وضع النشاط ومنع الانتقال إلى وضع السكون (`SetThreadExecutionState`)، ويتم تحرير هذا القيد تلقائياً بمجرد اكتمال كافة المهام أو توقفها. تخضع هذه الميزة لخيار **«منع نوم الجهاز أثناء التنزيلات»** في شاشة الإعدادات وهي مفعّلة افتراضياً.
+
+### إيقاف تشغيل الجهاز عند انتهاء التحميلات
+خيار اختياري لإيقاف تشغيل الكمبيوتر تلقائياً فور انتهاء كافة التنزيلات، ويمكن تفعيله من داخل نافذة التحميل العائمة أو عبر القائمة الرئيسية لشريط الأدوات (⋮):
+- **إعداد مؤقت:** لا يُحفظ هذا الخيار في الإعدادات الدائمة على القرص، ويتم إلغاؤه وإعادة ضبطه تلقائياً عند إعادة تشغيل البرنامج منعاً لأي إغلاق غير مقصود لاحقاً.
+- **العد التنازلي للحماية:** عند اكتمال كافة التحميلات، يبدأ عد تنازلي مرئي لمدة 60 ثانية مع زر واضح لـ **«إلغاء»** الإيقاف في أي وقت قبل إغلاق النظام.
+- **قواعد الرفض الصارمة:** يمتنع البرنامج تماماً عن إيقاف تشغيل الجهاز إذا كانت هناك أي مهمة فاشلة، أو متوقفة مؤقتاً، أو لا تزال قيد التحميل، أو في حال عدم وجود أي مهام في القائمة.
 
 ### اختيار مجلد الحفظ
 - تُحفظ التنزيلات افتراضياً في مجلد التنزيلات القياسي الخاص بالنظام (`Downloads`).
@@ -83,6 +118,10 @@ Get-FileHash .\SAYL-Setup-x64-0.1.0.exe -Algorithm SHA256
 يمكنك الوصول إلى لوحة الإعدادات عبر النقر على **أيقونة الترس في شريط الأدوات**:
 - **مجلد التنزيل الافتراضي:** تحديد المسار الذي تُحفظ فيه كافة الملفات المكتملة عبر مستعرض المجلدات.
 - **عدد الاتصالات المتزامنة:** تخصيص عدد الاتصالات لكل مهمة (الافتراضي 4 اتصالات متزامنة) لموازنة استهلاك عرض النطاق الترددي.
+- **طريقة العرض الافتراضية:** التبديل بين نمط البطاقات ونمط الجدول المضغوط، مع حفظ اختيارك تلقائياً.
+- **منع نوم الجهاز أثناء التنزيلات:** إبقاء نظام Windows في وضع النشاط طالما هناك مهام قيد التحميل (مفعّل افتراضياً).
+- **إظهار نافذة التحميل عند بدء كل تحميل:** فتح نافذة التحميل العائمة تلقائياً عند بدء أي تنزيل جديد (مفعّل افتراضياً).
+- **إغلاق النافذة تلقائيًا عند انتهاء التحميل:** إغلاق نافذة التحميل العائمة تلقائياً فور اكتمال الملف (معطّل افتراضياً).
 - **اللغة والمظهر:** التبديل الفوري بين اللغة العربية (مع اتجاه RTL) واللغة الإنجليزية، واختيار المظهر المناسب (فاتح أو داكن).
 
 ---
@@ -165,8 +204,45 @@ Compare the output hash against the one published in `SHA256SUMS.txt`.
 2. Paste the target file URL into the dialog.
 3. Click **"Start Download"** to initiate the transfer.
 
+#### Handling Duplicate URLs
+When adding a URL that already exists in the downloads list, SAYL prompts with a dialog offering three clear actions:
+- **Open existing:** Switch directly to the existing download task and view its details.
+- **Download again:** Start a new, independent download task for the same URL.
+- **Cancel:** Close the dialog and dismiss the addition.
+
 #### Drag and Drop
 Drag any download link directly from your browser or desktop application and drop it into the SAYL window to begin downloading immediately.
+
+#### Categories & Collapsible Sidebar
+SAYL features a collapsible sidebar that organizes your downloads by file category with live task counts:
+- **Available Categories:** All, Video, Audio, Documents, Programs, Compressed, and Other.
+- **Automatic Classification:** Files are categorized based on their file extension first, falling back to the HTTP MIME content type (`Content-Type`) when extensions are absent or ambiguous.
+
+#### Search & State Filtering
+- **Quick Search:** Real-time search box filtering downloads by matching file name or URL.
+- **State Filter:** Quick filter chips to view tasks by status: All, Active (Running), Paused, Completed, and Failed.
+
+#### View Modes: Cards & Compact Table
+SAYL offers two view layouts to match your preference:
+- **Card View (Default):** Rich visual cards displaying progress, size, and download speed.
+- **Compact Table View:** Streamlined tabular layout displaying Name, Size, Progress, Speed, Remaining Time, State, and quick Action buttons.
+- Your preferred view mode is saved automatically in Settings and restored across sessions.
+
+#### Floating Download Window
+A small floating window for each active download allows monitoring progress outside the main application window:
+- **Metrics Displayed:** File name, size, gradient progress bar, real-time speed, estimated remaining time, and active segment count (`Parts`).
+- **Direct Controls:** Pause, resume, and cancel buttons.
+- **Completion Actions:** Offers **"Open file"** and **"Show in folder"** buttons once the transfer completes.
+- **Configuration:** Governed by two preferences in Settings: "Show download window when download starts" (on by default) and "Close window automatically when finished" (off by default).
+
+#### Sleep Prevention During Downloads
+To ensure large downloads finish uninterrupted, SAYL requests Windows to remain awake (`SetThreadExecutionState`) while downloads are actively running, and releases this lock automatically once all downloads stop or finish. This behavior is governed by the **"Prevent sleep during downloads"** setting and is enabled by default.
+
+#### Shutdown Computer on Completion
+An optional feature to shut down the machine automatically once all downloads complete, accessible from the floating download window and the toolbar's main menu (⋮):
+- **Transient Preference:** Never saved to disk; automatically reset upon application restart to prevent unintended future shutdowns.
+- **Safety Countdown:** Initiates a visible 60-second countdown prompt with an explicit **"Cancel"** action before initiating system shutdown.
+- **Refusal Safeguards:** Strictly refuses to shut down if any task has failed, is paused, is still running, or if there are no download tasks in the list.
 
 #### Save Folder Selection
 - By default, files are saved to your system's `Downloads` folder.
@@ -190,6 +266,10 @@ SAYL integrates with Chromium-based browsers (Google Chrome, Microsoft Edge, Bra
 Open Settings via the **gear button in the toolbar**:
 - **Default Download Directory:** Configure where all downloaded files are saved using the native directory picker.
 - **Concurrency & Connections:** Adjust maximum concurrent connections per download (default is 4).
+- **Default View Mode:** Toggle between Card view and compact Table view, saved automatically.
+- **Prevent Sleep During Downloads:** Keep Windows awake while downloads are active (enabled by default).
+- **Show Download Window on Start:** Automatically display the floating window when a download begins (enabled by default).
+- **Close Window on Finish:** Automatically close the floating download window when complete (disabled by default).
 - **Appearance & Language:** Toggle between Arabic (with full RTL support) and English, and select Dark or Light theme modes.
 
 ---
