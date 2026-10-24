@@ -38,8 +38,10 @@ RequestExecutionLevel user
 !include "LogicLib.nsh"
 
 !define MUI_ABORTWARNING
-!define MUI_ICON "${NSISDIR}\Contrib\Graphics\Icons\modern-install.ico"
-!define MUI_UNICON "${NSISDIR}\Contrib\Graphics\Icons\modern-uninstall.ico"
+; SAYL brand icon for the installer/uninstaller windows (paths are relative to
+; this script, like OutFile and BUILD_DIR above).
+!define MUI_ICON "..\..\assets\brand\icon.ico"
+!define MUI_UNICON "..\..\assets\brand\icon.ico"
 
 ; Installer Pages
 !insertmacro MUI_PAGE_WELCOME
