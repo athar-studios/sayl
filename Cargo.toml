@@ -10,5 +10,6 @@ members = [
     "crates/torrent",
     "crates/plugin-host",
     "crates/test-http",
+    "crates/bench",
     "apps/desktop/src-tauri",
 ]

@@ -3096,6 +3096,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "sayl-bench"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "futures-util",
+ "reqwest 0.12.28",
+ "sayl-http",
+ "sayl-test-http",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "sayl-cli"
 version = "0.1.0"
 dependencies = [
