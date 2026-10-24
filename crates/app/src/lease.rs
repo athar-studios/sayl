@@ -541,4 +541,23 @@ impl LeaseTable {
     pub fn completed_ranges(&self) -> &[(u64, u64)] {
         &self.completed_ranges
     }
+
+    /// Marks specific byte ranges as already completed, for resume support.
+    ///
+    /// This is used when recovering from a checkpoint that has already downloaded some ranges.
+    /// The ranges should be non-overlapping and within [0, total_size).
+    pub fn mark_completed_ranges(&mut self, ranges: &[(u64, u64)]) {
+        for &(start, end_inclusive) in ranges {
+            for entry in self.chunks.iter_mut() {
+                if entry.start == start && entry.end_inclusive == end_inclusive {
+                    if entry.status == ChunkStatus::Unclaimed {
+                        entry.status = ChunkStatus::Completed;
+                        self.completed_count += 1;
+                        self.completed_ranges.push((start, end_inclusive));
+                    }
+                    break;
+                }
+            }
+        }
+    }
 }

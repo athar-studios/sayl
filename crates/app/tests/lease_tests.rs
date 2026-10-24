@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use sayl_app::lease::{LeaseReport, LeaseTable};
+use sayl_app::lease::{LeaseReport, LeaseTable, DEFAULT_LEASE_TTL};
 use sayl_app::parallel::{
     run_parallel_download_with_options, run_parallel_download_with_report, ParallelOptions,
 };
@@ -281,7 +281,7 @@ async fn test_end_to_end_fixture_server_max_connections_4() {
     let cancel_token = CancellationToken::new();
     let pause_token = CancellationToken::new();
     let (event_sender, _rx) = sayl_core::event::event_channel(128);
-    let store = Store::open_in_memory().unwrap();
+    let store = Arc::new(Store::open_in_memory().unwrap());
 
     let chunk_size = 16384; // 4 chunks of 16 KiB
     let (outcome, report) = run_parallel_download_with_report(
@@ -295,7 +295,9 @@ async fn test_end_to_end_fixture_server_max_connections_4() {
         cancel_token,
         pause_token,
         &event_sender,
-        &store,
+        store.clone(),
+        &[], // No completed ranges for fresh download
+        DEFAULT_LEASE_TTL,
     )
     .await
     .expect("parallel download succeeds");
@@ -401,12 +403,10 @@ async fn test_slow_worker_triggers_steal_and_file_is_correct() {
     let cancel_token = CancellationToken::new();
     let pause_token = CancellationToken::new();
     let (event_sender, _rx) = sayl_core::event::event_channel(128);
-    let store = Store::open_in_memory().unwrap();
+    let store = Arc::new(Store::open_in_memory().unwrap());
 
-    let options = ParallelOptions {
-        chunk_size: 2000, // 2 chunks: 0..=1999 and 2000..=3999
-        lease_ttl: Duration::from_millis(40), // 40ms TTL < 100ms delay on first worker
-    };
+    let chunk_size = 2000; // 2 chunks: 0..=1999 and 2000..=3999
+    let lease_ttl = Duration::from_millis(40); // 40ms TTL < 100ms delay on first worker
 
     let (outcome, report) = run_parallel_download_with_options(
         &client,
@@ -415,11 +415,13 @@ async fn test_slow_worker_triggers_steal_and_file_is_correct() {
         task_id,
         size as u64,
         2,
-        options,
+        chunk_size,
         cancel_token,
         pause_token,
         &event_sender,
-        &store,
+        store.clone(),
+        &[], // No completed ranges for fresh download
+        lease_ttl,
     )
     .await
     .expect("download completes with steal");
@@ -517,7 +519,7 @@ async fn test_worker_failing_mid_chunk_retried_by_another_worker_and_completes()
     let cancel_token = CancellationToken::new();
     let pause_token = CancellationToken::new();
     let (event_sender, _rx) = sayl_core::event::event_channel(128);
-    let store = Store::open_in_memory().unwrap();
+    let store = Arc::new(Store::open_in_memory().unwrap());
 
     let (outcome, report) = run_parallel_download_with_report(
         &client,
@@ -530,7 +532,9 @@ async fn test_worker_failing_mid_chunk_retried_by_another_worker_and_completes()
         cancel_token,
         pause_token,
         &event_sender,
-        &store,
+        store.clone(),
+        &[], // No completed ranges for fresh download
+        DEFAULT_LEASE_TTL,
     )
     .await
     .expect("download succeeds through retry by worker");
@@ -563,7 +567,7 @@ async fn test_persistent_worker_failure_fails_cleanly() {
     let cancel_token = CancellationToken::new();
     let pause_token = CancellationToken::new();
     let (event_sender, _rx) = sayl_core::event::event_channel(128);
-    let store = Store::open_in_memory().unwrap();
+    let store = Arc::new(Store::open_in_memory().unwrap());
 
     let result = run_parallel_download_with_report(
         &client,
@@ -576,7 +580,9 @@ async fn test_persistent_worker_failure_fails_cleanly() {
         cancel_token,
         pause_token,
         &event_sender,
-        &store,
+        store.clone(),
+        &[], // No completed ranges for fresh download
+        DEFAULT_LEASE_TTL,
     )
     .await;
 

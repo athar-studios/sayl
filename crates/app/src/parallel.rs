@@ -47,24 +47,22 @@ pub async fn run_parallel_download(
     cancel_token: CancellationToken,
     pause_token: CancellationToken,
     event_sender: &EventSender,
-    store: &Store,
+    store: Arc<Store>,
 ) -> Result<DownloadOutcome, CoreError> {
-    let options = ParallelOptions {
-        chunk_size,
-        lease_ttl: DEFAULT_LEASE_TTL,
-    };
-    let (outcome, _) = run_parallel_download_with_options(
+    let (outcome, _report) = run_parallel_download_with_options(
         client,
         url,
         part_path,
         task_id,
         total_size,
         max_connections,
-        options,
+        chunk_size,
         cancel_token,
         pause_token,
         event_sender,
         store,
+        &[], // No completed ranges for fresh download
+        DEFAULT_LEASE_TTL,
     )
     .await?;
     Ok(outcome)
@@ -82,12 +80,10 @@ pub async fn run_parallel_download_with_report(
     cancel_token: CancellationToken,
     pause_token: CancellationToken,
     event_sender: &EventSender,
-    store: &Store,
+    store: Arc<Store>,
+    completed_ranges: &[(u64, u64)],
+    lease_ttl: Duration,
 ) -> Result<(DownloadOutcome, LeaseReport), CoreError> {
-    let options = ParallelOptions {
-        chunk_size,
-        lease_ttl: DEFAULT_LEASE_TTL,
-    };
     run_parallel_download_with_options(
         client,
         url,
@@ -95,11 +91,13 @@ pub async fn run_parallel_download_with_report(
         task_id,
         total_size,
         max_connections,
-        options,
+        chunk_size,
         cancel_token,
         pause_token,
         event_sender,
         store,
+        completed_ranges,
+        lease_ttl,
     )
     .await
 }
@@ -112,11 +110,13 @@ pub async fn run_parallel_download_with_options(
     task_id: TaskId,
     total_size: u64,
     max_connections: usize,
-    options: ParallelOptions,
+    chunk_size: usize,
     cancel_token: CancellationToken,
     pause_token: CancellationToken,
     event_sender: &EventSender,
-    store: &Store,
+    store: Arc<Store>,
+    completed_ranges: &[(u64, u64)],
+    lease_ttl: Duration,
 ) -> Result<(DownloadOutcome, LeaseReport), CoreError> {
     if cancel_token.is_cancelled() {
         return Ok((
@@ -131,8 +131,28 @@ pub async fn run_parallel_download_with_options(
         ));
     }
 
-    // Preallocate destination file size on disk
-    {
+    // Check if file already exists and has content (resume case)
+    let file_exists = part_path.exists();
+    let existing_len = if file_exists {
+        std::fs::metadata(part_path).map(|m| m.len()).unwrap_or(0)
+    } else {
+        0
+    };
+
+    // If resuming with completed ranges, don't truncate; ensure file is at least total_size
+    if !completed_ranges.is_empty() || existing_len > 0 {
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(part_path)
+            .map_err(|e| CoreError::io_with_context(e, "open part file for parallel resume"))?;
+        if existing_len < total_size {
+            file.set_len(total_size)
+                .map_err(|e| CoreError::io_with_context(e, "set_len part file for parallel resume"))?;
+        }
+    } else {
+        // Fresh download: preallocate
         let file = std::fs::OpenOptions::new()
             .read(true)
             .write(true)
@@ -145,7 +165,7 @@ pub async fn run_parallel_download_with_options(
     }
 
     if total_size == 0 {
-        let table = LeaseTable::new(0, options.chunk_size);
+        let table = LeaseTable::new(0, chunk_size);
         let report = table.report();
         return Ok((DownloadOutcome::Completed { written: 0 }, report));
     }
@@ -164,7 +184,18 @@ pub async fn run_parallel_download_with_options(
             .map_err(|e| CoreError::io_with_context(e, "open shared part file"))?,
     );
 
-    let table = Arc::new(Mutex::new(LeaseTable::new(total_size, options.chunk_size)));
+    // Create LeaseTable and mark completed ranges from checkpoint
+    let mut table = LeaseTable::new(total_size, chunk_size);
+    if !completed_ranges.is_empty() {
+        // Convert (start, end_exclusive) to (start, end_inclusive) for LeaseTable
+        let inclusive_ranges: Vec<(u64, u64)> = completed_ranges
+            .iter()
+            .map(|&(s, e)| (s, e.saturating_sub(1)))
+            .filter(|&(s, e)| s <= e)
+            .collect();
+        table.mark_completed_ranges(&inclusive_ranges);
+    }
+    let table = Arc::new(Mutex::new(table));
     let total_chunks = { table.lock().await.total_chunks() };
     let num_workers = max_connections.min(total_chunks).max(1);
 
@@ -174,6 +205,67 @@ pub async fn run_parallel_download_with_options(
 
     let mut handles = Vec::with_capacity(num_workers);
 
+    // Clone store for monitor task and final checkpoint, then shadow original to prevent capture
+    let store_for_monitor = store.clone();
+    let store_for_final = store.clone();
+    let store = (); // Shadow original store to prevent capture in worker closures
+
+    // Spawn monitor task first (captures store_for_monitor)
+    let total_dl_clone = Arc::clone(&total_downloaded);
+    let event_sender_clone = event_sender.clone();
+    let cancel_token_clone = cancel_token.clone();
+    let pause_token_clone = pause_token.clone();
+    let table_clone = Arc::clone(&table);
+
+    let monitor_handle = tokio::spawn(async move {
+        let store_monitor = store_for_monitor.clone();
+        let mut interval = tokio::time::interval(Duration::from_millis(500)); // Save checkpoint every 500ms
+        loop {
+            interval.tick().await;
+            if cancel_token_clone.is_cancelled() || pause_token_clone.is_cancelled() {
+                break;
+            }
+            let current = total_dl_clone.load(Ordering::Relaxed).min(total_size);
+            let elapsed = start_time.elapsed().as_secs_f64();
+            let speed = if elapsed > 0.0 {
+                (current as f64 / elapsed) as u64
+            } else {
+                0
+            };
+            let _ = event_sender_clone
+                .emit(
+                    task_id,
+                    EventKind::Progress,
+                    EventPayload::Progress {
+                        downloaded_bytes: current,
+                        total_bytes: Some(total_size),
+                        speed_bps: speed,
+                    },
+                )
+                .await;
+
+            // Save checkpoint periodically
+            let ranges = {
+                let tbl = table_clone.lock().await;
+                tbl.completed_ranges().to_vec()
+            };
+            if !ranges.is_empty() {
+                let completed_ranges: Vec<(u64, u64)> = ranges
+                    .iter()
+                    .map(|&(s, e)| (s, e + 1))
+                    .collect();
+                let written: u64 = completed_ranges.iter().map(|&(s, e)| e - s).sum();
+                let checkpoint = Checkpoint::new(task_id, written, Some(total_size), completed_ranges);
+                let _ = store_monitor.save_checkpoint(&checkpoint);
+            }
+
+            if current >= total_size {
+                break;
+            }
+        }
+    });
+
+    // Spawn workers (store not captured here)
     for worker_id in 0..num_workers {
         let client = client.clone();
         let url = url.clone();
@@ -183,7 +275,7 @@ pub async fn run_parallel_download_with_options(
         let first_error = Arc::clone(&first_error);
         let cancel_token = cancel_token.clone();
         let pause_token = pause_token.clone();
-        let lease_ttl = options.lease_ttl;
+        let lease_ttl = lease_ttl;
 
         let handle = tokio::spawn(async move {
             let mut consecutive_failures = 0;
@@ -433,43 +525,6 @@ pub async fn run_parallel_download_with_options(
         handles.push(handle);
     }
 
-    // Periodic progress reporter task while workers run
-    let total_dl_clone = Arc::clone(&total_downloaded);
-    let event_sender_clone = event_sender.clone();
-    let cancel_token_clone = cancel_token.clone();
-    let pause_token_clone = pause_token.clone();
-
-    let monitor_handle = tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_millis(50));
-        loop {
-            interval.tick().await;
-            if cancel_token_clone.is_cancelled() || pause_token_clone.is_cancelled() {
-                break;
-            }
-            let current = total_dl_clone.load(Ordering::Relaxed).min(total_size);
-            let elapsed = start_time.elapsed().as_secs_f64();
-            let speed = if elapsed > 0.0 {
-                (current as f64 / elapsed) as u64
-            } else {
-                0
-            };
-            let _ = event_sender_clone
-                .emit(
-                    task_id,
-                    EventKind::Progress,
-                    EventPayload::Progress {
-                        downloaded_bytes: current,
-                        total_bytes: Some(total_size),
-                        speed_bps: speed,
-                    },
-                )
-                .await;
-            if current >= total_size {
-                break;
-            }
-        }
-    });
-
     // Wait for all workers to complete
     for handle in handles {
         let _ = handle.await;
@@ -494,7 +549,7 @@ pub async fn run_parallel_download_with_options(
 
         let checkpoint =
             Checkpoint::new(task_id, current_written, Some(total_size), completed_ranges);
-        let _ = store.save_checkpoint(&checkpoint);
+        let _ = store_for_final.save_checkpoint(&checkpoint);
         return Ok((DownloadOutcome::Cancelled { written: current_written }, report));
     }
 
@@ -515,7 +570,7 @@ pub async fn run_parallel_download_with_options(
 
         let checkpoint =
             Checkpoint::new(task_id, current_written, Some(total_size), completed_ranges);
-        let _ = store.save_checkpoint(&checkpoint);
+        let _ = store_for_final.save_checkpoint(&checkpoint);
         let _ = event_sender
             .emit(
                 task_id,
@@ -549,7 +604,7 @@ pub async fn run_parallel_download_with_options(
 
         let checkpoint =
             Checkpoint::new(task_id, total_size, Some(total_size), completed_ranges);
-        let _ = store.save_checkpoint(&checkpoint);
+        let _ = store_for_final.save_checkpoint(&checkpoint);
         let _ = event_sender
             .emit(
                 task_id,

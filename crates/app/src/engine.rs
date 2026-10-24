@@ -18,6 +18,7 @@ use tokio_util::sync::CancellationToken;
 use url::Url;
 
 use crate::config::EngineConfig;
+use crate::lease::DEFAULT_LEASE_TTL;
 use crate::queue::{Scheduler, TaskStatus as QueueTaskStatus};
 use crate::sequential::DownloadOutcome;
 
@@ -42,7 +43,7 @@ impl Drop for TaskGuard {
 
 struct EngineInner {
     download_dir: PathBuf,
-    store: Store,
+    store: Arc<Store>,
     client: reqwest::Client,
     config: EngineConfig,
     event_sender: EventSender,
@@ -76,7 +77,7 @@ impl Engine {
         std::fs::create_dir_all(&st_dir)
             .map_err(|e| CoreError::io_with_context(e, "create store_dir"))?;
 
-        let store = Store::open(&st_dir)?;
+        let store = Arc::new(Store::open(&st_dir)?);
         Self::with_store(dl_dir, store, config)
     }
 
@@ -88,14 +89,14 @@ impl Engine {
         let dl_dir = download_dir.into();
         std::fs::create_dir_all(&dl_dir)
             .map_err(|e| CoreError::io_with_context(e, "create download_dir"))?;
-        let store = Store::open_in_memory()?;
+        let store = Arc::new(Store::open_in_memory()?);
         Self::with_store(dl_dir, store, config)
     }
 
     /// Creates an engine wrapping an existing storage instance.
     pub fn with_store(
         download_dir: impl Into<PathBuf>,
-        store: Store,
+        store: Arc<Store>,
         config: EngineConfig,
     ) -> Result<Self, CoreError> {
         let dl_dir = download_dir.into();
@@ -372,6 +373,22 @@ impl Engine {
         record.last_modified = probe_res.last_modified.clone().or(record.last_modified.clone());
         self.inner.store.upsert_task(&record)?;
 
+        // Load checkpoint for resume support
+        let checkpoint = self.inner.store.load_checkpoint(task_id).map_err(CoreError::from)?;
+        let (checkpoint_written, checkpoint_ranges) = if let Some(cp) = checkpoint {
+            // Validate checkpoint against current task and probe
+            let cp_valid = cp.total_size == record.total_size
+                && cp.written <= record.total_size.unwrap_or(u64::MAX)
+                && cp.range_map.iter().all(|(s, e)| s < e);
+            if cp_valid {
+                (cp.written, cp.range_map.clone())
+            } else {
+                (0u64, Vec::new())
+            }
+        } else {
+            (0u64, Vec::new())
+        };
+
         // Resume check
         let safe_filename = sayl_http::filename::sanitize_filename(&record.filename);
         if record.filename != safe_filename {
@@ -389,17 +406,20 @@ impl Engine {
             0
         };
 
+        // Use checkpoint.written for resume info if available and valid, else disk_len
+        let resume_written = if checkpoint_written > 0 { checkpoint_written } else { disk_len };
+        
         let mut resume_from = 0u64;
         let mut already_complete = false;
         let mut resume_info_opt = None;
 
-        if disk_len > 0 {
+        if resume_written > 0 || disk_len > 0 {
             let info = ResumeInfo {
                 url: record.url.clone(),
                 etag: record.etag.clone(),
                 last_modified: record.last_modified.clone(),
                 total_size: record.total_size,
-                written: disk_len,
+                written: resume_written,
             };
 
             let val_decision = sayl_http::resume::validate_resume(
@@ -409,11 +429,16 @@ impl Engine {
                 probe_res.content_length,
             );
 
-            let decision = match val_decision {
-                ResumeDecision::ResumeFrom(_) => {
-                    sayl_http::resume::reconcile_partial_len(&info, disk_len)
+            // Reconcile checkpoint/file length with actual disk length
+            let decision = if disk_len < checkpoint_written && checkpoint_written > 0 {
+                ResumeDecision::RestartFromZero
+            } else {
+                match val_decision {
+                    ResumeDecision::ResumeFrom(_) => {
+                        sayl_http::resume::reconcile_partial_len(&info, disk_len)
+                    }
+                    other => other,
                 }
-                other => other,
             };
 
             match decision {
@@ -463,8 +488,24 @@ impl Engine {
             }
         }
 
+        // Final safety check: if file is shorter than resume_from, force restart from zero
+        if resume_from > 0 && disk_len < resume_from {
+            resume_from = 0;
+            resume_info_opt = None;
+            let f = std::fs::OpenOptions::new()
+                .write(true)
+                .truncate(true)
+                .create(true)
+                .open(&part_path)
+                .map_err(|e| CoreError::io_with_context(e, "truncate part file to zero"))?;
+            drop(f);
+            record.written = 0;
+            self.inner.store.upsert_task(&record)?;
+        }
+
         // Download execution
-        let outcome_status = if !already_complete {
+        let mut outcome_status = QueueTaskStatus::Finished;
+        if !already_complete {
             self.transition_and_persist(&mut record, DownloadState::Downloading)
                 .await?;
 
@@ -474,8 +515,8 @@ impl Engine {
                 && record.total_size.unwrap() > 0
                 && resume_from == 0;
 
-            let download_result = if use_parallel {
-                crate::parallel::run_parallel_download(
+            if use_parallel {
+                let download_result = crate::parallel::run_parallel_download_with_options(
                     &self.inner.client,
                     &probe_res.final_url,
                     &part_path,
@@ -486,11 +527,79 @@ impl Engine {
                     cancel_token.clone(),
                     pause_token.clone(),
                     &self.inner.event_sender,
-                    &self.inner.store,
+                    self.inner.store.clone(),
+                    &checkpoint_ranges, // Pass completed ranges for resume
+                    DEFAULT_LEASE_TTL,
                 )
-                .await
+                .await;
+
+                outcome_status = match download_result {
+                    Ok((DownloadOutcome::Completed { written }, _report)) => {
+                        record.written = written;
+                        self.inner.store.upsert_task(&record)?;
+                        QueueTaskStatus::Finished
+                    }
+                    Ok((DownloadOutcome::Paused { written }, _report)) => {
+                        record.written = written;
+                        let checkpoint = Checkpoint::new(
+                            task_id,
+                            written,
+                            record.total_size,
+                            checkpoint_ranges.clone(),
+                        );
+                        let _ = self.inner.store.save_checkpoint(&checkpoint);
+                        self.transition_and_persist(&mut record, DownloadState::Pausing)
+                            .await?;
+                        self.transition_and_persist(&mut record, DownloadState::Paused)
+                            .await?;
+                        self.scheduler_pause_and_promote(sched_id).await;
+                        return Ok(());
+                    }
+                    Ok((DownloadOutcome::Cancelled { written }, _report)) => {
+                        record.written = written;
+                        self.transition_and_persist(&mut record, DownloadState::Cancelling)
+                            .await?;
+                        self.transition_and_persist(&mut record, DownloadState::Cancelled)
+                            .await?;
+                        let _ = self
+                            .inner
+                            .event_sender
+                            .emit(
+                                task_id,
+                                EventKind::Cancelled,
+                                EventPayload::Cancelled {
+                                    reason: "cancelled by user".into(),
+                                },
+                            )
+                            .await;
+                        QueueTaskStatus::Cancelled
+                    }
+                    Err(err) => {
+                        let _ = self
+                            .transition_and_persist(&mut record, DownloadState::Failed)
+                            .await;
+                        record.error = Some(err.to_string());
+                        let _ = self.inner.store.upsert_task(&record);
+                        let _ = self
+                            .inner
+                            .event_sender
+                            .emit(
+                                task_id,
+                                EventKind::Error,
+                                EventPayload::Error {
+                                    error: err.to_string(),
+                                    retryable: err.is_retryable(),
+                                },
+                            )
+                            .await;
+                        let promoted = self.finish_and_get_promoted(sched_id, QueueTaskStatus::Failed);
+                        self.spawn_promoted_tasks(promoted);
+                        self.remove_scheduler_id(task_id);
+                        return Err(err);
+                    }
+                };
             } else {
-                crate::sequential::run_sequential_download(
+                let download_result = crate::sequential::run_sequential_download(
                     &self.inner.client,
                     &probe_res.final_url,
                     &part_path,
@@ -501,79 +610,78 @@ impl Engine {
                     cancel_token.clone(),
                     pause_token.clone(),
                     &self.inner.event_sender,
-                    &self.inner.store,
+                    &*self.inner.store,
                 )
-                .await
-            };
+                .await;
 
-            match download_result {
-                Ok(DownloadOutcome::Completed { written }) => {
-                    record.written = written;
-                    self.inner.store.upsert_task(&record)?;
-                    QueueTaskStatus::Finished
-                }
-                Ok(DownloadOutcome::Paused { written }) => {
-                    record.written = written;
-                    let checkpoint = Checkpoint::new(
-                        task_id,
-                        written,
-                        record.total_size,
-                        vec![(0, written)],
-                    );
-                    let _ = self.inner.store.save_checkpoint(&checkpoint);
-                    self.transition_and_persist(&mut record, DownloadState::Pausing)
-                        .await?;
-                    self.transition_and_persist(&mut record, DownloadState::Paused)
-                        .await?;
-                    self.scheduler_pause_and_promote(sched_id).await;
-                    return Ok(());
-                }
-                Ok(DownloadOutcome::Cancelled { written }) => {
-                    record.written = written;
-                    self.transition_and_persist(&mut record, DownloadState::Cancelling)
-                        .await?;
-                    self.transition_and_persist(&mut record, DownloadState::Cancelled)
-                        .await?;
-                    let _ = self
-                        .inner
-                        .event_sender
-                        .emit(
+                outcome_status = match download_result {
+                    Ok(DownloadOutcome::Completed { written }) => {
+                        record.written = written;
+                        self.inner.store.upsert_task(&record)?;
+                        QueueTaskStatus::Finished
+                    }
+                    Ok(DownloadOutcome::Paused { written }) => {
+                        record.written = written;
+                        let checkpoint = Checkpoint::new(
                             task_id,
-                            EventKind::Cancelled,
-                            EventPayload::Cancelled {
-                                reason: "cancelled by user".into(),
-                            },
-                        )
-                        .await;
-                    QueueTaskStatus::Cancelled
-                }
-                Err(err) => {
-                    let _ = self
-                        .transition_and_persist(&mut record, DownloadState::Failed)
-                        .await;
-                    record.error = Some(err.to_string());
-                    let _ = self.inner.store.upsert_task(&record);
-                    let _ = self
-                        .inner
-                        .event_sender
-                        .emit(
-                            task_id,
-                            EventKind::Error,
-                            EventPayload::Error {
-                                error: err.to_string(),
-                                retryable: err.is_retryable(),
-                            },
-                        )
-                        .await;
-                    let promoted = self.finish_and_get_promoted(sched_id, QueueTaskStatus::Failed);
-                    self.spawn_promoted_tasks(promoted);
-                    self.remove_scheduler_id(task_id);
-                    return Err(err);
-                }
+                            written,
+                            record.total_size,
+                            vec![(0, written)],
+                        );
+                        let _ = self.inner.store.save_checkpoint(&checkpoint);
+                        self.transition_and_persist(&mut record, DownloadState::Pausing)
+                            .await?;
+                        self.transition_and_persist(&mut record, DownloadState::Paused)
+                            .await?;
+                        self.scheduler_pause_and_promote(sched_id).await;
+                        return Ok(());
+                    }
+                    Ok(DownloadOutcome::Cancelled { written }) => {
+                        record.written = written;
+                        self.transition_and_persist(&mut record, DownloadState::Cancelling)
+                            .await?;
+                        self.transition_and_persist(&mut record, DownloadState::Cancelled)
+                            .await?;
+                        let _ = self
+                            .inner
+                            .event_sender
+                            .emit(
+                                task_id,
+                                EventKind::Cancelled,
+                                EventPayload::Cancelled {
+                                    reason: "cancelled by user".into(),
+                                },
+                            )
+                            .await;
+                        QueueTaskStatus::Cancelled
+                    }
+                    Err(err) => {
+                        let _ = self
+                            .transition_and_persist(&mut record, DownloadState::Failed)
+                            .await;
+                        record.error = Some(err.to_string());
+                        let _ = self.inner.store.upsert_task(&record);
+                        let _ = self
+                            .inner
+                            .event_sender
+                            .emit(
+                                task_id,
+                                EventKind::Error,
+                                EventPayload::Error {
+                                    error: err.to_string(),
+                                    retryable: err.is_retryable(),
+                                },
+                            )
+                            .await;
+                        let promoted = self.finish_and_get_promoted(sched_id, QueueTaskStatus::Failed);
+                        self.spawn_promoted_tasks(promoted);
+                        self.remove_scheduler_id(task_id);
+                        return Err(err);
+                    }
+                };
             }
-        } else {
-            QueueTaskStatus::Finished
-        };
+
+        }
 
         // If already_complete or download completed, continue to verification/finalization
         if matches!(outcome_status, QueueTaskStatus::Finished) && !already_complete {
@@ -948,9 +1056,69 @@ impl Engine {
                 0
             };
 
+            // Load checkpoint if exists
+            let checkpoint = self.inner.store.load_checkpoint(task.id).map_err(CoreError::from)?;
+            let mut checkpoint_valid = false;
+            let mut checkpoint_written = 0u64;
+            let mut _checkpoint_ranges: Vec<(u64, u64)> = Vec::new();
+
+            if let Some(cp) = checkpoint {
+                // Validate checkpoint against task and file
+                // Note: we allow part_len < cp.written (partial file shorter than checkpoint)
+                // as this is handled separately below
+                let cp_corrupt = cp.total_size.is_some() && task.total_size.is_some() && cp.total_size != task.total_size
+                    || cp.written > task.total_size.unwrap_or(u64::MAX)
+                    || cp.range_map.iter().any(|(s, e)| s >= e);
+                
+                if !cp_corrupt {
+                    checkpoint_valid = true;
+                    checkpoint_written = cp.written;
+                    _checkpoint_ranges = cp.range_map.clone();
+                    // Update task.written from checkpoint if it's more recent
+                    if cp.written > task.written {
+                        task.written = cp.written;
+                        let _ = self.inner.store.upsert_task(&task);
+                    }
+                } else {
+                    // Corrupt checkpoint: discard it
+                    let _ = self.inner.store.save_checkpoint(&Checkpoint::new(
+                        task.id, 0, task.total_size, Vec::new()
+                    ));
+                }
+            }
+
+            // Check if final file exists and is complete (handles crash after write before finalize)
+            let final_path = self
+                .inner
+                .download_dir
+                .join(&task.filename);
+            let final_exists = final_path.exists();
+            let final_len = if final_exists {
+                tokio::fs::metadata(&final_path)
+                    .await
+                    .map(|m| m.len())
+                    .unwrap_or(0)
+            } else {
+                0
+            };
+            let final_complete = final_exists 
+                && task.total_size.is_some() 
+                && final_len >= task.total_size.unwrap();
+
+            // Handle partial file shorter than checkpoint: discard checkpoint entirely to force full restart
+            if checkpoint_valid && part_len < checkpoint_written && !final_complete {
+                let new_checkpoint = Checkpoint::new(task.id, 0, task.total_size, Vec::new());
+                self.inner.store.save_checkpoint(&new_checkpoint).map_err(CoreError::from)?;
+                checkpoint_valid = false;
+                checkpoint_written = 0;
+                task.written = 0;
+                self.inner.store.upsert_task(&task)?;
+            }
+
             let is_corrupt = task.url.is_empty()
                 || task.filename.is_empty()
-                || (task.total_size.is_some() && part_len > task.total_size.unwrap());
+                || (task.total_size.is_some() && part_len > task.total_size.unwrap())
+                || (checkpoint_valid && part_len < checkpoint_written && !final_complete);
 
             if is_corrupt {
                 let _ = self
@@ -1011,12 +1179,24 @@ impl Engine {
                     }
                 }
                 DownloadState::Verifying | DownloadState::Finalizing => {
-                    if self
-                        .transition_and_persist(&mut task, DownloadState::Failed)
-                        .await
-                        .is_ok()
-                    {
-                        updated.push(task.id);
+                    // If file is complete, finalize; else fail
+                    if task.total_size.is_some() && part_len >= task.total_size.unwrap() {
+                        // File appears complete, transition to Finalizing then let start() handle it
+                        if self
+                            .transition_and_persist(&mut task, DownloadState::Finalizing)
+                            .await
+                            .is_ok()
+                        {
+                            updated.push(task.id);
+                        }
+                    } else {
+                        if self
+                            .transition_and_persist(&mut task, DownloadState::Failed)
+                            .await
+                            .is_ok()
+                        {
+                            updated.push(task.id);
+                        }
                     }
                 }
                 _ => {}
