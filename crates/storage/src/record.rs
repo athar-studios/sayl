@@ -33,6 +33,9 @@ pub struct TaskRecord {
     pub etag: Option<String>,
     /// HTTP Last-Modified validator from origin response headers.
     pub last_modified: Option<String>,
+    /// MIME content type from origin response headers.
+    #[serde(default)]
+    pub content_type: Option<String>,
     /// Timestamp when the task was initially registered.
     pub created_at: DateTime<Utc>,
     /// Timestamp when the task was last updated or checkpointed.
@@ -60,6 +63,7 @@ impl TaskRecord {
             written: 0,
             etag: None,
             last_modified: None,
+            content_type: None,
             created_at: now,
             updated_at: now,
             error: None,
@@ -85,6 +89,7 @@ impl TaskRecord {
             written: 0,
             etag: None,
             last_modified: None,
+            content_type: None,
             created_at: now,
             updated_at: now,
             error: None,
@@ -149,6 +154,28 @@ mod tests {
         let json = serde_json::to_string(&record).expect("serialization succeeds");
         let decoded: TaskRecord = serde_json::from_str(&json).expect("deserialization succeeds");
         assert_eq!(record, decoded);
+    }
+
+    #[test]
+    fn test_task_record_deserialize_without_content_type() {
+        let json = r#"{
+            "id": "01900000-0000-7000-8000-000000000001",
+            "url": "https://example.com/file.iso",
+            "final_url": null,
+            "save_path": "/downloads",
+            "filename": "file.iso",
+            "state": "Queued",
+            "total_size": null,
+            "written": 0,
+            "etag": null,
+            "last_modified": null,
+            "created_at": "2025-01-01T00:00:00Z",
+            "updated_at": "2025-01-01T00:00:00Z",
+            "error": null
+        }"#;
+
+        let decoded: TaskRecord = serde_json::from_str(json).expect("deserialization succeeds");
+        assert_eq!(decoded.content_type, None);
     }
 
     #[test]

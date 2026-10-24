@@ -3,9 +3,20 @@
 //! Orchestrates the `sayl-app` download engine, manages settings,
 //! and communicates with the Svelte frontend via Tauri commands and events.
 
+pub mod duplicates;
+pub mod power;
+pub mod shutdown;
+
+pub use duplicates::{find_duplicate, normalize_url_for_compare};
+pub use power::{should_inhibit, SleepInhibitor};
+pub use shutdown::{
+    shutdown_decision, ShutdownController, ShutdownDecision, ShutdownRunner, ShutdownStatus,
+    SHUTDOWN_COUNTDOWN_SECS,
+};
+
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
 
 use sayl_app::{Engine, EngineConfig};
 use sayl_core::id::TaskId;
@@ -23,12 +34,18 @@ pub struct LiveTaskStats {
 
 /// User configurable settings.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct Settings {
     pub download_dir: String,
     pub max_concurrent_tasks: usize,
     pub max_connections_per_task: usize,
     pub theme: String,
     pub language: String,
+    pub view_mode: String,
+    pub sidebar_collapsed: bool,
+    pub prevent_sleep: bool,
+    pub show_download_window: bool,
+    pub close_download_window_on_finish: bool,
 }
 
 impl Default for Settings {
@@ -39,6 +56,11 @@ impl Default for Settings {
             max_connections_per_task: 4,
             theme: "system".to_string(),
             language: "ar".to_string(),
+            view_mode: "cards".to_string(),
+            sidebar_collapsed: false,
+            prevent_sleep: true,
+            show_download_window: true,
+            close_download_window_on_finish: false,
         }
     }
 }
@@ -110,6 +132,9 @@ pub fn validate_settings(settings: &Settings) -> Result<(), String> {
     if !["ar", "en"].contains(&settings.language.as_str()) {
         return Err("Language must be ar or en".to_string());
     }
+    if !["cards", "table"].contains(&settings.view_mode.as_str()) {
+        return Err("View mode must be cards or table".to_string());
+    }
     Ok(())
 }
 
@@ -125,11 +150,18 @@ pub struct TaskView {
     pub speed_bps: Option<u64>,
     pub eta_secs: Option<u64>,
     pub error: Option<String>,
+    pub mime: Option<String>,
+    pub parts: Option<u32>,
 }
 
 impl TaskView {
     /// Constructs a `TaskView` from a durable `TaskRecord` and optional transient stats.
-    pub fn from_record(rec: &TaskRecord, speed_bps: Option<u64>, eta_secs: Option<u64>) -> Self {
+    pub fn from_record(
+        rec: &TaskRecord,
+        speed_bps: Option<u64>,
+        eta_secs: Option<u64>,
+        parts: Option<u32>,
+    ) -> Self {
         let is_running =
             rec.state == DownloadState::Downloading || rec.state == DownloadState::Probing;
         Self {
@@ -142,8 +174,18 @@ impl TaskView {
             speed_bps: if is_running { speed_bps } else { None },
             eta_secs: if is_running { eta_secs } else { None },
             error: rec.error.clone(),
+            mime: rec.content_type.clone(),
+            parts,
         }
     }
+}
+
+/// Outcome of invoking `add_task`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum AddTaskOutcome {
+    Added { task: TaskView },
+    Duplicate { existing: TaskView },
 }
 
 /// Progress event payload matching `sayl://progress`.
@@ -161,15 +203,25 @@ pub struct AppState {
     pub settings: RwLock<Settings>,
     pub live_stats: Arc<Mutex<HashMap<TaskId, LiveTaskStats>>>,
     pub settings_path: PathBuf,
+    pub sleep_inhibitor: Arc<SleepInhibitor>,
+    pub shutdown_controller: Arc<ShutdownController>,
 }
 
 impl AppState {
-    pub fn new(engine: Engine, settings: Settings, settings_path: PathBuf) -> Self {
+    pub fn new(
+        engine: Engine,
+        settings: Settings,
+        settings_path: PathBuf,
+        sleep_inhibitor: Arc<SleepInhibitor>,
+        shutdown_controller: Arc<ShutdownController>,
+    ) -> Self {
         Self {
             engine,
             settings: RwLock::new(settings),
             live_stats: Arc::new(Mutex::new(HashMap::new())),
             settings_path,
+            sleep_inhibitor,
+            shutdown_controller,
         }
     }
 }
@@ -210,6 +262,45 @@ pub fn default_data_dir() -> PathBuf {
     std::env::temp_dir().join("sayl-data")
 }
 
+pub(crate) fn update_sleep_inhibition(
+    engine: &Engine,
+    settings: &RwLock<Settings>,
+    inhibitor: &SleepInhibitor,
+) {
+    let prevent_sleep = settings.read().map(|s| s.prevent_sleep).unwrap_or(true);
+    let active_count = match engine.list_tasks() {
+        Ok(tasks) => tasks
+            .into_iter()
+            .filter(|t| {
+                matches!(
+                    t.state,
+                    DownloadState::Queued
+                        | DownloadState::Probing
+                        | DownloadState::Downloading
+                        | DownloadState::Verifying
+                        | DownloadState::Finalizing
+                )
+            })
+            .count(),
+        Err(_) => 0,
+    };
+    inhibitor.set_active(power::should_inhibit(prevent_sleep, active_count));
+}
+
+pub(crate) fn task_parts_count(engine: &Engine, task_id: TaskId) -> Option<u32> {
+    engine
+        .load_checkpoint(task_id)
+        .ok()
+        .flatten()
+        .and_then(|cp| {
+            if cp.range_map.is_empty() {
+                None
+            } else {
+                Some(cp.range_map.len() as u32)
+            }
+        })
+}
+
 // ----------------------------------------------------------------------------
 // Tauri Commands
 // ----------------------------------------------------------------------------
@@ -218,10 +309,35 @@ pub mod commands {
     use super::*;
 
     #[tauri::command]
-    pub async fn add_task(state: State<'_, AppState>, url: String) -> Result<TaskView, String> {
+    pub async fn add_task(
+        state: State<'_, AppState>,
+        url: String,
+        force: Option<bool>,
+    ) -> Result<AddTaskOutcome, String> {
         let clean_url = url.trim();
         if clean_url.is_empty() {
             return Err("URL cannot be empty".to_string());
+        }
+
+        if force != Some(true) {
+            let records = state
+                .engine
+                .list_tasks()
+                .map_err(|e| format!("Storage read failed: {e}"))?;
+            if let Some(existing_rec) = duplicates::find_duplicate(&records, clean_url) {
+                let stats_guard = state.live_stats.lock().ok();
+                let stats = stats_guard
+                    .as_ref()
+                    .and_then(|m| m.get(&existing_rec.id).copied());
+                let parts = task_parts_count(&state.engine, existing_rec.id);
+                let view = TaskView::from_record(
+                    existing_rec,
+                    stats.map(|s| s.speed_bps),
+                    stats.and_then(|s| s.eta_secs),
+                    parts,
+                );
+                return Ok(AddTaskOutcome::Duplicate { existing: view });
+            }
         }
 
         let task_id = state
@@ -232,6 +348,7 @@ pub mod commands {
 
         // Auto-start the newly added task
         state.engine.spawn_start(task_id);
+        update_sleep_inhibition(&state.engine, &state.settings, &state.sleep_inhibitor);
 
         let record = state
             .engine
@@ -239,7 +356,11 @@ pub mod commands {
             .map_err(|e| format!("Storage read failed: {e}"))?
             .ok_or_else(|| "Task record not found after insert".to_string())?;
 
-        Ok(TaskView::from_record(&record, None, None))
+        let parts = task_parts_count(&state.engine, task_id);
+
+        Ok(AddTaskOutcome::Added {
+            task: TaskView::from_record(&record, None, None, parts),
+        })
     }
 
     #[tauri::command]
@@ -249,6 +370,7 @@ pub mod commands {
             .map_err(|e| format!("Invalid task ID: {e}"))?;
 
         state.engine.spawn_start(task_id);
+        update_sleep_inhibition(&state.engine, &state.settings, &state.sleep_inhibitor);
         Ok(())
     }
 
@@ -267,6 +389,7 @@ pub mod commands {
         if let Ok(mut stats) = state.live_stats.lock() {
             stats.remove(&task_id);
         }
+        update_sleep_inhibition(&state.engine, &state.settings, &state.sleep_inhibitor);
 
         Ok(())
     }
@@ -286,6 +409,7 @@ pub mod commands {
         if let Ok(mut stats) = state.live_stats.lock() {
             stats.remove(&task_id);
         }
+        update_sleep_inhibition(&state.engine, &state.settings, &state.sleep_inhibitor);
 
         Ok(())
     }
@@ -302,10 +426,12 @@ pub mod commands {
             .into_iter()
             .map(|rec| {
                 let stats = stats_guard.as_ref().and_then(|m| m.get(&rec.id).copied());
+                let parts = task_parts_count(&state.engine, rec.id);
                 TaskView::from_record(
                     &rec,
                     stats.map(|s| s.speed_bps),
                     stats.and_then(|s| s.eta_secs),
+                    parts,
                 )
             })
             .collect();
@@ -341,6 +467,8 @@ pub mod commands {
         if let Ok(json) = serde_json::to_string_pretty(&settings) {
             let _ = std::fs::write(&state.settings_path, json);
         }
+
+        update_sleep_inhibition(&state.engine, &state.settings, &state.sleep_inhibitor);
 
         Ok(settings)
     }
@@ -407,6 +535,57 @@ pub mod commands {
 
         Ok(())
     }
+
+    #[tauri::command]
+    pub fn open_task_file(state: State<'_, AppState>, id: String) -> Result<(), String> {
+        let task_id = id
+            .parse::<TaskId>()
+            .map_err(|e| format!("Invalid task ID: {e}"))?;
+
+        let record = state
+            .engine
+            .get_task(task_id)
+            .map_err(|e| format!("Failed to get task: {e}"))?
+            .ok_or_else(|| "Task not found".to_string())?;
+
+        let file_path = record.save_path.join(&record.filename);
+        if !file_path.exists() {
+            return Err(format!("File does not exist: {}", file_path.display()));
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            std::process::Command::new("explorer")
+                .arg(&file_path)
+                .spawn()
+                .map_err(|e| format!("Failed to open file: {e}"))?;
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = file_path;
+        }
+
+        Ok(())
+    }
+
+    #[tauri::command]
+    pub fn arm_shutdown(
+        state: State<'_, AppState>,
+        seconds: Option<u64>,
+    ) -> Result<ShutdownStatus, String> {
+        Ok(state.shutdown_controller.arm(seconds))
+    }
+
+    #[tauri::command]
+    pub fn cancel_shutdown(state: State<'_, AppState>) -> Result<ShutdownStatus, String> {
+        Ok(state.shutdown_controller.cancel())
+    }
+
+    #[tauri::command]
+    pub fn get_shutdown_status(state: State<'_, AppState>) -> Result<ShutdownStatus, String> {
+        Ok(state.shutdown_controller.status())
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -445,7 +624,37 @@ pub fn run() {
         }
     };
 
-    let app_state = AppState::new(engine, initial_settings, settings_path);
+    let sleep_inhibitor = Arc::new(SleepInhibitor::new());
+    let app_handle_slot: Arc<OnceLock<tauri::AppHandle>> = Arc::new(OnceLock::new());
+
+    let shutdown_runner: Arc<dyn ShutdownRunner> = Arc::new(shutdown::SystemShutdownRunner);
+    let engine_for_shutdown = engine.clone();
+    let shutdown_states: Arc<dyn Fn() -> Vec<DownloadState> + Send + Sync> = Arc::new(move || {
+        engine_for_shutdown
+            .list_tasks()
+            .map(|tasks| tasks.into_iter().map(|t| t.state).collect())
+            .unwrap_or_default()
+    });
+    let app_handle_for_notify = Arc::clone(&app_handle_slot);
+    let shutdown_notify: Arc<dyn Fn(ShutdownStatus) + Send + Sync> = Arc::new(move |status| {
+        if let Some(app_handle) = app_handle_for_notify.get() {
+            let _ = app_handle.emit("sayl://shutdown", &status);
+        }
+    });
+
+    let shutdown_controller = Arc::new(ShutdownController::new(
+        shutdown_runner,
+        shutdown_states,
+        shutdown_notify,
+    ));
+
+    let app_state = AppState::new(
+        engine,
+        initial_settings,
+        settings_path,
+        sleep_inhibitor,
+        shutdown_controller,
+    );
 
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -459,13 +668,19 @@ pub fn run() {
             commands::get_settings,
             commands::set_settings,
             commands::open_download_folder,
-            commands::reveal_task
+            commands::reveal_task,
+            commands::open_task_file,
+            commands::arm_shutdown,
+            commands::cancel_shutdown,
+            commands::get_shutdown_status
         ])
-        .setup(|app| {
+        .setup(move |app| {
+            let _ = app_handle_slot.set(app.handle().clone());
             let state = app.state::<AppState>();
             let engine = state.engine.clone();
             let live_stats = Arc::clone(&state.live_stats);
             let app_handle = app.handle().clone();
+            let sleep_inhibitor = Arc::clone(&state.sleep_inhibitor);
 
             tauri::async_runtime::spawn(async move {
                 // Recover non-terminal tasks from durable storage
@@ -479,6 +694,11 @@ pub fn run() {
                     Err(err) => {
                         eprintln!("Engine recovery error: {err}");
                     }
+                }
+
+                // Initial sync for sleep inhibition after recovery
+                if let Some(app_state) = app_handle.try_state::<AppState>() {
+                    update_sleep_inhibition(&engine, &app_state.settings, &sleep_inhibitor);
                 }
 
                 // Event forwarding pump
@@ -522,11 +742,18 @@ pub fn run() {
                                 };
                                 let _ = app_handle.emit("sayl://progress", &progress);
                             }
-                            sayl_core::event::EventPayload::StateChanged { to, .. }
-                                if to.is_terminal() || *to == DownloadState::Paused =>
-                            {
-                                if let Ok(mut stats) = live_stats.lock() {
-                                    stats.remove(&task_id);
+                            sayl_core::event::EventPayload::StateChanged { to, .. } => {
+                                if to.is_terminal() || *to == DownloadState::Paused {
+                                    if let Ok(mut stats) = live_stats.lock() {
+                                        stats.remove(&task_id);
+                                    }
+                                }
+                                if let Some(app_state) = app_handle.try_state::<AppState>() {
+                                    update_sleep_inhibition(
+                                        &engine,
+                                        &app_state.settings,
+                                        &sleep_inhibitor,
+                                    );
                                 }
                             }
                             _ => {}
@@ -567,6 +794,7 @@ mod tests {
             max_connections_per_task: 8,
             theme: "dark".to_string(),
             language: "ar".to_string(),
+            ..Settings::default()
         };
         assert!(validate_settings(&valid).is_ok());
     }
@@ -602,6 +830,65 @@ mod tests {
             ..Settings::default()
         };
         assert!(validate_settings(&invalid_lang).is_err());
+    }
+
+    #[test]
+    fn test_settings_validation_view_mode() {
+        let mut s = Settings::default();
+        s.view_mode = "cards".to_string();
+        assert!(validate_settings(&s).is_ok());
+
+        s.view_mode = "table".to_string();
+        assert!(validate_settings(&s).is_ok());
+
+        s.view_mode = "grid".to_string();
+        assert!(validate_settings(&s).is_err());
+        assert_eq!(
+            validate_settings(&s).unwrap_err(),
+            "View mode must be cards or table"
+        );
+    }
+
+    #[test]
+    fn test_settings_backward_compat_and_serialized_keys() {
+        let old_json = r#"{
+            "download_dir": "C:\\Downloads",
+            "max_concurrent_tasks": 3,
+            "max_connections_per_task": 4,
+            "theme": "dark",
+            "language": "en"
+        }"#;
+
+        let settings: Settings = serde_json::from_str(old_json).expect("parses old json");
+        assert_eq!(settings.download_dir, "C:\\Downloads");
+        assert_eq!(settings.max_concurrent_tasks, 3);
+        assert_eq!(settings.max_connections_per_task, 4);
+        assert_eq!(settings.theme, "dark");
+        assert_eq!(settings.language, "en");
+        assert_eq!(settings.view_mode, "cards");
+        assert!(!settings.sidebar_collapsed);
+        assert!(settings.prevent_sleep);
+        assert!(settings.show_download_window);
+        assert!(!settings.close_download_window_on_finish);
+
+        let val: serde_json::Value = serde_json::to_value(&settings).expect("serializes");
+        let obj = val.as_object().expect("object");
+        assert_eq!(obj.len(), 10);
+        let expected_keys = [
+            "download_dir",
+            "max_concurrent_tasks",
+            "max_connections_per_task",
+            "theme",
+            "language",
+            "view_mode",
+            "sidebar_collapsed",
+            "prevent_sleep",
+            "show_download_window",
+            "close_download_window_on_finish",
+        ];
+        for key in expected_keys {
+            assert!(obj.contains_key(key), "missing key: {key}");
+        }
     }
 
     #[test]
@@ -642,7 +929,7 @@ mod tests {
             "archive.zip",
         );
 
-        let view = TaskView::from_record(&record, Some(1048576), Some(120));
+        let view = TaskView::from_record(&record, Some(1048576), Some(120), None);
         assert_eq!(view.id, record.id.to_string());
         assert_eq!(view.url, "https://example.com/archive.zip");
         assert_eq!(view.filename, "archive.zip");
@@ -652,6 +939,8 @@ mod tests {
         assert_eq!(view.speed_bps, None);
         assert_eq!(view.eta_secs, None);
         assert_eq!(view.error, None);
+        assert_eq!(view.mime, None);
+        assert_eq!(view.parts, None);
     }
 
     #[test]
@@ -665,12 +954,33 @@ mod tests {
         record.written = 50_000_000;
         record.total_size = Some(100_000_000);
 
-        let view = TaskView::from_record(&record, Some(2_000_000), Some(25));
+        let view = TaskView::from_record(&record, Some(2_000_000), Some(25), None);
         assert_eq!(view.state, "Downloading");
         assert_eq!(view.speed_bps, Some(2_000_000));
         assert_eq!(view.eta_secs, Some(25));
         assert_eq!(view.written, 50_000_000);
         assert_eq!(view.total_size, Some(100_000_000));
+        assert_eq!(view.mime, None);
+        assert_eq!(view.parts, None);
+    }
+
+    #[test]
+    fn test_task_view_mime_and_parts_mapping() {
+        let mut record = TaskRecord::new(
+            "https://example.com/archive.tar.gz",
+            PathBuf::from("C:\\Downloads"),
+            "archive.tar.gz",
+        );
+        record.content_type = Some("application/gzip".to_string());
+
+        let view = TaskView::from_record(&record, None, None, Some(4));
+        assert_eq!(view.mime, Some("application/gzip".to_string()));
+        assert_eq!(view.parts, Some(4));
+
+        record.content_type = None;
+        let view_empty = TaskView::from_record(&record, None, None, None);
+        assert_eq!(view_empty.mime, None);
+        assert_eq!(view_empty.parts, None);
     }
 
     #[test]

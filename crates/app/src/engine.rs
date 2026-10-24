@@ -157,6 +157,7 @@ impl Engine {
         record.total_size = probe_res.content_length;
         record.etag = probe_res.etag.clone();
         record.last_modified = probe_res.last_modified.clone();
+        record.content_type = probe_res.content_type.clone();
         record.state = DownloadState::Queued;
 
         self.inner.store.upsert_task(&record)?;
@@ -402,6 +403,9 @@ impl Engine {
             .last_modified
             .clone()
             .or(record.last_modified.clone());
+        if probe_res.content_type.is_some() {
+            record.content_type = probe_res.content_type.clone();
+        }
         self.inner.store.upsert_task(&record)?;
 
         // Load checkpoint for resume support
