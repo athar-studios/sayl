@@ -85,7 +85,7 @@ Get-FileHash .\SAYL-Setup-x64-0.1.0.exe -Algorithm SHA256
 - يتم حفظ نمط العرض المختار تلقائياً في الإعدادات ويظل ثابتاً عبر جلسات الاستخدام.
 
 ### نافذة التحميل العائمة
-نافذة مستقلة وصغيرة تطفو على الشاشة لكل تنزيل نشط، تعرض اسم الملف، وحجمه، وشريط تقدم متدرج، والسرعة اللحظية، والوقت المتبقي، وعدد الأجزاء (`Parts`)، مع أزرار الإيقاف المؤقت والاستئناف والإلغاء؛ وعند اكتمال التنزيل تتيح خياري **«فتح الملف»** و**«فتح المجلد»**. وتخضع النافذة لإعدادين في شاشة الإعدادات: «إظهار نافذة التحميل عند بدء كل تحميل» (مفعّل افتراضياً) و«إغلاق النافذة تلقائيًا عند انتهاء التحميل» (معطّل افتراضياً).
+لوحة صغيرة عائمة داخل واجهة التطبيق، واحدة لكل تنزيل نشط، تظهر فوق قائمة المهام، وتُظهر اسم الملف، وحجمه، وشريط تقدم متدرج، والسرعة اللحظية، والوقت المتبقي، وعدد الأجزاء (`Parts`)، مع أزرار الإيقاف المؤقت والاستئناف والإلغاء؛ وعند اكتمال التنزيل تتيح خياري **«فتح الملف»** و**«فتح المجلد»**. وتخضع النافذة لإعدادين في شاشة الإعدادات: «إظهار نافذة التحميل عند بدء كل تحميل» (مفعّل افتراضياً) و«إغلاق النافذة تلقائيًا عند انتهاء التحميل» (معطّل افتراضياً).
 
 ### منع نوم الجهاز أثناء التنزيلات
 طالما توجد مهام تنزيل نشطة، يطلب التطبيق من نظام التشغيل Windows البقاء في وضع النشاط ومنع الانتقال إلى وضع السكون (`SetThreadExecutionState`)، ويتم تحرير هذا القيد تلقائياً بمجرد اكتمال كافة المهام أو توقفها. تخضع هذه الميزة لخيار **«منع نوم الجهاز أثناء التنزيلات»** في شاشة الإعدادات وهي مفعّلة افتراضياً.
@@ -229,7 +229,7 @@ SAYL offers two view layouts to match your preference:
 - Your preferred view mode is saved automatically in Settings and restored across sessions.
 
 #### Floating Download Window
-A small floating window for each active download allows monitoring progress outside the main application window:
+A small floating panel inside the app, one per active download, overlays the task list so progress can be watched without leaving the current view:
 - **Metrics Displayed:** File name, size, gradient progress bar, real-time speed, estimated remaining time, and active segment count (`Parts`).
 - **Direct Controls:** Pause, resume, and cancel buttons.
 - **Completion Actions:** Offers **"Open file"** and **"Show in folder"** buttons once the transfer completes.
