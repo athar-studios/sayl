@@ -2,9 +2,9 @@
   "schema_version": 1,
   "project": "sayl-downloader",
   "milestone": "M1",
-  "current_task": "M1 complete — desktop app, website, docs and release pipeline delivered",
+  "current_task": "M1 closed — CLI delivered, independent security review completed and remediated",
   "state": "in_progress",
-  "last_verified_commit": "7cfd571",
+  "last_verified_commit": "ff5409e",
   "toolchain": {
     "test_command": "cargo +stable-x86_64-pc-windows-gnu test -p <crate>",
     "required_env": {
@@ -68,9 +68,29 @@
       "result": "correctly reports the four missing release artefacts and exits non-zero without throwing"
     },
     {
+      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-cli",
+      "exit_code": 0,
+      "result": "12 integration tests pass; sayl.exe smoke-tested (list --json -> [], add on unreachable URL -> exit 3 Arabic error)"
+    },
+    {
+      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-http",
+      "exit_code": 0,
+      "result": "68 tests (56 lib + 12 integration), 0 failed, after the security hardening"
+    },
+    {
+      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-app",
+      "exit_code": 0,
+      "result": "11 tests (2 lib + 9 integration), 0 failed, after the security hardening"
+    },
+    {
+      "command": "cd apps/desktop; npm test; npm run build; npm audit",
+      "exit_code": 0,
+      "result": "21 vitest tests pass; vite build succeeds; npm audit reports 0 vulnerabilities (was 2 critical + 1 moderate)"
+    },
+    {
       "command": "git log -1 --oneline",
       "exit_code": 0,
-      "result": "7cfd571 docs + release pipeline (DOCS-001, REL-001)"
+      "result": "ff5409e fix(security): SEC-FIX-001 remediation of the independent review findings"
     }
   ],
   "blockers": [
@@ -79,6 +99,6 @@
     "Model identity attestation for status=passed reports is env-var based (SAYL_PRIMARY_*), not cryptographic, per docs/REPORT-CONTRACT.md:9.",
     "LICENSE choice is still the project owner's decision; README records `License: to be decided by the project owner` and no LICENSE file exists yet."
   ],
-  "next_task": "Phase M1 is closed. Next: SCHED-001 (lease-based bounded range splitting beyond the engine's current N-way split), PERF-001 (benchmark vs aria2), REC-001/002 (crash recovery drills), then MEDIA/TORRENT/PLUGIN/CATALOG/PRIV/AND phases, then SEC-STRIX-001 security review LAST as the owner asked. Packaging (REL-002..004) needs one elevated Windows SDK install from the owner.",
-  "notes": "Round 10 progress. Committed f245629 (STORE-001) and 98cdf36 (HTTP-002 resume+retry) and 9b508de (APP-001) and c932e6c (SITE-001). Verified test totals by running each crate: core 33, test-http 25, http 65, storage 18, app 9 = 150. Two consecutive delegated attempts on the resume/retry work failed with max-tokens without writing a single file (their reports were truncated internal monologues), so the lead implemented crates/http/src/resume.rs and crates/http/src/retry.rs directly — disclosed as the narrow self-implementation exception. That work encodes: weak ETags never authorise If-Range, weak ETag with a matching Last-Modified does, size/validator change forces a restart from zero, and retry honours Retry-After in both delta-seconds and HTTP-date form while never retrying cancelled or fatal errors. STORE-001 deliberately avoids SQLite because no C compiler exists: append-only JSONL journal + atomic snapshot + fsync + single-writer lock. SITE-001 produced the Arabic RTL static site, README/CONTRIBUTING/SECURITY/CODE_OF_CONDUCT and .github files; the lead corrected ci.yml to use the MSVC toolchain so CI exercises the production link path instead of the local GNU workaround. docs/agent/HANDOFF.md was rewritten from scratch because the previous TEST-001 section had UTF-8 mojibake."
+  "next_task": "Security review and remediation are DONE (7c7b8ae review, ff5409e fixes). Remaining phases from MASTER-PLAN: SCHED-001 scheduler/lease hardening, PERF-001 benchmark harness vs aria2, REC-001/002 recovery drills, MEDIA-001..003, PLUG-001..003, WEB-001..005 browser bridge, CATALOG-001, PRIV-001, AND-001..002, and REL-002..004 installer builds which require one elevated Windows SDK install from the owner.",
+  "notes": "Round 11. Added a real CLI (12 tests, smoke-tested) and ran the final security gate the owner asked for. SEC-STRIX-001 was an independent read-only review by a separate model: docs/SECURITY-REVIEW.md carries 11 findings with path:line evidence. The four I re-verified myself and the two most severe: (S1, Critical) tauri.conf.json had \"csp\": null so the webview ran with no Content-Security-Policy; (S2, High) RedirectTracker::step enforced scheme/hop/loop/credential-stripping but had no private-target guard, so a public server could pivot the app onto a LAN or loopback service; (S3) neutralize_reserved_device_names only compared text before the first dot, so `CON .txt` slipped through; (S4) is_disallowed_char filtered C0/DEL but not bidi overrides or zero-width characters; (S5) engine.rs:213 called .lock().unwrap() where the six other sites handle poisoning. SEC-FIX-001 remediated all of them plus download-dir validation, store-path re-sanitization, noreferrer links, and a vitest 5 upgrade: sayl-http 65->68 tests, sayl-app 9->11, npm audit 3 advisories -> 0. Residual risks are documented in the review's accepted-risks section: the CSP is set but cannot be proven enforced without a WebView2 runtime, DNS-rebinding pivots after the redirect check are uncovered, and store files inherit the default DACL. Earlier rounds: toolchain solved with GNU+rust-lld (MSVC lacks the Windows SDK), state-machine self-transition fix, fixture server, HTTP-001/002, STORE-001, APP-001, SITE-001, UI-001, DOCS-001, REL-001. 150 crate tests plus 21 frontend tests are green; totals now core 33, test-http 25, http 68, storage 18, app 11, cli 12, desktop 3 (unrunnable locally), frontend 21."
 }
