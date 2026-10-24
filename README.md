@@ -1,7 +1,7 @@
 # سيل (SAYL) — مدير تحميل مستقل لـ Windows
 
 [![CI](https://github.com/SAYL/SAYL/workflows/CI/badge.svg)](https://github.com/SAYL/SAYL/actions)
-[![License](https://img.shields.io/badge/license-TBD-lightgrey.svg)](#license)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](#license)
 
 **سيل (SAYL)** مدير تحميل (Download Manager) مكتوب بلغة Rust، بواجهة سطح مكتب Tauri 2 + Svelte + TypeScript، **Windows أولًا**، مصمم للاستئناف الآمن، التنزيل المتوازي المُحقق، والخصوصية المطلقة.
 
@@ -187,7 +187,7 @@ cargo +stable-x86_64-pc-windows-gnu test --workspace
 
 ## الرخصة (License)
 
-**License: to be decided by the project owner**
+**License: [Apache-2.0](LICENSE)**
 
 لم تُحسم الرخصة بعد. القرار يعود لمالك المشروع.
 
@@ -236,4 +236,4 @@ Production builds require MSVC toolchain + Windows SDK (elevated install).
 - **Roadmap:** `docs/MASTER-PLAN.md`
 - **Toolchain:** `docs/TOOLCHAIN.md`
 
-**License:** to be decided by the project owner.
+**License:** [Apache-2.0](LICENSE).
