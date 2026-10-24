@@ -3110,6 +3110,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "sayl-bridge"
+version = "0.1.0"
+dependencies = [
+ "sayl-http",
+ "serde",
+ "serde_json",
+ "url",
+]
+
+[[package]]
 name = "sayl-cli"
 version = "0.1.0"
 dependencies = [
