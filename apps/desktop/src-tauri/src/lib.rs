@@ -437,6 +437,7 @@ pub fn run() {
         max_connections: initial_settings.max_connections_per_task,
         max_concurrent_tasks: initial_settings.max_concurrent_tasks,
         chunk_size: EngineConfig::default().chunk_size,
+        ..Default::default()
     };
 
     let engine = match Engine::new(&download_dir, &store_dir, engine_config) {
@@ -450,6 +451,7 @@ pub fn run() {
     let app_state = AppState::new(engine, initial_settings, settings_path);
 
     let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             commands::add_task,

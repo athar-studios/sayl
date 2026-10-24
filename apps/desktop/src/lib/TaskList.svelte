@@ -1,17 +1,23 @@
 <script>
+  import { t } from "./i18n.js";
   import TaskCard from "./TaskCard.svelte";
   import EmptyState from "./EmptyState.svelte";
   import { createEventDispatcher } from "svelte";
 
   export let tasks = [];
   export let selectedId = null;
+  export let totalTasksCount = 0;
 
   const dispatch = createEventDispatcher();
 </script>
 
 <div class="task-list-container">
-  {#if tasks.length === 0}
+  {#if tasks.length === 0 && totalTasksCount === 0}
     <EmptyState on:add={() => dispatch("add")} />
+  {:else if tasks.length === 0 && totalTasksCount > 0}
+    <div class="empty-tab-notice">
+      <p>{$t("tabs.empty")}</p>
+    </div>
   {:else}
     <div class="task-grid" role="feed" aria-busy="false">
       {#each tasks as task (task.id)}
@@ -45,5 +51,15 @@
     max-width: 1000px;
     margin: 0 auto;
     width: 100%;
+  }
+
+  .empty-tab-notice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    padding: 3rem 1rem;
+    color: var(--color-text-subtle);
+    font-size: 0.95rem;
   }
 </style>
