@@ -91,6 +91,26 @@
       "command": "pwsh -NoProfile -File tools/release.ps1 -DryRun",
       "exit_code": 0,
       "result": "all release steps simulated including NSIS/MSI naming and SHA256SUMS.txt generation; without -DryRun it aborts at the missing Windows SDK"
+    },
+    {
+      "command": "python -c \"import yaml,io;[yaml.safe_load(io.open(p,encoding='utf-8')) for p in ['.github/workflows/ci.yml','.github/workflows/release.yml']];print('workflows parse')\"",
+      "exit_code": 0,
+      "result": "both workflows parse; ci.yml has 9 jobs including the new frontend, website/manifest and privacy-audit jobs; release.yml has build-installers plus a separate attach-to-release job that alone carries contents: write"
+    },
+    {
+      "command": "node --check extensions/browser/chromium/background.js; node --check extensions/browser/chromium/popup.js; python -c \"import json; json.load(open('extensions/browser/chromium/manifest.json',encoding='utf-8')); print('manifest valid')\"",
+      "exit_code": 0,
+      "result": "extension JS parses and the MV3 manifest is valid after removing the unused storage permission"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/register-native-host.ps1 -HostExe ... -ExtensionId not-a-real-id",
+      "exit_code": 1,
+      "result": "correctly refuses an extension id that is not 32 chars from a-p and writes no registry key"
+    },
+    {
+      "command": "docs/SECURITY-REVIEW-V0.1.0.md (independent read-only review)",
+      "exit_code": 0,
+      "result": "2 Medium + 3 Low findings, 0 Critical/High; all five were genuine and are fixed in commit 46b2683. Cannot prove by execution: no browser, no WebView2 window, no live network attack; the release workflow was parsed but never run on a runner."
     }
   ],
   "blockers": [
