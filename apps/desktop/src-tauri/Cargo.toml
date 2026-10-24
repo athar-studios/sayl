@@ -1,0 +1,28 @@
+[package]
+name = "sayl-desktop"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "sayl_desktop_lib"
+# Desktop-only build: `rlib` is all the binary needs. The usual Tauri template
+# also emits `staticlib` and `cdylib` for the mobile targets, but under the
+# x86_64-pc-windows-gnu toolchain the `cdylib` link exports every symbol and
+# rust-lld aborts with "too many exported symbols (107776, max 65535)".
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+sayl-app = { path = "../../../crates/app" }
+sayl-core = { path = "../../../crates/core", features = ["serde"] }
+sayl-storage = { path = "../../../crates/storage" }
+tauri = { version = "2", features = [] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.40", features = ["rt-multi-thread", "macros", "sync"] }
+tracing = "0.1"
+
+[dev-dependencies]
+tempfile = "3.10"

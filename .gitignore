@@ -15,6 +15,11 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Frontend build output and Tauri packaging artefacts
+apps/desktop/dist/
+apps/desktop/src-tauri/gen/
+releases/
+
 # Logs
 *.log
 npm-debug.log*

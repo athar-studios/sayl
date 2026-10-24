@@ -1,0 +1,155 @@
+:root {
+  --color-bg: #f8fafc;
+  --color-bg-card: #ffffff;
+  --color-bg-card-hover: #f1f5f9;
+  --color-bg-alt: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-border-focus: #0d9488;
+  --color-text: #0f172a;
+  --color-text-muted: #64748b;
+  --color-text-subtle: #94a3b8;
+  --color-accent: #0f766e;
+  --color-accent-hover: #0d9488;
+  --color-accent-active: #115e59;
+  --color-accent-light: #ccfbf1;
+  --color-accent-text: #ffffff;
+  --color-danger: #e11d48;
+  --color-danger-hover: #be123c;
+  --color-danger-light: #ffe4e6;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-info: #0284c7;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.08);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 9999px;
+
+  --font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Cairo", Tahoma, Arial, sans-serif;
+  --transition-normal: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="dark"] {
+  --color-bg: #090d16;
+  --color-bg-card: #111827;
+  --color-bg-card-hover: #1f2937;
+  --color-bg-alt: #162032;
+  --color-border: #1f293d;
+  --color-border-focus: #14b8a6;
+  --color-text: #f3f4f6;
+  --color-text-muted: #9ca3af;
+  --color-text-subtle: #6b7280;
+  --color-accent: #0d9488;
+  --color-accent-hover: #14b8a6;
+  --color-accent-active: #0f766e;
+  --color-accent-light: #134e4a;
+  --color-accent-text: #ffffff;
+  --color-danger: #f43f5e;
+  --color-danger-hover: #fb7185;
+  --color-danger-light: #881337;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-info: #38bdf8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: #090d16;
+    --color-bg-card: #111827;
+    --color-bg-card-hover: #1f2937;
+    --color-bg-alt: #162032;
+    --color-border: #1f293d;
+    --color-border-focus: #14b8a6;
+    --color-text: #f3f4f6;
+    --color-text-muted: #9ca3af;
+    --color-text-subtle: #6b7280;
+    --color-accent: #0d9488;
+    --color-accent-hover: #14b8a6;
+    --color-accent-active: #0f766e;
+    --color-accent-light: #134e4a;
+    --color-accent-text: #ffffff;
+    --color-danger: #f43f5e;
+    --color-danger-hover: #fb7185;
+    --color-danger-light: #881337;
+    --color-success: #22c55e;
+    --color-warning: #f59e0b;
+    --color-info: #38bdf8;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+*, ::before, ::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  font-family: var(--font-family);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.5;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+button {
+  font-family: inherit;
+  font-size: 0.875rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-normal), color var(--transition-normal), border var(--transition-normal);
+}
+
+button:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+input, select {
+  font-family: inherit;
+  font-size: 0.875rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg-card);
+  color: var(--color-text);
+  padding: 0.5rem 0.75rem;
+  width: 100%;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
