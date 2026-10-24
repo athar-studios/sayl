@@ -1,202 +1,32 @@
 {
   "schema_version": 1,
   "project": "sayl-downloader",
-  "milestone": "M0",
-  "current_task": "TEST-001",
+  "milestone": "M1",
+  "current_task": "HTTP-001",
   "state": "in_progress",
-  "last_verified_commit": "28013d8d58fd8a270b795fb729e8d6009401afa1",
+  "last_verified_commit": "e414a5a20a2276f1a40d7987f006301cdb48c994",
+  "toolchain": {
+    "test_command": "cargo +stable-x86_64-pc-windows-gnu test -p <crate>",
+    "required_env": {
+      "PATH_prefix": "%USERPROFILE%\\.cargo\\bin",
+      "RUSTFLAGS": "-C linker=rust-lld"
+    },
+    "msvc_status": "link.exe present at MSVC 14.44.35207, but Windows SDK missing (kernel32.lib absent) => MSVC link fails LNK1181; session is not elevated so SDK cannot be installed",
+    "gnu_status": "stable-x86_64-pc-windows-gnu + bundled rust-lld links and runs tests successfully",
+    "reference": "docs/TOOLCHAIN.md"
+  },
   "checks": [
     {
       "command": "python tools/workflow.py validate",
       "exit_code": 0,
-      "log": "artifacts/BOOT-002/03-validate.out.txt",
-      "ran_at": "2026-10-23T16:40:00Z"
+      "log": "artifacts/CORE-001/02-validate.out.txt",
+      "ran_at": "2026-10-24T00:11:00Z"
     },
     {
-      "command": "$env:SAYL_PRIMARY_PROVIDER='p21566ec00365e463'; $env:SAYL_PRIMARY_MODEL='ag/gemini-3.8-flash-high'; $env:SAYL_CHALLENGER_PROVIDER='p21566ec00365e463'; $env:SAYL_CHALLENGER_MODEL='cmc/deepseek/deepseek-v4.1-flash'; python tools/workflow.py preflight",
+      "command": "$env:SAYL_PRIMARY_PROVIDER='p21566ec00365e463'; $env:SAYL_PRIMARY_MODEL='ag/gemini-3.8-flash'; $env:SAYL_CHALLENGER_PROVIDER='p21566ec00365e463'; $env:SAYL_CHALLENGER_MODEL='openrouter/poolside/laguna-s-2.1:free'; python tools/workflow.py preflight",
       "exit_code": 0,
-      "log": "artifacts/BOOT-002/04-preflight.out.txt",
-      "ran_at": "2026-10-23T16:40:10Z"
-    },
-    {
-      "command": "$env:PYTHONIOENCODING='utf-8'; python tools/workflow.py packet BOOT-002 builder",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-002/05-packet.out.json",
-      "ran_at": "2026-10-23T16:40:20Z"
-    },
-    {
-      "command": "python tools/workflow.py check-report reports/BOOT-002/builder.json",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-002/06-check-report.out.txt",
-      "ran_at": "2026-10-23T16:40:30Z"
-    },
-    {
-      "command": "git status --porcelain",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/01-git-status.txt",
-      "ran_at": "2026-10-23T17:28:30Z"
-    },
-    {
-      "command": "git log -1",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/01-git-log.txt",
-      "ran_at": "2026-10-23T17:28:31Z"
-    },
-    {
-      "command": "python tools/workflow.py validate",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/02-validate.out.txt",
-      "ran_at": "2026-10-23T17:28:32Z"
-    },
-    {
-      "command": "python tools/workflow.py preflight (with SAYL_PRIMARY/CHALLENGER env vars)",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/03-preflight.out.txt",
-      "ran_at": "2026-10-23T17:28:33Z"
-    },
-    {
-      "command": "python tools/workflow.py packet BOOT-003 builder",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/04-packet.out.json",
-      "ran_at": "2026-10-23T17:28:34Z"
-    },
-    {
-      "command": "python tools/workflow.py check-report reports/BOOT-003/builder.json",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/05-check-report.out.txt",
-      "ran_at": "2026-10-23T17:30:00Z"
-    },
-    {
-      "command": "git status --porcelain",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/D-01-git-status.txt",
-      "ran_at": "2026-10-23T17:45:00Z"
-    },
-    {
-      "command": "git rev-parse HEAD",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/D-01-git-head.txt",
-      "ran_at": "2026-10-23T17:45:01Z"
-    },
-    {
-      "command": "git rev-parse HEAD^{tree}",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/D-01-git-tree.txt",
-      "ran_at": "2026-10-23T17:45:02Z"
-    },
-    {
-      "command": "python tools/workflow.py validate",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/D-03-validate.out.txt",
-      "ran_at": "2026-10-23T17:45:10Z"
-    },
-    {
-      "command": "python tools/workflow.py preflight (with SAYL_PRIMARY/CHALLENGER env vars)",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/D-03-preflight.out.txt",
-      "ran_at": "2026-10-23T17:45:20Z"
-    },
-    {
-      "command": "python tools/workflow.py check-report reports/BOOT-003/builder.json",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/D-03-check-builder.out.txt",
-      "ran_at": "2026-10-23T17:45:30Z"
-    },
-    {
-      "command": "python tools/workflow.py check-report reports/BOOT-003/debater.json",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/D-03-check-debater.out.txt",
-      "ran_at": "2026-10-23T17:51:00Z"
-    },
-    {
-      "command": "git add STATUS.json docs/agent/HANDOFF.md && git commit -m \"chore: update STATUS for BOOT-003\"",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/builder-response-commit.log",
-      "ran_at": "2026-10-23T22:12:00Z"
-    },
-    {
-      "command": "python tools/workflow.py check-report reports/BOOT-003/builder.json",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/06-check-report-after-response.out.txt",
-      "ran_at": "2026-10-23T22:12:30Z"
-    },
-    {
-      "command": "python tools/workflow.py validate",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/07-validate-after-response.out.txt",
-      "ran_at": "2026-10-23T22:12:35Z"
-    },
-    {
-      "command": "python tools/workflow.py preflight (with SAYL_PRIMARY/CHALLENGER env vars)",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/08-preflight-after-response.out.txt",
-      "ran_at": "2026-10-23T22:12:40Z"
-    },
-    {
-      "command": "git add STATUS.json docs/agent/HANDOFF.md && git commit -m \"chore: update STATUS and HANDOFF for BOOT-003 debouncer resolution\"",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/debater-resolution-commit.log",
-      "ran_at": "2026-10-23T22:25:00Z"
-    },
-    {
-      "command": "python tools/workflow.py check-report reports/BOOT-003/builder.json",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/09-check-builder-after-debater-res.out.txt",
-      "ran_at": "2026-10-23T22:26:00Z"
-    },
-    {
-      "command": "python tools/workflow.py check-report reports/BOOT-003/debater.json",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/10-check-debater-res.out.txt",
-      "ran_at": "2026-10-23T22:26:05Z"
-    },
-    {
-      "command": "python tools/workflow.py validate",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/11-validate-final.out.txt",
-      "ran_at": "2026-10-23T22:26:10Z"
-    },
-    {
-      "command": "python tools/workflow.py preflight (with SAYL_PRIMARY/CHALLENGER env vars)",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/12-preflight-final.out.txt",
-      "ran_at": "2026-10-23T22:26:15Z"
-    },
-    {
-      "command": "python tools/workflow.py check-report reports/BOOT-003/planner.json",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/planner-check.out.txt",
-      "ran_at": "2026-10-23T23:00:00Z"
-    },
-    {
-      "command": "python tools/workflow.py check-report reports/BOOT-003/runtime_tester.json",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/runtime_tester-check.out.txt",
-      "ran_at": "2026-10-23T23:10:00Z"
-    },
-    {
-      "command": "python tools/workflow.py check-report reports/BOOT-003/final_reviewer.json",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/final_reviewer-check.out.txt",
-      "ran_at": "2026-10-23T23:20:00Z"
-    },
-    {
-      "command": "python tools/workflow.py check-report reports/BOOT-003/security_reviewer.json",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/security_reviewer-check.out.txt",
-      "ran_at": "2026-10-23T23:30:00Z"
-    },
-    {
-      "command": "$env:SAYL_PRIMARY_PROVIDER='p21566ec00365e463'; $env:SAYL_PRIMARY_MODEL='ag/gemini-3.8-flash'; $env:SAYL_CHALLENGER_PROVIDER='p21566ec00365e463'; $env:SAYL_CHALLENGER_MODEL='openrouter/poolside/laguna-s-2.1:free'; python tools/workflow.py gate BOOT-003",
-      "exit_code": 0,
-      "log": "artifacts/BOOT-003/gate.out.txt",
-      "ran_at": "2026-10-23T23:35:00Z"
-    },
-    {
-      "command": "python tools/workflow.py packet CORE-001 planner",
-      "exit_code": 0,
-      "log": "artifacts/CORE-001/01-packet.out.json",
-      "ran_at": "2026-10-24T00:05:00Z"
+      "log": "artifacts/CORE-001/03-preflight.out.txt",
+      "ran_at": "2026-10-24T00:12:00Z"
     },
     {
       "command": "python tools/workflow.py check-report reports/CORE-001/planner.json",
@@ -205,117 +35,49 @@
       "ran_at": "2026-10-24T00:10:00Z"
     },
     {
-      "command": "python tools/workflow.py validate",
-      "exit_code": 0,
-      "log": "artifacts/CORE-001/02-validate.out.txt",
-      "ran_at": "2026-10-24T00:11:00Z"
-    },
-    {
-      "command": "python tools/workflow.py preflight (with SAYL_PRIMARY/CHALLENGER env vars)",
-      "exit_code": 0,
-      "log": "artifacts/CORE-001/03-preflight.out.txt",
-      "ran_at": "2026-10-24T00:12:00Z"
-    },
-    {
-      "command": "cargo check -p sayl-core",
-      "exit_code": 0,
-      "log": "artifacts/CORE-001/builder-cargo-check.err.txt",
-      "ran_at": "2026-10-24T00:30:00Z"
-    },
-    {
-      "command": "cargo check --tests -p sayl-core",
-      "exit_code": 0,
-      "log": "artifacts/CORE-001/builder-cargo-check-tests.err.txt",
-      "ran_at": "2026-10-24T00:30:10Z"
-    },
-    {
-      "command": "cargo test --no-run -p sayl-core",
-      "exit_code": 101,
-      "log": "artifacts/CORE-001/builder-cargo-test.err.txt",
-      "ran_at": "2026-10-24T00:30:20Z"
-    },
-    {
-      "command": "python tools/workflow.py validate",
-      "exit_code": 0,
-      "log": "artifacts/CORE-001/builder-validate.out.txt",
-      "ran_at": "2026-10-24T00:30:30Z"
-    },
-    {
-      "command": "python tools/workflow.py preflight (with SAYL_PRIMARY/CHALLENGER env vars)",
-      "exit_code": 0,
-      "log": "artifacts/CORE-001/builder-preflight.out.txt",
-      "ran_at": "2026-10-24T00:30:35Z"
-    },
-    {
-      "command": "python tools/workflow.py packet CORE-001 builder",
-      "exit_code": 0,
-      "log": "artifacts/CORE-001/builder-packet.out.json",
-      "ran_at": "2026-10-24T00:30:40Z"
-    },
-    {
       "command": "python tools/workflow.py check-report reports/CORE-001/builder.json",
       "exit_code": 0,
-      "log": "artifacts/CORE-001/builder-check-report.out.txt",
-      "ran_at": "2026-10-24T00:35:00Z"
+      "log": "artifacts/CORE-001/builder-check.out.txt",
+      "ran_at": "2026-10-24T00:40:00Z"
     },
     {
-      "command": "cargo check -p sayl-test-http",
+      "command": "python tools/workflow.py check-report reports/TEST-001/planner.json",
       "exit_code": 0,
-      "log": "artifacts/TEST-001/builder-cargo-check.err.txt",
-      "ran_at": "2026-10-24T06:36:30Z"
-    },
-    {
-      "command": "cargo check --tests -p sayl-test-http",
-      "exit_code": 0,
-      "log": "artifacts/TEST-001/builder-cargo-check-tests.err.txt",
-      "ran_at": "2026-10-24T06:36:35Z"
-    },
-    {
-      "command": "cargo test --no-run -p sayl-test-http",
-      "exit_code": 101,
-      "log": "artifacts/TEST-001/builder-cargo-test.err.txt",
-      "ran_at": "2026-10-24T06:36:40Z"
-    },
-    {
-      "command": "cargo check -p sayl-core",
-      "exit_code": 0,
-      "log": "artifacts/TEST-001/builder-core-check.err.txt",
-      "ran_at": "2026-10-24T06:36:45Z"
-    },
-    {
-      "command": "cargo check --tests -p sayl-core",
-      "exit_code": 0,
-      "log": "artifacts/TEST-001/builder-core-check-tests.err.txt",
-      "ran_at": "2026-10-24T06:36:50Z"
-    },
-    {
-      "command": "python tools/workflow.py validate",
-      "exit_code": 0,
-      "log": "artifacts/TEST-001/builder-validate.out.txt",
-      "ran_at": "2026-10-24T06:36:15Z"
-    },
-    {
-      "command": "python tools/workflow.py preflight (with SAYL_PRIMARY/CHALLENGER env vars)",
-      "exit_code": 0,
-      "log": "artifacts/TEST-001/builder-preflight.out.txt",
-      "ran_at": "2026-10-24T06:36:20Z"
-    },
-    {
-      "command": "$env:PYTHONIOENCODING='utf-8'; python tools/workflow.py packet TEST-001 builder",
-      "exit_code": 0,
-      "log": "artifacts/TEST-001/builder-packet.out.json",
-      "ran_at": "2026-10-24T06:36:25Z"
+      "log": "artifacts/TEST-001/planner-check.out.txt",
+      "ran_at": "2026-10-24T06:25:00Z"
     },
     {
       "command": "python tools/workflow.py check-report reports/TEST-001/builder.json",
       "exit_code": 0,
-      "log": "artifacts/TEST-001/builder-check-report.out.txt",
-      "ran_at": "2026-10-24T06:40:00Z"
+      "log": "artifacts/TEST-001/builder-check.out.txt",
+      "ran_at": "2026-10-24T06:45:00Z"
+    },
+    {
+      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-core",
+      "exit_code": 0,
+      "log": "artifacts/CORE-001/gnu-test-final.out.txt",
+      "ran_at": "2026-10-24T06:55:00Z",
+      "result": "25 lib + 3 + 4 integration + 1 doctest = 33 tests, 0 failed"
+    },
+    {
+      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-test-http",
+      "exit_code": 0,
+      "log": "artifacts/TEST-001/gnu-test-final.out.txt",
+      "ran_at": "2026-10-24T06:56:00Z",
+      "result": "23 lib + 1 integration (27 scenarios) + 1 doctest = 25 tests, 0 failed"
+    },
+    {
+      "command": "git log -1 --oneline",
+      "exit_code": 0,
+      "log": "artifacts/HTTP-001/git-head.out.txt",
+      "ran_at": "2026-10-24T06:58:00Z",
+      "result": "e414a5a feat: fix core state-machine self-transitions; add deterministic HTTP fixture server (TEST-001); document working GNU+rust-lld toolchain"
     }
   ],
   "blockers": [
-    "MSVC VCTools workload not installed (requires elevated VS installer; UAC consent not automatable in this session). Rust toolchain installed at ~/.cargo/bin (cargo 1.99.1, rustc 1.99.1) but not on system PATH. cargo check -p sayl-test-http and cargo check --tests -p sayl-test-http pass cleanly (exit code 0); cargo test --no-run -p sayl-test-http fails with link.exe not found."
+    "Windows SDK not installed and session is not elevated: the MSVC target cannot link (LNK1181: kernel32.lib). Workaround in force: build and test with `stable-x86_64-pc-windows-gnu` + `rust-lld` (see docs/TOOLCHAIN.md). The final Tauri production build will still need one elevated install of the Windows SDK.",
+    "Model identity attestation for status=passed reports is env-var based (SAYL_PRIMARY_*), not cryptographic, per docs/REPORT-CONTRACT.md:9. Earlier tasks resolved this by recording identity_source=runtime_metadata with the limitation stated."
   ],
-  "next_task": "TEST-001 runtime_tester and debater review — builder implementation complete; cargo test deferred until MSVC link.exe available",
-  "notes": "TEST-001 planner report created (status=blocked). TEST-001 builder implementation completed: HttpFixtureServer in server.rs, all 27 failure modes in scenarios.rs, deterministic BodyGenerator in body_gen.rs, public API in lib.rs, comprehensive README.md, unit and integration tests. All type checking passes cleanly via cargo check -p sayl-test-http and cargo check --tests -p sayl-test-http (exit 0). Builder report reports/TEST-001/builder.json created (status=blocked due to MSVC linker for acceptance criterion #5)."
+  "next_task": "HTTP-001 (HTTP client: probe, range validation, redirect policy, safe filenames, sequential streaming) — in progress; then STORE-001, SCHED-001, UI stack",
+  "notes": "TOOLCHAIN PROBLEM SOLVED (round 9): cargo test now works end-to-end. MSVC VCTools 14.44.35207 IS installed with link.exe/cl.exe, but the Windows SDK is absent so MSVC linking fails; the session runs unelevated so the SDK cannot be installed by the agent. The working path is the already-installed GNU toolchain with the bundled rust-lld as linker, documented in docs/TOOLCHAIN.md. Using it, two real defects were found and fixed: (1) crates/core/src/state.rs rejected idempotent nonterminal self-transitions, breaking 2 tests — fixed so nonterminal self-transitions return Ok while terminal ones stay absorbing (matrix now 33 valid / 88 invalid); (2) crates/test-http/src/server.rs FileTruncation ignored the requested range end — fixed with req_end.min(shrunk_size-1). Also added the tokio `macros` feature so the fixture-server doctest compiles. TEST-001 fixture server is implemented: 27 deterministic failure scenarios, bound to 127.0.0.1:0, with request recording and verification. Committed as e414a5a. Earlier milestones: BOOT-001/002/003 complete with gates passed."
 }
