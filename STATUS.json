@@ -1,124 +1,59 @@
 {
   "schema_version": 1,
   "project": "sayl-downloader",
-  "milestone": "v0.1.0 (Windows-only, in progress)",
-  "current_task": "v0.1.0 scope: engine + CLI, Tauri desktop branding/UX, Chromium/Edge MV3 extension with native-messaging host, release-plan docs, website identity and fixes. Installers still blocked on the Windows SDK.",
+  "milestone": "v0.1.0 (Windows-only, release candidate on branch dev)",
+  "current_task": "Prepare v0.1.0 on the dev integration branch: manifests that a real browser loads, localized context menu, link-click routing with browser fallback, CI-first validation, and a release report that separates what was executed from what needs a real machine.",
   "state": "in_progress",
-  "last_verified_commit": "5ecd8ab",
+  "workflow": {
+    "local_builds": "forbidden",
+    "local_builds_reason": "Smart App Control holds newly linked binaries on this developer machine, so cargo build/test and npm build are not run locally for this release.",
+    "validation": "GitHub Actions only",
+    "branch": "dev",
+    "push_policy": "push origin dev only; master, tags and GitHub releases are owner-only",
+    "watch": "gh run watch; failures read with gh run view --log-failed",
+    "repeated_cycles": ["cycle 1", "cycle 2", "cycle 3"]
+  },
   "toolchain": {
-    "test_command": "cargo +stable-x86_64-pc-windows-gnu test -p <crate>",
-    "required_env": {
-      "PATH_prefix": "%USERPROFILE%\\.cargo\\bin",
-      "RUSTFLAGS": "-C linker=rust-lld"
-    },
-    "msvc_status": "link.exe present at MSVC 14.44.35207, but Windows SDK missing (kernel32.lib absent) => MSVC link fails LNK1181; session is not elevated so SDK cannot be installed",
-    "gnu_status": "stable-x86_64-pc-windows-gnu + bundled rust-lld links and runs tests successfully",
-    "no_c_compiler": "no gcc/clang/cl usable => rusqlite/libsqlite3-sys, ring, rustls, openssl are forbidden; TLS goes through native-tls (SChannel)",
+    "local_runtime": "not used for validation in this release",
+    "ci_runner": "windows-latest (MSVC + Windows SDK)",
+    "msvc_status": "Windows SDK 10.0.26100 later found installed locally (kernel32.lib present under Windows Kits\\10\\Lib\\10.0.26100.0\\um\\x64), but local production builds remain out of scope for this release per the owner's workflow.",
     "reference": "docs/TOOLCHAIN.md"
   },
-  "checks": [
+  "release_artefacts": {
+    "built_locally_before_workflow_change": "releases/ (gitignored) contained NSIS exe 3051643 B, MSI 4419584 B, source zip 1476048 B and SHA256SUMS.txt from a real MSVC run; those files are not tracked and are not the deliverable of this branch.",
+    "ci_source": "release.yml builds the same four artefacts on a GitHub runner (triggered by dev pushes, tags, or manual dispatch) and uploads them as workflow artefacts."
+  },
+  "checks": [],
+  "what_needs_a_real_machine": [
+    "Installing SAYL-Setup-x64-0.1.0.exe and completing the uninstall.",
+    "Opening the desktop window at all: this session's token is Low Mandatory Level, Chromium's Mojo CreateNamedPipeW fails with Access denied and msedgewebview2.exe dies, so no GUI window and no real UI screenshot can be produced here.",
+    "The four locale/theme screenshots of the real window (Arabic light, Arabic dark, English light, English dark).",
+    "The in-app download journey: pause, resume, cancel, save-folder picker, drag and drop, and relaunch mid-download.",
+    "Loading the unpacked extension into Chrome or Edge, registering the native host with the real extension id, and watching a link and a context-menu click arrive in the running app."
+  ],
+  "defects_fixed": [
     {
-      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-core",
-      "exit_code": 0,
-      "result": "33 tests (25 lib + 3 + 4 integration + 1 doctest), 0 failed"
+      "id": "DEFECT-007",
+      "component": "extensions/browser/chromium/manifest.json",
+      "description": "The manifest declared no default_locale and no _locales, so chrome.i18n had no strings and the extension could not be localized.",
+      "fix": "Declared default_locale ar, added _locales/ar and _locales/en, and moved name, description and action title to __MSG_ placeholders.",
+      "test": "CI validates both messages.json files as JSON"
     },
     {
-      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-test-http",
-      "exit_code": 0,
-      "result": "25 tests (23 lib + 2), 0 failed"
+      "id": "DEFECT-008",
+      "component": "extensions/browser/chromium/background.js",
+      "description": "The context menu title was hard-coded Arabic only; it must read 'التحميل باستخدام سيل' in Arabic and 'Download with Sayl' in English.",
+      "fix": "Menu title now comes from chrome.i18n (context_menu_download) with both locales present.",
+      "test": "tools/e2e/browser-extension-test.mjs loads background.js against recording stubs and asserts the created menu title"
     },
     {
-      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-http",
-      "exit_code": 0,
-      "result": "132 tests (98 lib + 22 client + 12 integration), 0 failed"
-    },
-    {
-      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-storage",
-      "exit_code": 0,
-      "result": "18 tests (9 lib + 8 integration + 1 doctest), 0 failed"
-    },
-    {
-      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-bench",
-      "exit_code": 0,
-      "result": "2 tests, 0 failed"
-    },
-    {
-      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-bridge",
-      "exit_code": 0,
-      "result": "36 tests (31 lib incl. 6 EngineDispatcher tests + 5 session), 0 failed, after the native-messaging host work"
-    },
-    {
-      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-cli",
-      "exit_code": 0,
-      "result": "12 tests, 0 failed"
-    },
-    {
-      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-app --lib",
-      "exit_code": 0,
-      "result": "14 tests, 0 failed"
-    },
-    {
-      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-app --test lease_tests",
-      "exit_code": 0,
-      "result": "13 tests, 0 failed"
-    },
-    {
-      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-app --test recovery_tests",
-      "exit_code": 0,
-      "result": "6 tests, 0 failed (sequential crash resume, parallel no-double-fetch, finalize-after-write, corrupt checkpoint, terminal protection, truncated-part reconciliation)"
-    },
-    {
-      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-app --test integration_tests",
-      "exit_code": 0,
-      "result": "13 tests, 0 failed, observed green in this session against commit 2c49259. After that relink, Smart App Control refused the binary hash on 26 consecutive attempts (three rounds, 40-55s reputation waits), so it could not be re-run at the current commit. No source in that target changed after the green run, and --lib/--test lease_tests/--test recovery_tests all re-ran green on the same tree."
-    },
-    {
-      "command": "cd apps/desktop; npm test; npm run build",
-      "exit_code": 0,
-      "result": "26 vitest tests pass (3 files), vite build emits dist with local IBM Plex Sans Arabic woff2 assets"
-    },
-    {
-      "command": "cargo +stable-x86_64-pc-windows-gnu check -p sayl-desktop",
-      "exit_code": 0,
-      "result": "type-checks clean after adding tauri-plugin-dialog; the Tauri window itself cannot be launched here (no Windows SDK / WebView2 runtime)"
-    },
-    {
-      "command": "node --check apps/website/app.js; python tools/privacy_audit.py",
-      "exit_code": 0,
-      "result": "site JS parses; privacy audit 4/4 PASS (0 telemetry, 0 absolute user paths, 0 secrets, 0 unauthorised outbound URLs). Note: I added one documented allowance to tools/privacy_audit.py for runtime-built loopback URL templates (crates/bench format!(\"http://{}\", addr)) which had made category 4 fail on pre-existing code."
-    },
-    {
-      "command": "pwsh -NoProfile -File tools/release.ps1 -DryRun",
-      "exit_code": 0,
-      "result": "all release steps simulated including NSIS/MSI naming and SHA256SUMS.txt generation; without -DryRun it aborts at the missing Windows SDK"
-    },
-    {
-      "command": "python -c \"import yaml,io;[yaml.safe_load(io.open(p,encoding='utf-8')) for p in ['.github/workflows/ci.yml','.github/workflows/release.yml']];print('workflows parse')\"",
-      "exit_code": 0,
-      "result": "both workflows parse; ci.yml has 9 jobs including the new frontend, website/manifest and privacy-audit jobs; release.yml has build-installers plus a separate attach-to-release job that alone carries contents: write"
-    },
-    {
-      "command": "node --check extensions/browser/chromium/background.js; node --check extensions/browser/chromium/popup.js; python -c \"import json; json.load(open('extensions/browser/chromium/manifest.json',encoding='utf-8')); print('manifest valid')\"",
-      "exit_code": 0,
-      "result": "extension JS parses and the MV3 manifest is valid after removing the unused storage permission"
-    },
-    {
-      "command": "pwsh -NoProfile -File tools/register-native-host.ps1 -HostExe ... -ExtensionId not-a-real-id",
-      "exit_code": 1,
-      "result": "correctly refuses an extension id that is not 32 chars from a-p and writes no registry key"
-    },
-    {
-      "command": "docs/SECURITY-REVIEW-V0.1.0.md (independent read-only review)",
-      "exit_code": 0,
-      "result": "2 Medium + 3 Low findings, 0 Critical/High; all five were genuine and are fixed in commit 46b2683. Cannot prove by execution: no browser, no WebView2 window, no live network attack; the release workflow was parsed but never run on a runner."
+      "id": "DEFECT-009",
+      "component": "extensions/browser/chromium/background.js",
+      "description": "The extension had no link-click handler, so clicking a download link never reached SAYL.",
+      "fix": "Registered a main-frame content script that intercepts http(s) link clicks and hands them to the background worker, and documented that SAYL is only used when the native host answers.",
+      "test": "tools/e2e/browser-extension-test.mjs compares the clicked URL with the bridge queue"
     }
   ],
-  "blockers": [
-    "Windows SDK not installed and session is not elevated: MSVC cannot link (LNK1181: kernel32.lib). Workaround for tests: `stable-x86_64-pc-windows-gnu` + `rust-lld`. The Tauri production build and the NSIS/MSI installers still need one elevated Windows SDK install; until then no installer can be produced or hashed for the website.",
-    "Smart App Control (VerifiedAndReputablePolicyState=1) intermittently blocks freshly linked test executables with `An Application Control policy has blocked this file (os error 4551)`. Each target sometimes gains cloud reputation after a 30-75s delay; on some hashes it never flips within the retry window, which is why `cargo test -p sayl-app` as a whole is unreliable here and per-target runs are used.",
-    "The Tauri window was never launched in this environment, so the desktop UI is verified only by unit tests, `cargo check`, the vite build and source inspection — no real runtime journey, no screenshots.",
-    "Model identity attestation for status=passed reports is env-var based (SAYL_PRIMARY_*), not cryptographic, per docs/REPORT-CONTRACT.md:9."
-  ],
-  "next_task": "Owner action closes v0.1.0: push and tag (git tag v0.1.0; git push origin v0.1.0) so .github/workflows/release.yml builds NSIS+MSI+SHA256SUMS on a runner that has the Windows SDK, then create the GitHub Release so the site's releases/latest link resolves. One elevated Windows SDK install locally would also enable cargo tauri build for a real desktop run and screenshots.",
-  "notes": "Round 23. Commits ba17d7a (brand kit + wrangler ignore), 3012861 (version plans + changelog/userguide/roadmap), 04e9764 (bridge host + MV3 extension + registration script), dad6697 (desktop brand/UX), 8ec3eda (website fixes + identity), 5ecd8ab (privacy audit allowance). Verified totals now: core 33, test-http 25, http 132, storage 18, bench 2, bridge 36, cli 12, app 46 (14 lib + 13 lease + 6 recovery + 13 integration) = 304 Rust tests, plus 26 frontend vitest tests. Website fixed for mobile layout, raw attribute text and fake installer links; privacy audit 4/4 PASS. Honest limits: the hero on the site is a labelled HTML/CSS preview, not a screenshot, because the Tauri app cannot run here; the desktop ring/folder-picker/drag-drop/animations were never executed; the extension was never loaded into a real browser (only the host protocol, manifests and the registration script's refusal path were run). Owner decisions applied this round: Apache-2.0 license, repo ashrymahrm/sayl, domain sayl.site, Windows-only v0.1.0 scope."
+  "next_task": "Push the dev branch, watch CI and the release workflow, fix failures from gh run view --log-failed, and fill docs/TEST-REPORT-V0.1.0.md with the CI evidence plus the list of runtime checks that need a real desktop machine.",
+  "notes": "The local install and fixture download that earlier rounds performed were engine/CLI level and are reported in docs/TEST-REPORT-V0.1.0.md as such; they do not stand in for the GUI or browser journeys."
 }

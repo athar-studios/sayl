@@ -7,6 +7,8 @@ name: Release (Windows installers)
 # Triggers:
 #   - pushing a tag like v0.1.0
 #   - manual run with an explicit version
+#   - pushes to the `dev` integration branch, so the installers are exercised
+#     while the release is being prepared (nothing is published from there)
 #
 # The run does NOT publish anything by itself. It uploads the artefacts and the
 # SHA256SUMS.txt as workflow artefacts and attaches them to the GitHub Release
@@ -16,6 +18,8 @@ on:
   push:
     tags:
       - "v*"
+    branches:
+      - dev
   workflow_dispatch:
     inputs:
       version:
@@ -28,6 +32,8 @@ permissions:
 
 env:
   RUST_TOOLCHAIN: "stable"
+  # Version used when the run is not a tag or a manual dispatch (dev pushes).
+  DEFAULT_VERSION: "0.1.0"
 
 jobs:
   build-installers:
@@ -46,12 +52,15 @@ jobs:
           INPUT_VERSION: ${{ inputs.version }}
           REF_NAME: ${{ github.ref_name }}
           EVENT_NAME: ${{ github.event_name }}
+          DEFAULT_VERSION: ${{ env.DEFAULT_VERSION }}
         run: |
           # Untrusted values arrive through env, never interpolated into the script.
           if ($env:EVENT_NAME -eq "workflow_dispatch") {
             $v = $env:INPUT_VERSION
-          } else {
+          } elseif ($env:REF_NAME -like "v*") {
             $v = $env:REF_NAME -replace '^v', ''
+          } else {
+            $v = $env:DEFAULT_VERSION
           }
           $v = $v.Trim()
           if ($v -notmatch '^\d+\.\d+\.\d+$') {

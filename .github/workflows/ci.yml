@@ -1,15 +1,19 @@
 name: CI
 
+# The default branch is `master`; `dev` is the integration branch that release
+# work lands on (a draft pull request from `dev` to `master` makes pull_request
+# runs cover it as well).
 on:
   push:
-    branches: [main]
+    branches: [master, dev]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 # CI runs the MSVC toolchain on purpose: windows-latest ships the Windows SDK,
-# so this job is the only place the production (MSVC) link path is exercised.
-# Locally the project falls back to stable-x86_64-pc-windows-gnu + rust-lld
-# because the Windows SDK is not installed there; see docs/TOOLCHAIN.md.
+# so this job is the only place the MSVC link path is exercised. Newly linked
+# binaries on this developer machine are held by Smart App Control, which is
+# why validation for this repository happens in CI rather than locally; see
+# docs/TOOLCHAIN.md.
 env:
   RUST_TOOLCHAIN: "stable"
 
@@ -156,6 +160,15 @@ jobs:
       - name: Build frontend bundle
         working-directory: apps/desktop
         run: npm run build
+        shell: pwsh
+
+      - name: Check the browser bridge helpers parse
+        run: |
+          Get-ChildItem tools/e2e/*.mjs | ForEach-Object {
+            node --check $_.FullName
+            if ($LASTEXITCODE -ne 0) { Write-Error "syntax error in $($_.Name)"; exit 1 }
+          }
+          Write-Host "tools/e2e scripts parse"
         shell: pwsh
 
   test-website-and-privacy:
