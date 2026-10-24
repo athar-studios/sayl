@@ -1,0 +1,100 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <!--
+    ============================================================================
+    SAYL ("سيل") - WiX v4 Installer Configuration
+    Per-user MSI package (Scope="perUser").
+    No administrator privileges required.
+    No telemetry, no background tracking, respects user privacy.
+    ============================================================================
+
+    UPGRADE CODE STRATEGY:
+    The UpgradeCode GUID below MUST remain constant across all future releases of SAYL
+    to allow the Windows Installer service to detect and perform major upgrades.
+    Stable UpgradeCode GUID: {9D8E42B1-7A3C-4E28-8B91-56A88B3F2104}
+
+    CODE-SIGNING STEP HOOK:
+    Code signing is NOT performed automatically or with fake/placeholder certificates.
+    The project owner must sign release binaries using their own Authenticode certificate:
+
+    Step 1: Sign the executable before running WiX build:
+      signtool.exe sign /sha1 <OWNER_CERT_THUMBPRINT> /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 sayl.exe
+
+    Step 2: Compile the MSI package:
+      wix build sayl.wxs -d Version=<version> -d SourceDir=<path_to_binary> -o SAYL-Setup-x64-<version>.msi
+
+    Step 3: Sign the generated MSI package:
+      signtool.exe sign /sha1 <OWNER_CERT_THUMBPRINT> /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 SAYL-Setup-x64-<version>.msi
+    ============================================================================
+  -->
+
+  <?ifndef Version?>
+    <?define Version = "0.1.0" ?>
+  <?endif?>
+
+  <?ifndef SourceDir?>
+    <?define SourceDir = "..\..\apps\desktop\src-tauri\target\release" ?>
+  <?endif?>
+
+  <Package Name="SAYL"
+           Manufacturer="SAYL Team"
+           Version="$(var.Version)"
+           UpgradeCode="9D8E42B1-7A3C-4E28-8B91-56A88B3F2104"
+           Scope="perUser"
+           Language="1033">
+
+    <SummaryInformation Description="SAYL (سيل) Download Manager Installer"
+                        Keywords="Installer,Download Manager,SAYL,سيل" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of SAYL is already installed. / إصدار أحدث من سيل مثبت بالفعل." />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Standard Per-User Directory Structure ($LOCALAPPDATA\Programs\SAYL) -->
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="SAYL" />
+      </Directory>
+    </StandardDirectory>
+
+    <!-- Start Menu Shortcut Directory -->
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="SAYL" />
+    </StandardDirectory>
+
+    <!-- Components -->
+    <!-- Component 1: Application Executable -->
+    <Component Id="MainExecutable"
+               Guid="3E4B7B12-9A23-45B1-8C52-1F92D73A6E01"
+               Directory="INSTALLFOLDER">
+      <File Id="SaylExe"
+            Source="$(var.SourceDir)\sayl.exe"
+            KeyPath="yes" />
+    </Component>
+
+    <!-- Component 2: Start Menu Shortcut (with HKCU KeyPath as required by perUser ICE38) -->
+    <Component Id="ApplicationShortcut"
+               Guid="7C8A9B10-D2E3-4F5A-6B7C-8D9E0F1A2B3C"
+               Directory="ApplicationProgramsFolder">
+      <Shortcut Id="ApplicationStartMenuShortcut"
+                Name="SAYL"
+                Description="SAYL Download Manager / سيل - مدير التحميل"
+                Target="[!SaylExe]"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RemoveFolder Id="CleanUpShortCut"
+                    Directory="ApplicationProgramsFolder"
+                    On="uninstall" />
+      <RegistryValue Root="HKCU"
+                     Key="Software\SAYL"
+                     Name="installed"
+                     Type="integer"
+                     Value="1"
+                     KeyPath="yes" />
+    </Component>
+
+    <!-- Features -->
+    <Feature Id="MainFeature" Title="SAYL" Level="1">
+      <ComponentRef Id="MainExecutable" />
+      <ComponentRef Id="ApplicationShortcut" />
+    </Feature>
+  </Package>
+</Wix>
