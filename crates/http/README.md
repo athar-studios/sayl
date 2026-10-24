@@ -56,7 +56,7 @@ Per `docs/TOOLCHAIN.md`, on Windows environments without the Windows SDK, the pr
 ```powershell
 $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
 $env:RUSTFLAGS = "-C linker=rust-lld"
-cd "C:\Users\Dragonfly\Downloads\Download Manager"
+cd "<path-to-repo>"
 cargo +stable-x86_64-pc-windows-gnu test -p sayl-http
 ```
 

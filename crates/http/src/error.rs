@@ -194,7 +194,9 @@ impl HttpError {
     /// Returns `true` if this error represents a fatal, unrecoverable failure.
     pub fn is_fatal(&self) -> bool {
         match self {
-            Self::Status { status, .. } => matches!(status, 400 | 401 | 403 | 404 | 405 | 410 | 451),
+            Self::Status { status, .. } => {
+                matches!(status, 400 | 401 | 403 | 404 | 405 | 410 | 451)
+            }
             Self::Redirect { .. } => true,
             Self::InvalidHeader { .. } => true,
             Self::Url(_) => true,
@@ -246,13 +248,10 @@ impl From<HttpError> for sayl_core::CoreError {
                 "content_length",
                 format!("received {actual} of declared {expected} bytes"),
             ),
-            HttpError::InvalidHeader { name, reason } => sayl_core::CoreError::validation(
-                "header",
-                format!("header '{name}': {reason}"),
-            ),
-            HttpError::Url(url_err) => {
-                sayl_core::CoreError::validation("url", url_err.to_string())
+            HttpError::InvalidHeader { name, reason } => {
+                sayl_core::CoreError::validation("header", format!("header '{name}': {reason}"))
             }
+            HttpError::Url(url_err) => sayl_core::CoreError::validation("url", url_err.to_string()),
             HttpError::Io(io_err) => sayl_core::CoreError::Io {
                 source: io_err,
                 context: Some("http transport".to_string()),

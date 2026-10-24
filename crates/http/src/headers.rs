@@ -33,7 +33,10 @@ pub fn validate_header_value(name: &str, value: &str) -> Result<(), HttpError> {
     if value.len() > MAX_HEADER_VALUE_LEN {
         return Err(HttpError::validation(
             "header_value",
-            format!("header '{}' value exceeds maximum length of {} bytes", name, MAX_HEADER_VALUE_LEN),
+            format!(
+                "header '{}' value exceeds maximum length of {} bytes",
+                name, MAX_HEADER_VALUE_LEN
+            ),
         ));
     }
 
@@ -50,14 +53,20 @@ pub fn validate_header_value(name: &str, value: &str) -> Result<(), HttpError> {
             };
             return Err(HttpError::validation(
                 "header_value",
-                format!("header '{}' contains forbidden {} (U+{:04X}) at byte index {}", name, char_desc, code, idx),
+                format!(
+                    "header '{}' contains forbidden {} (U+{:04X}) at byte index {}",
+                    name, char_desc, code, idx
+                ),
             ));
         }
         // Also reject DEL (0x7F)
         if code == 0x7F {
             return Err(HttpError::validation(
                 "header_value",
-                format!("header '{}' contains forbidden DEL (U+007F) at byte index {}", name, idx),
+                format!(
+                    "header '{}' contains forbidden DEL (U+007F) at byte index {}",
+                    name, idx
+                ),
             ));
         }
     }
@@ -79,7 +88,10 @@ pub fn validate_header_name(name: &str) -> Result<(), HttpError> {
         if !is_token_char(ch) {
             return Err(HttpError::validation(
                 "header_name",
-                format!("header name '{}' contains invalid character '{}' (U+{:04X})", name, ch, ch as u32),
+                format!(
+                    "header name '{}' contains invalid character '{}' (U+{:04X})",
+                    name, ch, ch as u32
+                ),
             ));
         }
     }
@@ -118,7 +130,10 @@ pub fn build_request_headers(user_headers: &[(String, String)]) -> Result<Header
         if RESERVED_HEADER_NAMES.contains(&lower_name.as_str()) {
             return Err(HttpError::validation(
                 "header_name",
-                format!("header '{}' is reserved and cannot be set by the caller", name),
+                format!(
+                    "header '{}' is reserved and cannot be set by the caller",
+                    name
+                ),
             ));
         }
 
@@ -128,10 +143,16 @@ pub fn build_request_headers(user_headers: &[(String, String)]) -> Result<Header
 
         // Insert into HeaderMap (this also validates ASCII)
         let header_name = HeaderName::from_bytes(name.as_bytes()).map_err(|e| {
-            HttpError::validation("header_name", format!("header '{}' is not valid ASCII: {}", name, e))
+            HttpError::validation(
+                "header_name",
+                format!("header '{}' is not valid ASCII: {}", name, e),
+            )
         })?;
         let header_value = HeaderValue::from_str(value).map_err(|e| {
-            HttpError::validation("header_value", format!("header '{}' value is not valid: {}", name, e))
+            HttpError::validation(
+                "header_value",
+                format!("header '{}' value is not valid: {}", name, e),
+            )
         })?;
 
         headers.insert(header_name, header_value);
@@ -308,7 +329,10 @@ mod tests {
 
     #[test]
     fn test_build_request_headers_rejects_proxy_authorization() {
-        let headers = vec![("Proxy-Authorization".to_string(), "Basic secret".to_string())];
+        let headers = vec![(
+            "Proxy-Authorization".to_string(),
+            "Basic secret".to_string(),
+        )];
         let err = build_request_headers(&headers).unwrap_err();
         assert!(matches!(err, HttpError::Validation { .. }));
         assert!(err.to_string().contains("reserved"));
@@ -343,11 +367,13 @@ mod tests {
 
     #[test]
     fn test_validate_no_header_injection_rejects_percent_encoded_crlf() {
-        let err = validate_no_header_injection("filename%0d%0aInjected: header", "filename").unwrap_err();
+        let err =
+            validate_no_header_injection("filename%0d%0aInjected: header", "filename").unwrap_err();
         assert!(matches!(err, HttpError::Validation { .. }));
         assert!(err.to_string().contains("CRLF"));
 
-        let err = validate_no_header_injection("filename%0D%0AInjected: header", "filename").unwrap_err();
+        let err =
+            validate_no_header_injection("filename%0D%0AInjected: header", "filename").unwrap_err();
         assert!(matches!(err, HttpError::Validation { .. }));
 
         let err = validate_no_header_injection("path%0d%0aX-Evil: 1", "URL path").unwrap_err();

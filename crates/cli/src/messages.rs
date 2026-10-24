@@ -65,7 +65,9 @@ pub fn ambiguous_prefix(prefix: &str, matches: &[String], lang: Language) -> Str
     let list = matches.join(", ");
     match lang {
         Language::Ar => format!("خطأ: البادئة '{prefix}' غامضة وتطابق عدة مهام: [{list}]"),
-        Language::En => format!("Error: Ambiguous prefix '{prefix}' matches multiple tasks: [{list}]"),
+        Language::En => {
+            format!("Error: Ambiguous prefix '{prefix}' matches multiple tasks: [{list}]")
+        }
     }
 }
 

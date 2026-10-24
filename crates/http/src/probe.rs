@@ -96,30 +96,32 @@ pub async fn probe_with_options(
     }
 
     // Step 1: Attempt HEAD request first
-    let (head_res, head_rejected) = match execute_head_with_redirects(client, &mut tracker, &headers).await {
-        Ok(res) => {
-            let status = res.status();
-            if status == StatusCode::METHOD_NOT_ALLOWED || status == StatusCode::NOT_IMPLEMENTED {
-                // Origin rejected HEAD with 405 or 501
+    let (head_res, head_rejected) =
+        match execute_head_with_redirects(client, &mut tracker, &headers).await {
+            Ok(res) => {
+                let status = res.status();
+                if status == StatusCode::METHOD_NOT_ALLOWED || status == StatusCode::NOT_IMPLEMENTED
+                {
+                    // Origin rejected HEAD with 405 or 501
+                    (None, true)
+                } else if status.is_client_error() || status.is_server_error() {
+                    return Err(HttpError::status(
+                        status.as_u16(),
+                        format!("HEAD probe rejected: {status}"),
+                        None,
+                    ));
+                } else {
+                    (Some(res), false)
+                }
+            }
+            Err(err) => {
+                // If connection/network failed, return error
+                if err.is_fatal() {
+                    return Err(err);
+                }
                 (None, true)
-            } else if status.is_client_error() || status.is_server_error() {
-                return Err(HttpError::status(
-                    status.as_u16(),
-                    format!("HEAD probe rejected: {status}"),
-                    None,
-                ));
-            } else {
-                (Some(res), false)
             }
-        }
-        Err(err) => {
-            // If connection/network failed, return error
-            if err.is_fatal() {
-                return Err(err);
-            }
-            (None, true)
-        }
-    };
+        };
 
     // Step 2: Analyze HEAD response if available
     let mut content_length = None;
@@ -146,10 +148,22 @@ pub async fn probe_with_options(
             }
         }
 
-        etag = hdrs.get(ETAG).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
-        last_modified = hdrs.get(LAST_MODIFIED).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
-        content_type = hdrs.get(CONTENT_TYPE).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
-        content_disposition = hdrs.get(CONTENT_DISPOSITION).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
+        etag = hdrs
+            .get(ETAG)
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+        last_modified = hdrs
+            .get(LAST_MODIFIED)
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+        content_type = hdrs
+            .get(CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+        content_disposition = hdrs
+            .get(CONTENT_DISPOSITION)
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
 
         // We need ranged GET if:
         // 1. Content-Length was missing
@@ -173,16 +187,28 @@ pub async fn probe_with_options(
 
         // Update headers from GET response if missing
         if etag.is_none() {
-            etag = hdrs.get(ETAG).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
+            etag = hdrs
+                .get(ETAG)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
         }
         if last_modified.is_none() {
-            last_modified = hdrs.get(LAST_MODIFIED).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
+            last_modified = hdrs
+                .get(LAST_MODIFIED)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
         }
         if content_type.is_none() {
-            content_type = hdrs.get(CONTENT_TYPE).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
+            content_type = hdrs
+                .get(CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
         }
         if content_disposition.is_none() {
-            content_disposition = hdrs.get(CONTENT_DISPOSITION).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
+            content_disposition = hdrs
+                .get(CONTENT_DISPOSITION)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
         }
 
         if let Some(ar_val) = hdrs.get(ACCEPT_RANGES) {
@@ -276,7 +302,9 @@ async fn execute_head_with_redirects(
 
         if status.is_redirection() {
             let Some(loc_val) = res.headers().get(reqwest::header::LOCATION) else {
-                return Err(HttpError::redirect("redirect response missing Location header"));
+                return Err(HttpError::redirect(
+                    "redirect response missing Location header",
+                ));
             };
             let loc_str = loc_val.to_str().map_err(|_| {
                 HttpError::redirect("Location header contains non-ASCII characters")
@@ -309,7 +337,9 @@ async fn execute_get_with_redirects(
 
         if status.is_redirection() {
             let Some(loc_val) = res.headers().get(reqwest::header::LOCATION) else {
-                return Err(HttpError::redirect("redirect response missing Location header"));
+                return Err(HttpError::redirect(
+                    "redirect response missing Location header",
+                ));
             };
             let loc_str = loc_val.to_str().map_err(|_| {
                 HttpError::redirect("Location header contains non-ASCII characters")

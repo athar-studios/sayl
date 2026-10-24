@@ -121,7 +121,8 @@ mod tests {
         let original = TaskId::new();
         let formatted = original.to_string();
 
-        let parsed = TaskId::from_str(&formatted).expect("parsing valid UUID string should succeed");
+        let parsed =
+            TaskId::from_str(&formatted).expect("parsing valid UUID string should succeed");
         assert_eq!(original, parsed);
         assert_eq!(parsed.to_string(), formatted);
     }

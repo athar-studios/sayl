@@ -109,14 +109,38 @@ impl fmt::Display for VerificationError {
             Self::CountMismatch { expected, actual } => {
                 write!(f, "Expected {} requests, but recorded {}", expected, actual)
             }
-            Self::MethodMismatch { index, expected, actual } => {
-                write!(f, "Request [{}]: method expected '{}', found '{}'", index, expected, actual)
+            Self::MethodMismatch {
+                index,
+                expected,
+                actual,
+            } => {
+                write!(
+                    f,
+                    "Request [{}]: method expected '{}', found '{}'",
+                    index, expected, actual
+                )
             }
-            Self::PathMismatch { index, expected, actual } => {
-                write!(f, "Request [{}]: path expected '{}', found '{}'", index, expected, actual)
+            Self::PathMismatch {
+                index,
+                expected,
+                actual,
+            } => {
+                write!(
+                    f,
+                    "Request [{}]: path expected '{}', found '{}'",
+                    index, expected, actual
+                )
             }
-            Self::RangeMismatch { index, expected, actual } => {
-                write!(f, "Request [{}]: range expected '{}', found '{:?}'", index, expected, actual)
+            Self::RangeMismatch {
+                index,
+                expected,
+                actual,
+            } => {
+                write!(
+                    f,
+                    "Request [{}]: range expected '{}', found '{:?}'",
+                    index, expected, actual
+                )
             }
         }
     }
@@ -298,7 +322,10 @@ impl HttpFixtureServer {
 
     /// Synchronous accessor for recorded requests when lock is immediately available.
     pub fn try_recorded_requests(&self) -> Vec<RecordedRequest> {
-        self.recorded.try_lock().map(|l| l.clone()).unwrap_or_default()
+        self.recorded
+            .try_lock()
+            .map(|l| l.clone())
+            .unwrap_or_default()
     }
 
     /// Clears recorded requests and resets request counters.
@@ -308,7 +335,10 @@ impl HttpFixtureServer {
     }
 
     /// Verifies the recorded requests against an expected sequence.
-    pub async fn verify_requests(&self, expected: &[ExpectedRequest]) -> Result<(), VerificationError> {
+    pub async fn verify_requests(
+        &self,
+        expected: &[ExpectedRequest],
+    ) -> Result<(), VerificationError> {
         let recorded = self.recorded.lock().await;
         if recorded.len() != expected.len() {
             return Err(VerificationError::CountMismatch {
@@ -379,7 +409,8 @@ impl HttpFixtureServer {
 
                         tokio::spawn(async move {
                             active.fetch_add(1, Ordering::SeqCst);
-                            let _ = handle_connection(stream, cfg, rec, req_ctr, active.clone()).await;
+                            let _ =
+                                handle_connection(stream, cfg, rec, req_ctr, active.clone()).await;
                             active.fetch_sub(1, Ordering::SeqCst);
                         });
                     }
@@ -482,7 +513,10 @@ async fn handle_connection(
         let header_end = find_subsequence(&buffered_data, b"\r\n\r\n");
         if header_end.is_none() {
             if buffered_data.len() > 65536 {
-                return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "HTTP header too large"));
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "HTTP header too large",
+                ));
             }
             continue;
         }
@@ -1126,7 +1160,9 @@ async fn write_streamed_body(
 }
 
 fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    haystack.windows(needle.len()).position(|window| window == needle)
+    haystack
+        .windows(needle.len())
+        .position(|window| window == needle)
 }
 
 #[cfg(test)]

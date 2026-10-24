@@ -11,10 +11,10 @@ use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
 
-use sayl_core::id::TaskId;
 use crate::error::{Result, StoreError};
 use crate::journal::{Entry, Journal, JournalOp};
 use crate::record::{Checkpoint, TaskRecord};
+use sayl_core::id::TaskId;
 
 static OPEN_DIRS: OnceLock<Mutex<HashSet<PathBuf>>> = OnceLock::new();
 
@@ -303,7 +303,9 @@ impl Store {
             journal.append(&entry)?;
         }
 
-        inner.checkpoints.insert(checkpoint.task_id, checkpoint.clone());
+        inner
+            .checkpoints
+            .insert(checkpoint.task_id, checkpoint.clone());
         Ok(())
     }
 

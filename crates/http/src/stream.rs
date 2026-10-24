@@ -7,11 +7,11 @@
 //! - Cooperative cancellation via [`CancellationToken`].
 //! - Explicit `fsync` (`sync_all`) before declaring successful completion.
 
-use std::path::Path;
 use futures_util::StreamExt;
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT_ENCODING, CONTENT_LENGTH, USER_AGENT};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
 pub use tokio_util::sync::CancellationToken;
@@ -241,9 +241,7 @@ where
     // Verify written bytes equal expected length before declaring success
     if let Some(expected) = target_length {
         if written < expected {
-            tracing::warn!(
-                "stream truncated: received {written} bytes, expected {expected} bytes"
-            );
+            tracing::warn!("stream truncated: received {written} bytes, expected {expected} bytes");
             return Ok(StreamOutcome::Incomplete { written });
         } else if written > expected {
             return Err(HttpError::validation(

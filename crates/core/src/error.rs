@@ -63,7 +63,11 @@ pub enum CoreError {
 
 impl CoreError {
     /// Creates an HTTP error.
-    pub fn http(status_code: Option<u16>, message: impl Into<String>, retry_after: Option<u64>) -> Self {
+    pub fn http(
+        status_code: Option<u16>,
+        message: impl Into<String>,
+        retry_after: Option<u64>,
+    ) -> Self {
         let is_transient = match status_code {
             Some(429 | 500 | 502 | 503 | 504) => true,
             Some(_) => false,
@@ -286,7 +290,8 @@ mod tests {
         assert!(http_err.to_string().contains("503"));
         assert!(http_err.to_string().contains("Retry-After: 5s"));
 
-        let io_err = CoreError::io_with_context(io::Error::from(io::ErrorKind::NotFound), "file write");
+        let io_err =
+            CoreError::io_with_context(io::Error::from(io::ErrorKind::NotFound), "file write");
         assert_eq!(io_err.category(), "Io");
         assert!(io_err.to_string().contains("file write"));
 

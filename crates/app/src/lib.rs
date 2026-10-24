@@ -13,6 +13,8 @@ pub mod sequential;
 
 pub use config::EngineConfig;
 pub use engine::Engine;
-pub use lease::{LeaseReport, LeaseTable, RangeLease, WorkerId, DEFAULT_CHUNK_SIZE, DEFAULT_LEASE_TTL};
+pub use lease::{
+    LeaseReport, LeaseTable, RangeLease, WorkerId, DEFAULT_CHUNK_SIZE, DEFAULT_LEASE_TTL,
+};
 pub use queue::{QueueError, QueueLimits, QueueStats, Scheduler, TaskStatus, TokenBucket};
 pub use sequential::DownloadOutcome;

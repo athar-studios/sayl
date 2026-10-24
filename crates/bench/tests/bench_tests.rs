@@ -11,25 +11,37 @@ async fn test_smoke_1mib_measurement() {
     assert_eq!(report.file_size_bytes, size);
 
     // Assert sequential bytes transferred
-    let seq = report.sequential.as_ref().expect("sequential should be present");
+    let seq = report
+        .sequential
+        .as_ref()
+        .expect("sequential should be present");
     assert_eq!(seq.bytes_transferred, size);
     assert_eq!(seq.requests_issued, 1);
     assert!(seq.wall_time_secs > 0.0);
     assert!(seq.throughput_mb_s > 0.0);
 
     // Assert parallel bytes transferred
-    let p4 = report.parallel_4.as_ref().expect("parallel_4 should be present");
+    let p4 = report
+        .parallel_4
+        .as_ref()
+        .expect("parallel_4 should be present");
     assert_eq!(p4.bytes_transferred, size);
     assert_eq!(p4.connections, 4);
     assert_eq!(p4.requests_issued, 4);
 
-    let p8 = report.parallel_8.as_ref().expect("parallel_8 should be present");
+    let p8 = report
+        .parallel_8
+        .as_ref()
+        .expect("parallel_8 should be present");
     assert_eq!(p8.bytes_transferred, size);
     assert_eq!(p8.connections, 8);
     assert_eq!(p8.requests_issued, 8);
 
     // Assert range overhead
-    let ro = report.range_overhead.as_ref().expect("range_overhead should be present");
+    let ro = report
+        .range_overhead
+        .as_ref()
+        .expect("range_overhead should be present");
     assert_eq!(ro.file_size_bytes, size);
     assert_eq!(ro.bytes_transferred, size);
     assert_eq!(ro.requests_issued, 4);

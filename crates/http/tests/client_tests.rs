@@ -3,10 +3,9 @@
 use std::time::Duration;
 
 use sayl_http::{
-    build_client, ClientConfig, ProxyConfig, ProxyMode, RedirectPolicy,
-    validate_header_value, build_request_headers,
-    validate_no_header_injection, OriginBudget, ManualTimeSource, origin_from_url,
-    HttpError,
+    build_client, build_request_headers, origin_from_url, validate_header_value,
+    validate_no_header_injection, ClientConfig, HttpError, ManualTimeSource, OriginBudget,
+    ProxyConfig, ProxyMode, RedirectPolicy,
 };
 use sayl_test_http::{HttpFixtureServer, Scenario};
 use url::Url;
@@ -59,8 +58,16 @@ async fn test_proxy_url_with_credentials_error_redacts_password() {
     // The error should not contain the password
     if let Err(e) = result {
         let err_str = e.to_string();
-        assert!(!err_str.contains("secretpassword"), "password leaked in error: {}", err_str);
-        assert!(err_str.contains("***"), "credentials not redacted: {}", err_str);
+        assert!(
+            !err_str.contains("secretpassword"),
+            "password leaked in error: {}",
+            err_str
+        );
+        assert!(
+            err_str.contains("***"),
+            "credentials not redacted: {}",
+            err_str
+        );
     }
 }
 
@@ -148,7 +155,11 @@ async fn test_build_request_headers_rejects_reserved_headers() {
     for (name, value) in reserved {
         let headers = vec![(name.to_string(), value.to_string())];
         let err = build_request_headers(&headers).unwrap_err();
-        assert!(matches!(err, HttpError::Validation { .. }), "header '{}' should be rejected", name);
+        assert!(
+            matches!(err, HttpError::Validation { .. }),
+            "header '{}' should be rejected",
+            name
+        );
         assert!(err.to_string().contains("reserved"));
     }
 }
@@ -173,11 +184,24 @@ async fn test_pool_reuse_with_pooling_scenario() {
     let url = Url::parse(&format!("{}test.bin", base_url)).unwrap();
 
     // Make two sequential requests
-    let _ = client.get(url.clone()).send().await.expect("first request failed");
-    let _ = client.get(url.clone()).send().await.expect("second request failed");
+    let _ = client
+        .get(url.clone())
+        .send()
+        .await
+        .expect("first request failed");
+    let _ = client
+        .get(url.clone())
+        .send()
+        .await
+        .expect("second request failed");
 
     let recorded = server.recorded_requests().await;
-    assert_eq!(recorded.len(), 2, "expected 2 requests recorded, got {}", recorded.len());
+    assert_eq!(
+        recorded.len(),
+        2,
+        "expected 2 requests recorded, got {}",
+        recorded.len()
+    );
 
     // Verify both requests went to the same connection by checking
     // that the server handled them on the same TCP connection.
@@ -226,7 +250,11 @@ async fn test_origin_budget_releases_correctly() {
 #[tokio::test]
 async fn test_origin_budget_enforces_rate_limit() {
     let time_source = std::sync::Arc::new(ManualTimeSource::default());
-    let budget = OriginBudget::with_time_source(10, 3, time_source.clone() as std::sync::Arc<dyn sayl_http::budget::TimeSource>);
+    let budget = OriginBudget::with_time_source(
+        10,
+        3,
+        time_source.clone() as std::sync::Arc<dyn sayl_http::budget::TimeSource>,
+    );
     let origin = "https://example.com:443";
 
     // First 3 requests should succeed
@@ -329,7 +357,11 @@ async fn test_redirect_policy_integration() {
 #[tokio::test]
 async fn test_no_proxy_config() {
     let mut config = ClientConfig::default();
-    config.no_proxy = vec!["localhost".to_string(), "127.0.0.1".to_string(), ".local".to_string()];
+    config.no_proxy = vec![
+        "localhost".to_string(),
+        "127.0.0.1".to_string(),
+        ".local".to_string(),
+    ];
     let client = build_client(&config).expect("client build failed");
 
     // Client builds successfully with no_proxy list

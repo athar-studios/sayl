@@ -30,9 +30,9 @@ pub use budget::{
     origin_from_url, ManualTimeHandle, ManualTimeSource, OriginBudget, SystemTimeSource, TimeSource,
 };
 pub use client::{
-    build_client, ClientConfig, ProxyConfig, ProxyMode, DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_CONNECTIONS_PER_HOST,
-    DEFAULT_MAX_IDLE_PER_HOST, DEFAULT_MAX_RESPONSE_HEADERS_BYTES, DEFAULT_POOL_IDLE_TIMEOUT,
-    DEFAULT_READ_TIMEOUT, user_agent_default,
+    build_client, user_agent_default, ClientConfig, ProxyConfig, ProxyMode,
+    DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_CONNECTIONS_PER_HOST, DEFAULT_MAX_IDLE_PER_HOST,
+    DEFAULT_MAX_RESPONSE_HEADERS_BYTES, DEFAULT_POOL_IDLE_TIMEOUT, DEFAULT_READ_TIMEOUT,
 };
 pub use error::HttpError;
 pub use filename::{
@@ -40,23 +40,17 @@ pub use filename::{
     DEFAULT_FALLBACK_FILENAME, MAX_FILENAME_LENGTH,
 };
 pub use headers::{
-    build_request_headers, validate_header_name, validate_header_value, validate_no_header_injection,
-    MAX_HEADER_VALUE_LEN,
+    build_request_headers, validate_header_name, validate_header_value,
+    validate_no_header_injection, MAX_HEADER_VALUE_LEN,
 };
-pub use probe::{
-    parse_content_length, probe, probe_with_options, ProbeOptions, ProbeResult,
-};
+pub use probe::{parse_content_length, probe, probe_with_options, ProbeOptions, ProbeResult};
 pub use range::{format_byte_range, verify_range_probe_response, ContentRange, RangeSupport};
-pub use redirect::{
-    RedirectPolicy, RedirectTracker, DEFAULT_MAX_REDIRECT_HOPS,
-};
+pub use redirect::{RedirectPolicy, RedirectTracker, DEFAULT_MAX_REDIRECT_HOPS};
 pub use resume::{
-    if_range_value, is_weak_etag, reconcile_partial_len, validator_kind, validate_resume,
+    if_range_value, is_weak_etag, reconcile_partial_len, validate_resume, validator_kind,
     ResumeDecision, ResumeInfo, ValidatorKind,
 };
-pub use retry::{
-    is_retryable_status, should_retry, status_of, RetryPolicy,
-};
+pub use retry::{is_retryable_status, should_retry, status_of, RetryPolicy};
 pub use stream::{
     stream_to_file, stream_to_file_with_options, CancellationToken, StreamOptions, StreamOutcome,
     DEFAULT_CHUNK_SIZE,

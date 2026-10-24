@@ -102,8 +102,18 @@ impl DownloadState {
     pub const fn valid_destinations(&self) -> &'static [DownloadState] {
         match self {
             Self::Queued => &[Self::Probing, Self::Cancelling, Self::Failed],
-            Self::Probing => &[Self::Downloading, Self::Pausing, Self::Cancelling, Self::Failed],
-            Self::Downloading => &[Self::Verifying, Self::Pausing, Self::Cancelling, Self::Failed],
+            Self::Probing => &[
+                Self::Downloading,
+                Self::Pausing,
+                Self::Cancelling,
+                Self::Failed,
+            ],
+            Self::Downloading => &[
+                Self::Verifying,
+                Self::Pausing,
+                Self::Cancelling,
+                Self::Failed,
+            ],
             Self::Verifying => &[Self::Finalizing, Self::Cancelling, Self::Failed],
             Self::Finalizing => &[Self::Completed, Self::Cancelling, Self::Failed],
             Self::Pausing => &[Self::Paused, Self::Cancelling, Self::Failed],
@@ -175,7 +185,10 @@ impl std::error::Error for StateTransitionError {}
 /// // Terminal state cannot transition anywhere
 /// assert!(transition(DownloadState::Completed, DownloadState::Queued).is_err());
 /// ```
-pub fn transition(from: DownloadState, to: DownloadState) -> Result<DownloadState, StateTransitionError> {
+pub fn transition(
+    from: DownloadState,
+    to: DownloadState,
+) -> Result<DownloadState, StateTransitionError> {
     if from == to {
         return if !from.is_terminal() {
             Ok(from)
@@ -213,15 +226,30 @@ mod tests {
 
     #[test]
     fn test_pause_and_resume_cycle() {
-        assert_eq!(transition(DownloadState::Downloading, DownloadState::Pausing), Ok(DownloadState::Pausing));
-        assert_eq!(transition(DownloadState::Pausing, DownloadState::Paused), Ok(DownloadState::Paused));
-        assert_eq!(transition(DownloadState::Paused, DownloadState::Probing), Ok(DownloadState::Probing));
-        assert_eq!(transition(DownloadState::Probing, DownloadState::Downloading), Ok(DownloadState::Downloading));
+        assert_eq!(
+            transition(DownloadState::Downloading, DownloadState::Pausing),
+            Ok(DownloadState::Pausing)
+        );
+        assert_eq!(
+            transition(DownloadState::Pausing, DownloadState::Paused),
+            Ok(DownloadState::Paused)
+        );
+        assert_eq!(
+            transition(DownloadState::Paused, DownloadState::Probing),
+            Ok(DownloadState::Probing)
+        );
+        assert_eq!(
+            transition(DownloadState::Probing, DownloadState::Downloading),
+            Ok(DownloadState::Downloading)
+        );
     }
 
     #[test]
     fn test_probe_pause() {
-        assert_eq!(transition(DownloadState::Probing, DownloadState::Pausing), Ok(DownloadState::Pausing));
+        assert_eq!(
+            transition(DownloadState::Probing, DownloadState::Pausing),
+            Ok(DownloadState::Pausing)
+        );
     }
 
     #[test]
@@ -236,7 +264,10 @@ mod tests {
                 );
             }
         }
-        assert_eq!(transition(DownloadState::Cancelling, DownloadState::Cancelled), Ok(DownloadState::Cancelled));
+        assert_eq!(
+            transition(DownloadState::Cancelling, DownloadState::Cancelled),
+            Ok(DownloadState::Cancelled)
+        );
     }
 
     #[test]
@@ -295,7 +326,10 @@ mod tests {
 
                 // Property 3: Cancelling can only transition to Cancelled or Failed (or Cancelling self-transition)
                 if from == DownloadState::Cancelling {
-                    if to == DownloadState::Cancelled || to == DownloadState::Failed || to == DownloadState::Cancelling {
+                    if to == DownloadState::Cancelled
+                        || to == DownloadState::Failed
+                        || to == DownloadState::Cancelling
+                    {
                         assert!(res.is_ok());
                     } else {
                         assert!(res.is_err());

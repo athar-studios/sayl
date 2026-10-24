@@ -12,15 +12,15 @@
 //! - Redirect security: credentials stripped on origin change, disallowed schemes, max 5 hops, loops
 //! - Cancellation: stream halts cleanly when CancellationToken is fired
 
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, COOKIE, PROXY_AUTHORIZATION};
 use reqwest::Client;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use url::Url;
 
 use sayl_http::{
-    derive_filename, probe, sanitize_filename, stream_to_file, CancellationToken,
-    HttpError, RangeSupport, RedirectPolicy, RedirectTracker, StreamOutcome,
+    derive_filename, probe, sanitize_filename, stream_to_file, CancellationToken, HttpError,
+    RangeSupport, RedirectPolicy, RedirectTracker, StreamOutcome,
 };
 use sayl_test_http::{HttpFixtureServer, Scenario};
 
@@ -165,7 +165,9 @@ async fn test_scenario_head_rejected() {
     let url = Url::parse(&format!("http://{}/resource.bin", addr)).unwrap();
 
     // HEAD is rejected with 405 Method Not Allowed; probe falls back to GET Range: bytes=0-0
-    let result = probe(url).await.expect("probe should succeed via ranged GET fallback");
+    let result = probe(url)
+        .await
+        .expect("probe should succeed via ranged GET fallback");
     assert_eq!(result.status, 200);
     assert_eq!(result.content_length, Some(1024));
     assert_eq!(result.range_support, RangeSupport::Ignored);
@@ -180,7 +182,9 @@ async fn test_scenario_unknown_size() {
     let addr = server.start().await.expect("start server");
     let url = Url::parse(&format!("http://{}/unknown.bin", addr)).unwrap();
 
-    let result = probe(url.clone()).await.expect("probe should handle unknown size");
+    let result = probe(url.clone())
+        .await
+        .expect("probe should handle unknown size");
     assert_eq!(result.content_length, None);
 
     let client = Client::builder()
@@ -213,7 +217,9 @@ async fn test_scenario_empty_file() {
     let addr = server.start().await.expect("start server");
     let url = Url::parse(&format!("http://{}/empty.bin", addr)).unwrap();
 
-    let result = probe(url.clone()).await.expect("probe should handle empty file");
+    let result = probe(url.clone())
+        .await
+        .expect("probe should handle empty file");
     assert_eq!(result.content_length, Some(0));
 
     let client = Client::builder()
@@ -277,16 +283,9 @@ async fn test_cancellation_honored() {
     let token = CancellationToken::new();
     token.cancel(); // Pre-cancel
 
-    let outcome = stream_to_file(
-        &client,
-        &url,
-        &dest,
-        Some(10240),
-        token,
-        |_| {},
-    )
-    .await
-    .expect("cancelled stream should return Ok(Cancelled)");
+    let outcome = stream_to_file(&client, &url, &dest, Some(10240), token, |_| {})
+        .await
+        .expect("cancelled stream should return Ok(Cancelled)");
 
     assert_eq!(outcome, StreamOutcome::Cancelled { written: 0 });
     let _ = std::fs::remove_file(&dest);
@@ -319,10 +318,14 @@ fn test_redirect_policy_security_suite() {
     assert!(!headers.contains_key(PROXY_AUTHORIZATION));
 
     // 3. Reject non-http(s) schemes: file:, data:, ftp:
-    let err_file = tracker.step("file:///etc/shadow", &mut headers).unwrap_err();
+    let err_file = tracker
+        .step("file:///etc/shadow", &mut headers)
+        .unwrap_err();
     assert!(matches!(err_file, HttpError::Redirect { .. }));
 
-    let err_data = tracker.step("data:text/plain;base64,123", &mut headers).unwrap_err();
+    let err_data = tracker
+        .step("data:text/plain;base64,123", &mut headers)
+        .unwrap_err();
     assert!(matches!(err_data, HttpError::Redirect { .. }));
 
     // 4. Max 5 hops enforced
@@ -331,17 +334,27 @@ fn test_redirect_policy_security_suite() {
         Url::parse("https://hops.com/0").unwrap(),
     )
     .unwrap();
-    assert!(limited_tracker.step("https://hops.com/1", &mut headers).is_ok());
-    assert!(limited_tracker.step("https://hops.com/2", &mut headers).is_ok());
+    assert!(limited_tracker
+        .step("https://hops.com/1", &mut headers)
+        .is_ok());
+    assert!(limited_tracker
+        .step("https://hops.com/2", &mut headers)
+        .is_ok());
     let err_hops = limited_tracker
         .step("https://hops.com/3", &mut headers)
         .unwrap_err();
-    assert!(err_hops.to_string().contains("maximum redirect hops (2) exceeded"));
+    assert!(err_hops
+        .to_string()
+        .contains("maximum redirect hops (2) exceeded"));
 
     // 5. Loop detection
     let mut loop_tracker = RedirectTracker::new(Url::parse("https://loop.com/a").unwrap()).unwrap();
-    loop_tracker.step("https://loop.com/b", &mut headers).unwrap();
-    let err_loop = loop_tracker.step("https://loop.com/a", &mut headers).unwrap_err();
+    loop_tracker
+        .step("https://loop.com/b", &mut headers)
+        .unwrap();
+    let err_loop = loop_tracker
+        .step("https://loop.com/a", &mut headers)
+        .unwrap_err();
     assert!(err_loop.to_string().contains("redirect loop detected"));
 }
 
@@ -360,7 +373,10 @@ fn test_filename_sanitization_comprehensive() {
     assert_eq!(sanitize_filename("LPT9.log"), "_LPT9.log");
 
     // 3. Windows forbidden characters
-    assert_eq!(sanitize_filename(r#"foo<bar>baz:qux"pipe|q?star*.ext"#), "foo_bar_baz_qux_pipe_q_star_.ext");
+    assert_eq!(
+        sanitize_filename(r#"foo<bar>baz:qux"pipe|q?star*.ext"#),
+        "foo_bar_baz_qux_pipe_q_star_.ext"
+    );
 
     // 4. Arabic and Unicode preservation with NFC
     let arabic = "ملف_سيل_2026_النهائي.pdf";

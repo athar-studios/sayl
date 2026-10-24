@@ -189,7 +189,9 @@ fn neutralize_reserved_device_names(name: &str) -> String {
         None => name,
     };
     let collapsed = base_stem.split_whitespace().collect::<Vec<_>>().join(" ");
-    let normalized_stem = collapsed.trim_matches(|c| c == ' ' || c == '.').to_uppercase();
+    let normalized_stem = collapsed
+        .trim_matches(|c| c == ' ' || c == '.')
+        .to_uppercase();
 
     let is_reserved = WINDOWS_RESERVED_NAMES
         .iter()
@@ -245,7 +247,8 @@ mod tests {
 
     #[test]
     fn test_rfc5987_arabic_filename() {
-        let header = "attachment; filename*=UTF-8''%D8%AA%D9%82%D8%B1%D9%8A%D8%B1_%D8%B3%D9%8A%D9%84.pdf";
+        let header =
+            "attachment; filename*=UTF-8''%D8%AA%D9%82%D8%B1%D9%8A%D8%B1_%D8%B3%D9%8A%D9%84.pdf";
         let parsed = parse_content_disposition(header).unwrap();
         assert_eq!(parsed, "تقرير_سيل.pdf");
 
@@ -273,7 +276,10 @@ mod tests {
         assert_eq!(sanitize_filename("../../evil.exe"), "evil.exe");
         assert_eq!(sanitize_filename("..\\..\\evil.exe"), "evil.exe");
         assert_eq!(sanitize_filename("/var/log/syslog.txt"), "syslog.txt");
-        assert_eq!(sanitize_filename("C:\\Windows\\System32\\calc.exe"), "calc.exe");
+        assert_eq!(
+            sanitize_filename("C:\\Windows\\System32\\calc.exe"),
+            "calc.exe"
+        );
     }
 
     #[test]
@@ -331,7 +337,10 @@ mod tests {
 
     #[test]
     fn test_reserved_characters_replaced() {
-        assert_eq!(sanitize_filename(r#"file:name*with?bad<chars>|"#.into()), "file_name_with_bad_chars__");
+        assert_eq!(
+            sanitize_filename(r#"file:name*with?bad<chars>|"#.into()),
+            "file_name_with_bad_chars__"
+        );
     }
 
     #[test]
@@ -364,7 +373,8 @@ mod tests {
 
     #[test]
     fn test_derive_from_url() {
-        let url = Url::parse("https://cdn.example.com/downloads/v2.1/archive.zip?token=secret").unwrap();
+        let url =
+            Url::parse("https://cdn.example.com/downloads/v2.1/archive.zip?token=secret").unwrap();
         let name = derive_filename(None, &url, None);
         assert_eq!(name, "archive.zip");
     }

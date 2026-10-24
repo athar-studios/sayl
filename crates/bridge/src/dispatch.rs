@@ -36,8 +36,9 @@ impl EngineDispatcher {
         let dl_dir = download_dir.into();
         let st_dir = store_dir.into();
         let config = sayl_app::config::EngineConfig::default();
-        let engine = sayl_app::Engine::new(&dl_dir, &st_dir, config)
-            .map_err(|e| format!("failed to initialize engine at dl={dl_dir:?}, store={st_dir:?}: {e}"))?;
+        let engine = sayl_app::Engine::new(&dl_dir, &st_dir, config).map_err(|e| {
+            format!("failed to initialize engine at dl={dl_dir:?}, store={st_dir:?}: {e}")
+        })?;
 
         Ok(Self {
             runtime,
@@ -155,7 +156,10 @@ impl Dispatcher for EngineDispatcher {
         // Prevent any unexpected panic from escaping through the C-ABI or stdio loop
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.handle_inner(req))) {
             Ok(resp) => resp,
-            Err(_) => Response::error("internal_error", "dispatcher panicked while handling request"),
+            Err(_) => Response::error(
+                "internal_error",
+                "dispatcher panicked while handling request",
+            ),
         }
     }
 }
@@ -188,7 +192,8 @@ mod tests {
         let base = make_temp_dir();
         let dl = base.join("dl");
         let st = base.join("store");
-        let dispatcher = EngineDispatcher::new_with_options(&dl, &st, allow_private).expect("init test dispatcher");
+        let dispatcher = EngineDispatcher::new_with_options(&dl, &st, allow_private)
+            .expect("init test dispatcher");
         (dispatcher, dl, st)
     }
 
@@ -202,7 +207,10 @@ mod tests {
         let (mut dispatcher, dl, st) = make_test_dispatcher(false);
         let resp = dispatcher.handle(Request::Ping { version: 1 });
         match resp {
-            Response::Pong { version, app_version } => {
+            Response::Pong {
+                version,
+                app_version,
+            } => {
                 assert_eq!(version, 1);
                 assert_eq!(app_version, env!("CARGO_PKG_VERSION"));
             }
@@ -252,9 +260,7 @@ mod tests {
 
         // Case 2: valid UUID that does not exist in store
         let random_id = sayl_core::id::TaskId::new().to_string();
-        let resp_nonexistent = dispatcher.handle(Request::Status {
-            task_id: random_id,
-        });
+        let resp_nonexistent = dispatcher.handle(Request::Status { task_id: random_id });
         match resp_nonexistent {
             Response::Error { code, .. } => assert_eq!(code, "unknown_task"),
             other => panic!("expected Error unknown_task, got {other:?}"),
@@ -327,7 +333,11 @@ mod tests {
         std::env::set_var("SAYL_DOWNLOAD_DIR", &dl);
         std::env::set_var("SAYL_DATA_DIR", &st);
         let dispatcher = EngineDispatcher::from_env();
-        assert!(dispatcher.is_ok(), "from_env should succeed with valid directories: {:?}", dispatcher.err());
+        assert!(
+            dispatcher.is_ok(),
+            "from_env should succeed with valid directories: {:?}",
+            dispatcher.err()
+        );
         cleanup_dirs(dl, st);
     }
 }

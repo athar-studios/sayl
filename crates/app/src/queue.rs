@@ -509,7 +509,10 @@ mod tests {
         // A second finish must not decrement another origin's counter.
         s.finish(1, TaskStatus::Failed).unwrap();
         assert_eq!(s.stats().running, 0);
-        assert_eq!(s.finish(42, TaskStatus::Finished), Err(QueueError::UnknownTask));
+        assert_eq!(
+            s.finish(42, TaskStatus::Finished),
+            Err(QueueError::UnknownTask)
+        );
     }
 
     #[test]
@@ -580,6 +583,9 @@ mod tests {
         let _ = bucket.take(1000, start);
         let wait = bucket.take(500, start);
         // 500 bytes at 1000 B/s is about half a second.
-        assert!(wait >= Duration::from_millis(499) && wait <= Duration::from_millis(501), "{wait:?}");
+        assert!(
+            wait >= Duration::from_millis(499) && wait <= Duration::from_millis(501),
+            "{wait:?}"
+        );
     }
 }

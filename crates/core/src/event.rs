@@ -332,10 +332,7 @@ impl SequenceGapDetector {
 pub fn event_channel(capacity: usize) -> (EventSender, EventReceiver) {
     let (tx, rx) = mpsc::channel(capacity);
     let counter = Arc::new(AtomicU64::new(1));
-    (
-        EventSender::new(tx, counter),
-        EventReceiver::new(rx),
-    )
+    (EventSender::new(tx, counter), EventReceiver::new(rx))
 }
 
 #[cfg(test)]

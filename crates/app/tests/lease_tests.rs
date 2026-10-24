@@ -144,11 +144,15 @@ fn test_no_double_claim_unexpired_leases() {
     let now = Instant::now();
     let ttl = Duration::from_secs(30);
 
-    let c0 = table.claim_next(0, now, ttl).expect("worker 0 claims chunk 0");
+    let c0 = table
+        .claim_next(0, now, ttl)
+        .expect("worker 0 claims chunk 0");
     assert_eq!(c0.owner, Some(0));
     assert_eq!(c0.start, 0);
 
-    let c1 = table.claim_next(1, now, ttl).expect("worker 1 claims chunk 1");
+    let c1 = table
+        .claim_next(1, now, ttl)
+        .expect("worker 1 claims chunk 1");
     assert_eq!(c1.owner, Some(1));
     assert_eq!(c1.start, 100);
 
@@ -188,7 +192,10 @@ fn test_steal_expired_lease_and_reject_stale_completion() {
 
     // New owner (Worker 1) completes with valid lease -> ACCEPTED
     let completed_valid = table.complete(&lease1);
-    assert!(completed_valid, "valid current owner completion must succeed");
+    assert!(
+        completed_valid,
+        "valid current owner completion must succeed"
+    );
     assert!(table.is_complete());
 
     let report = table.report();
@@ -220,10 +227,15 @@ fn test_steal_longest_expired_first() {
     // Chunk 0 expired 1s ago (expiry: t0 + 6s)
     // Chunk 2 is still unexpired (expiry: t0 + 9s)
     let t_steal = t0 + Duration::from_secs(7);
-    let stolen = table.claim_next(3, t_steal, Duration::from_secs(5)).expect("steal");
+    let stolen = table
+        .claim_next(3, t_steal, Duration::from_secs(5))
+        .expect("steal");
 
     // Must steal Chunk 1 (longest-expired first)
-    assert_eq!(stolen.start, 100, "must steal longest-expired chunk 1 first");
+    assert_eq!(
+        stolen.start, 100,
+        "must steal longest-expired chunk 1 first"
+    );
     assert_eq!(stolen.owner, Some(3));
 }
 
@@ -302,7 +314,12 @@ async fn test_end_to_end_fixture_server_max_connections_4() {
     .await
     .expect("parallel download succeeds");
 
-    assert_eq!(outcome, DownloadOutcome::Completed { written: size as u64 });
+    assert_eq!(
+        outcome,
+        DownloadOutcome::Completed {
+            written: size as u64
+        }
+    );
 
     // Verify downloaded bytes
     let bytes = tokio::fs::read(&part_path).await.expect("read part file");
@@ -328,7 +345,11 @@ async fn test_end_to_end_fixture_server_max_connections_4() {
 
     assert_eq!(requested_ranges.len(), 4);
     let unique: HashSet<_> = requested_ranges.iter().collect();
-    assert_eq!(unique.len(), 4, "each byte range must be requested at most once");
+    assert_eq!(
+        unique.len(),
+        4,
+        "each byte range must be requested at most once"
+    );
 }
 
 #[tokio::test]
@@ -426,12 +447,21 @@ async fn test_slow_worker_triggers_steal_and_file_is_correct() {
     .await
     .expect("download completes with steal");
 
-    assert_eq!(outcome, DownloadOutcome::Completed { written: size as u64 });
+    assert_eq!(
+        outcome,
+        DownloadOutcome::Completed {
+            written: size as u64
+        }
+    );
 
     let bytes = tokio::fs::read(&part_path).await.expect("read part file");
     assert_eq!(bytes, expected_data);
 
-    assert!(report.steals_performed >= 1, "expected at least 1 steal, got {}", report.steals_performed);
+    assert!(
+        report.steals_performed >= 1,
+        "expected at least 1 steal, got {}",
+        report.steals_performed
+    );
     report.assert_full_coverage(size as u64);
 
     server_task.abort();
@@ -539,14 +569,23 @@ async fn test_worker_failing_mid_chunk_retried_by_another_worker_and_completes()
     .await
     .expect("download succeeds through retry by worker");
 
-    assert_eq!(outcome, DownloadOutcome::Completed { written: size as u64 });
+    assert_eq!(
+        outcome,
+        DownloadOutcome::Completed {
+            written: size as u64
+        }
+    );
 
     // Verify final file is completely byte-correct
     let bytes = tokio::fs::read(&part_path).await.expect("read part file");
     assert_eq!(bytes, expected_data);
 
     // Verify retries occurred and full coverage holds
-    assert!(report.retries >= 1, "expected at least 1 retry, got {}", report.retries);
+    assert!(
+        report.retries >= 1,
+        "expected at least 1 retry, got {}",
+        report.retries
+    );
     report.assert_full_coverage(size as u64);
 
     server_task.abort();
@@ -587,5 +626,8 @@ async fn test_persistent_worker_failure_fails_cleanly() {
     .await;
 
     // Fails cleanly with no partial success claim
-    assert!(result.is_err(), "must fail cleanly on persistent connection reset");
+    assert!(
+        result.is_err(),
+        "must fail cleanly on persistent connection reset"
+    );
 }

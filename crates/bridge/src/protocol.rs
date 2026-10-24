@@ -34,7 +34,10 @@ impl std::fmt::Display for BridgeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::FrameTooLarge { len } => {
-                write!(f, "frame length {len} exceeds the {MAX_MESSAGE_BYTES} byte cap")
+                write!(
+                    f,
+                    "frame length {len} exceeds the {MAX_MESSAGE_BYTES} byte cap"
+                )
             }
             Self::EmptyFrame => write!(f, "zero-length frame"),
             Self::MalformedJson(msg) => write!(f, "malformed message: {msg}"),
@@ -109,7 +112,9 @@ pub fn decode_frame(mut reader: impl Read) -> Result<Option<Vec<u8>>, BridgeErro
 
     let mut body = vec![0u8; declared];
     reader.read_exact(&mut body).map_err(|err| {
-        BridgeError::Io(format!("truncated frame body after the length prefix: {err}"))
+        BridgeError::Io(format!(
+            "truncated frame body after the length prefix: {err}"
+        ))
     })?;
     Ok(Some(body))
 }

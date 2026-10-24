@@ -41,7 +41,9 @@ async fn main() {
                 println!("SAYL Performance Benchmark (PERF-001)\n");
                 println!("Usage: sayl-bench [OPTIONS]\n");
                 println!("Options:");
-                println!("  --size <BYTES>       Payload size in bytes (default: 33554432 / 32 MiB)");
+                println!(
+                    "  --size <BYTES>       Payload size in bytes (default: 33554432 / 32 MiB)"
+                );
                 println!("  --scenario <NAME>    Specific scenario: all, sequential, parallel, parallel_4, parallel_8, range, resume, memory");
                 println!("  --json               Output machine-readable JSON");
                 println!("  -h, --help           Print help");

@@ -3,9 +3,9 @@
 //! Provides [`TaskRecord`] and [`Checkpoint`] models serialized to JSON
 //! for snapshotting and write-ahead journaling.
 
-use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 use sayl_core::id::TaskId;
 use sayl_core::state::DownloadState;

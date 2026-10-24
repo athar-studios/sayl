@@ -10,9 +10,9 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use sayl_core::id::TaskId;
 use crate::error::{Result, StoreError};
 use crate::record::{Checkpoint, TaskRecord};
+use sayl_core::id::TaskId;
 
 /// Specific mutation operation recorded in the write-ahead journal.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -328,7 +328,8 @@ mod tests {
         // Deliberately append a half-written JSON line directly to the file
         {
             let mut file = OpenOptions::new().append(true).open(&journal_path).unwrap();
-            file.write_all(b"{\"seq\":2,\"op\":{\"type\":\"UpsertTask\",\"payload\":{\"id\":").unwrap();
+            file.write_all(b"{\"seq\":2,\"op\":{\"type\":\"UpsertTask\",\"payload\":{\"id\":")
+                .unwrap();
             file.flush().unwrap();
         }
 

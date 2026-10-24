@@ -1,8 +1,8 @@
-use std::path::PathBuf;
 use assert_cmd::Command;
 use predicates::prelude::*;
 use sayl_test_http::{generate_bytes, HttpFixtureServer, Scenario};
 use serde_json::Value;
+use std::path::PathBuf;
 
 struct TestDirs {
     base: PathBuf,
@@ -358,7 +358,13 @@ async fn test_info_with_unique_prefix_and_ambiguous_prefix() {
         .get_output()
         .stdout
         .clone();
-    let id1 = String::from_utf8(out_1).unwrap().trim().lines().next().unwrap().to_string();
+    let id1 = String::from_utf8(out_1)
+        .unwrap()
+        .trim()
+        .lines()
+        .next()
+        .unwrap()
+        .to_string();
 
     // Add task 2
     let mut add_2 = Command::cargo_bin("sayl").unwrap();
@@ -374,7 +380,13 @@ async fn test_info_with_unique_prefix_and_ambiguous_prefix() {
         .get_output()
         .stdout
         .clone();
-    let id2 = String::from_utf8(out_2).unwrap().trim().lines().next().unwrap().to_string();
+    let id2 = String::from_utf8(out_2)
+        .unwrap()
+        .trim()
+        .lines()
+        .next()
+        .unwrap()
+        .to_string();
 
     let mut common_len = 0;
     let b1 = id1.as_bytes();
@@ -556,7 +568,13 @@ async fn test_remove_deletes_task_and_files() {
         .get_output()
         .stdout
         .clone();
-    let id = String::from_utf8(out).unwrap().trim().lines().next().unwrap().to_string();
+    let id = String::from_utf8(out)
+        .unwrap()
+        .trim()
+        .lines()
+        .next()
+        .unwrap()
+        .to_string();
 
     let mut start_cmd = Command::cargo_bin("sayl").unwrap();
     start_cmd

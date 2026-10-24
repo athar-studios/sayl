@@ -1,7 +1,7 @@
 //! Integration tests for idempotency keys and deduplication storage.
 
-use std::time::Duration;
 use sayl_core::{IdempotencyKey, IdempotencyStore, TaskId};
+use std::time::Duration;
 
 #[test]
 fn test_idempotent_command_deduplication() {

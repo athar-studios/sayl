@@ -90,7 +90,7 @@ pub fn validate_download_dir(dir: &str) -> Result<(), String> {
     };
     if check_str.contains("//")
         || check_str.contains(r"\\")
-        || check_str.contains(r"/\" )
+        || check_str.contains(r"/\")
         || check_str.contains(r"\/")
     {
         return Err("Download directory cannot contain empty path components".to_string());
@@ -134,7 +134,8 @@ pub struct TaskView {
 impl TaskView {
     /// Constructs a `TaskView` from a durable `TaskRecord` and optional transient stats.
     pub fn from_record(rec: &TaskRecord, speed_bps: Option<u64>, eta_secs: Option<u64>) -> Self {
-        let is_running = rec.state == DownloadState::Downloading || rec.state == DownloadState::Probing;
+        let is_running =
+            rec.state == DownloadState::Downloading || rec.state == DownloadState::Probing;
         Self {
             id: rec.id.to_string(),
             url: rec.url.clone(),
@@ -179,6 +180,9 @@ impl AppState {
 
 /// Default download directory resolution.
 pub fn default_download_dir() -> PathBuf {
+    if let Some(dir) = std::env::var_os("SAYL_DOWNLOAD_DIR") {
+        return PathBuf::from(dir);
+    }
     if let Some(user_dirs) = std::env::var_os("USERPROFILE") {
         let downloads = PathBuf::from(user_dirs).join("Downloads");
         if downloads.exists() {
@@ -192,13 +196,22 @@ pub fn default_download_dir() -> PathBuf {
 
 /// Default data directory for SAYL database and config.
 pub fn default_data_dir() -> PathBuf {
-    if let Some(app_data) = std::env::var_os("APPDATA") {
-        PathBuf::from(app_data).join("SAYL")
-    } else {
-        std::env::current_dir()
-            .unwrap_or_else(|_| PathBuf::from("."))
-            .join(".sayl")
+    if let Some(dir) = std::env::var_os("SAYL_DATA_DIR") {
+        return PathBuf::from(dir);
     }
+    if let Some(app_data) = std::env::var_os("APPDATA") {
+        let candidate = PathBuf::from(app_data).join("SAYL");
+        if std::fs::create_dir_all(&candidate).is_ok() {
+            return candidate;
+        }
+    }
+    let local = std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join(".sayl");
+    if std::fs::create_dir_all(&local).is_ok() {
+        return local;
+    }
+    std::env::temp_dir().join("sayl-data")
 }
 
 // ----------------------------------------------------------------------------
@@ -209,10 +222,7 @@ pub mod commands {
     use super::*;
 
     #[tauri::command]
-    pub async fn add_task(
-        state: State<'_, AppState>,
-        url: String,
-    ) -> Result<TaskView, String> {
+    pub async fn add_task(state: State<'_, AppState>, url: String) -> Result<TaskView, String> {
         let clean_url = url.trim();
         if clean_url.is_empty() {
             return Err("URL cannot be empty".to_string());
@@ -237,10 +247,7 @@ pub mod commands {
     }
 
     #[tauri::command]
-    pub async fn start_task(
-        state: State<'_, AppState>,
-        id: String,
-    ) -> Result<(), String> {
+    pub async fn start_task(state: State<'_, AppState>, id: String) -> Result<(), String> {
         let task_id = id
             .parse::<TaskId>()
             .map_err(|e| format!("Invalid task ID: {e}"))?;
@@ -250,10 +257,7 @@ pub mod commands {
     }
 
     #[tauri::command]
-    pub async fn pause_task(
-        state: State<'_, AppState>,
-        id: String,
-    ) -> Result<(), String> {
+    pub async fn pause_task(state: State<'_, AppState>, id: String) -> Result<(), String> {
         let task_id = id
             .parse::<TaskId>()
             .map_err(|e| format!("Invalid task ID: {e}"))?;
@@ -272,10 +276,7 @@ pub mod commands {
     }
 
     #[tauri::command]
-    pub async fn cancel_task(
-        state: State<'_, AppState>,
-        id: String,
-    ) -> Result<(), String> {
+    pub async fn cancel_task(state: State<'_, AppState>, id: String) -> Result<(), String> {
         let task_id = id
             .parse::<TaskId>()
             .map_err(|e| format!("Invalid task ID: {e}"))?;
@@ -444,7 +445,7 @@ pub fn run() {
         Ok(e) => e,
         Err(e) => {
             eprintln!("Failed to initialize download engine: {e}");
-            return;
+            panic!("Failed to initialize download engine: {e}");
         }
     };
 
@@ -474,7 +475,10 @@ pub fn run() {
                 // Recover non-terminal tasks from durable storage
                 match engine.recover().await {
                     Ok(recovered) => {
-                        println!("Engine recovery completed: {} tasks recovered", recovered.len());
+                        println!(
+                            "Engine recovery completed: {} tasks recovered",
+                            recovered.len()
+                        );
                     }
                     Err(err) => {
                         eprintln!("Engine recovery error: {err}");
@@ -541,8 +545,12 @@ pub fn run() {
             Ok(())
         });
 
+    let mut context = tauri::generate_context!();
+    context.config_mut().app.app_directories_override =
+        Some(tauri::utils::config::AppDirectoriesOverride::Root(data_dir));
+
     builder
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running SAYL desktop application");
 }
 
@@ -679,7 +687,26 @@ mod tests {
         };
 
         let json = serde_json::to_string(&p).expect("serialization succeeds");
-        let decoded: ProgressPayload = serde_json::from_str(&json).expect("deserialization succeeds");
+        let decoded: ProgressPayload =
+            serde_json::from_str(&json).expect("deserialization succeeds");
         assert_eq!(p, decoded);
+    }
+
+    #[test]
+    fn test_default_data_dir_override() {
+        let custom_dir = std::env::temp_dir().join("sayl_test_data_dir");
+        std::env::set_var("SAYL_DATA_DIR", &custom_dir);
+        let resolved = default_data_dir();
+        std::env::remove_var("SAYL_DATA_DIR");
+        assert_eq!(resolved, custom_dir);
+    }
+
+    #[test]
+    fn test_default_download_dir_override() {
+        let custom_dir = std::env::temp_dir().join("sayl_test_dl_dir");
+        std::env::set_var("SAYL_DOWNLOAD_DIR", &custom_dir);
+        let resolved = default_download_dir();
+        std::env::remove_var("SAYL_DOWNLOAD_DIR");
+        assert_eq!(resolved, custom_dir);
     }
 }

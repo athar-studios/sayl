@@ -108,8 +108,8 @@ mod tests {
 
     #[test]
     fn unknown_type_is_a_parse_error() {
-        let err = serde_json::from_str::<Request>(r#"{"type":"Execute","cmd":"rm -rf /"}"#)
-            .unwrap_err();
+        let err =
+            serde_json::from_str::<Request>(r#"{"type":"Execute","cmd":"rm -rf /"}"#).unwrap_err();
         assert!(err.to_string().contains("unknown variant") || err.to_string().contains("Execute"));
     }
 

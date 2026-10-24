@@ -148,8 +148,9 @@ pub async fn run_parallel_download_with_options(
             .open(part_path)
             .map_err(|e| CoreError::io_with_context(e, "open part file for parallel resume"))?;
         if existing_len < total_size {
-            file.set_len(total_size)
-                .map_err(|e| CoreError::io_with_context(e, "set_len part file for parallel resume"))?;
+            file.set_len(total_size).map_err(|e| {
+                CoreError::io_with_context(e, "set_len part file for parallel resume")
+            })?;
         }
     } else {
         // Fresh download: preallocate
@@ -160,8 +161,9 @@ pub async fn run_parallel_download_with_options(
             .truncate(true)
             .open(part_path)
             .map_err(|e| CoreError::io_with_context(e, "create part file for parallel transfer"))?;
-        file.set_len(total_size)
-            .map_err(|e| CoreError::io_with_context(e, "set_len part file for parallel transfer"))?;
+        file.set_len(total_size).map_err(|e| {
+            CoreError::io_with_context(e, "set_len part file for parallel transfer")
+        })?;
     }
 
     if total_size == 0 {
@@ -250,12 +252,11 @@ pub async fn run_parallel_download_with_options(
                 tbl.completed_ranges().to_vec()
             };
             if !ranges.is_empty() {
-                let completed_ranges: Vec<(u64, u64)> = ranges
-                    .iter()
-                    .map(|&(s, e)| (s, e + 1))
-                    .collect();
+                let completed_ranges: Vec<(u64, u64)> =
+                    ranges.iter().map(|&(s, e)| (s, e + 1)).collect();
                 let written: u64 = completed_ranges.iter().map(|&(s, e)| e - s).sum();
-                let checkpoint = Checkpoint::new(task_id, written, Some(total_size), completed_ranges);
+                let checkpoint =
+                    Checkpoint::new(task_id, written, Some(total_size), completed_ranges);
                 let _ = store_monitor.save_checkpoint(&checkpoint);
             }
 
@@ -310,10 +311,8 @@ pub async fn run_parallel_download_with_options(
                 };
 
                 // 2. Fetch Range
-                let range_header_val = sayl_http::range::format_byte_range(
-                    lease.start,
-                    Some(lease.end_inclusive),
-                );
+                let range_header_val =
+                    sayl_http::range::format_byte_range(lease.start, Some(lease.end_inclusive));
                 let req = match client
                     .get(url.clone())
                     .header(reqwest::header::ACCEPT_ENCODING, "identity")
@@ -550,7 +549,12 @@ pub async fn run_parallel_download_with_options(
         let checkpoint =
             Checkpoint::new(task_id, current_written, Some(total_size), completed_ranges);
         let _ = store_for_final.save_checkpoint(&checkpoint);
-        return Ok((DownloadOutcome::Cancelled { written: current_written }, report));
+        return Ok((
+            DownloadOutcome::Cancelled {
+                written: current_written,
+            },
+            report,
+        ));
     }
 
     // Check pause
@@ -581,7 +585,12 @@ pub async fn run_parallel_download_with_options(
                 },
             )
             .await;
-        return Ok((DownloadOutcome::Paused { written: current_written }, report));
+        return Ok((
+            DownloadOutcome::Paused {
+                written: current_written,
+            },
+            report,
+        ));
     }
 
     let report = { table.lock().await.report() };
@@ -602,8 +611,7 @@ pub async fn run_parallel_download_with_options(
             .map(|&(s, e)| (s, e + 1))
             .collect();
 
-        let checkpoint =
-            Checkpoint::new(task_id, total_size, Some(total_size), completed_ranges);
+        let checkpoint = Checkpoint::new(task_id, total_size, Some(total_size), completed_ranges);
         let _ = store_for_final.save_checkpoint(&checkpoint);
         let _ = event_sender
             .emit(

@@ -35,10 +35,14 @@ pub async fn run_sequential_download(
     store: &Store,
 ) -> Result<DownloadOutcome, CoreError> {
     if cancel_token.is_cancelled() {
-        return Ok(DownloadOutcome::Cancelled { written: resume_from });
+        return Ok(DownloadOutcome::Cancelled {
+            written: resume_from,
+        });
     }
     if pause_token.is_cancelled() {
-        return Ok(DownloadOutcome::Paused { written: resume_from });
+        return Ok(DownloadOutcome::Paused {
+            written: resume_from,
+        });
     }
 
     // Build HTTP request
@@ -113,7 +117,9 @@ pub async fn run_sequential_download(
                 vec![(0, current_written)],
             );
             let _ = store.save_checkpoint(&checkpoint);
-            return Ok(DownloadOutcome::Cancelled { written: current_written });
+            return Ok(DownloadOutcome::Cancelled {
+                written: current_written,
+            });
         }
         if pause_token.is_cancelled() {
             use tokio::io::AsyncWriteExt;
@@ -137,7 +143,9 @@ pub async fn run_sequential_download(
                     },
                 )
                 .await;
-            return Ok(DownloadOutcome::Paused { written: current_written });
+            return Ok(DownloadOutcome::Paused {
+                written: current_written,
+            });
         }
 
         tokio::select! {
@@ -281,5 +289,7 @@ pub async fn run_sequential_download(
         }
     }
 
-    Ok(DownloadOutcome::Completed { written: current_written })
+    Ok(DownloadOutcome::Completed {
+        written: current_written,
+    })
 }

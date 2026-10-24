@@ -152,12 +152,7 @@ impl Engine {
         });
 
         let task_id = TaskId::new();
-        let mut record = TaskRecord::with_id(
-            task_id,
-            url_str,
-            &self.inner.download_dir,
-            &filename,
-        );
+        let mut record = TaskRecord::with_id(task_id, url_str, &self.inner.download_dir, &filename);
         record.final_url = Some(probe_res.final_url.to_string());
         record.total_size = probe_res.content_length;
         record.etag = probe_res.etag.clone();
@@ -196,11 +191,10 @@ impl Engine {
     /// starts downloading when the scheduler promotes it (global slot + origin permit available).
     pub async fn start(&self, task_id: TaskId) -> Result<(), CoreError> {
         // 1. Load task record
-        let record = self
-            .inner
-            .store
-            .get_task(task_id)?
-            .ok_or_else(|| CoreError::storage("not_found", format!("task {task_id} not found")))?;
+        let record =
+            self.inner.store.get_task(task_id)?.ok_or_else(|| {
+                CoreError::storage("not_found", format!("task {task_id} not found"))
+            })?;
 
         // If already terminal, reject
         if record.state.is_terminal() {
@@ -216,11 +210,17 @@ impl Engine {
         // Enqueue in scheduler
         let origin = Self::extract_origin(&record.url)?;
         let promoted = {
-            let mut scheduler = self.inner.scheduler.lock().map_err(|_| {
-                CoreError::scheduler("scheduler mutex poisoned")
-            })?;
-            scheduler.enqueue(sched_id).map_err(Self::queue_error_to_core)?;
-            scheduler.set_origin(sched_id, &origin).map_err(Self::queue_error_to_core)?;
+            let mut scheduler = self
+                .inner
+                .scheduler
+                .lock()
+                .map_err(|_| CoreError::scheduler("scheduler mutex poisoned"))?;
+            scheduler
+                .enqueue(sched_id)
+                .map_err(Self::queue_error_to_core)?;
+            scheduler
+                .set_origin(sched_id, &origin)
+                .map_err(Self::queue_error_to_core)?;
             let started = scheduler.poll(Instant::now());
             started.contains(&sched_id)
         };
@@ -244,30 +244,50 @@ impl Engine {
     /// Gets the scheduler ID for a task, allocating a new one if needed.
     fn get_or_alloc_scheduler_id(&self, task_id: TaskId) -> u64 {
         {
-            let map = self.inner.scheduler_id_map.lock().unwrap_or_else(|e| e.into_inner());
+            let map = self
+                .inner
+                .scheduler_id_map
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
             if let Some(&id) = map.get(&task_id) {
                 return id;
             }
         }
         // Allocate new ID
-        let mut next_id = self.inner.next_scheduler_id.lock().unwrap_or_else(|e| e.into_inner());
+        let mut next_id = self
+            .inner
+            .next_scheduler_id
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let new_id = *next_id;
         *next_id += 1;
         drop(next_id);
-        let mut map = self.inner.scheduler_id_map.lock().unwrap_or_else(|e| e.into_inner());
+        let mut map = self
+            .inner
+            .scheduler_id_map
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         map.insert(task_id, new_id);
         new_id
     }
 
     /// Removes the scheduler ID mapping for a task.
     fn remove_scheduler_id(&self, task_id: TaskId) {
-        let mut map = self.inner.scheduler_id_map.lock().unwrap_or_else(|e| e.into_inner());
+        let mut map = self
+            .inner
+            .scheduler_id_map
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         map.remove(&task_id);
     }
 
     /// Gets the scheduler ID for a task, returning None if not found.
     fn get_scheduler_id(&self, task_id: TaskId) -> Option<u64> {
-        let map = self.inner.scheduler_id_map.lock().unwrap_or_else(|e| e.into_inner());
+        let map = self
+            .inner
+            .scheduler_id_map
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         map.get(&task_id).copied()
     }
 
@@ -305,9 +325,16 @@ impl Engine {
         let _guard = TaskGuard {
             task_id,
             active_tasks: Arc::clone(&self.inner.active_tasks),
-            _permit: self.inner.task_semaphore.clone().try_acquire_owned().map_err(|_| {
-                CoreError::scheduler("internal error: semaphore unavailable after scheduler promotion")
-            })?,
+            _permit: self
+                .inner
+                .task_semaphore
+                .clone()
+                .try_acquire_owned()
+                .map_err(|_| {
+                    CoreError::scheduler(
+                        "internal error: semaphore unavailable after scheduler promotion",
+                    )
+                })?,
         };
 
         // Transition to Probing
@@ -315,7 +342,8 @@ impl Engine {
             .await?;
 
         if cancel_token.is_cancelled() {
-            self.handle_cancel_during_probing(task_id, &mut record).await;
+            self.handle_cancel_during_probing(task_id, &mut record)
+                .await;
             let promoted = self.finish_and_get_promoted(sched_id, QueueTaskStatus::Cancelled);
             self.spawn_promoted_tasks(promoted);
             self.remove_scheduler_id(task_id);
@@ -370,11 +398,18 @@ impl Engine {
             record.total_size = probe_res.content_length;
         }
         record.etag = probe_res.etag.clone().or(record.etag.clone());
-        record.last_modified = probe_res.last_modified.clone().or(record.last_modified.clone());
+        record.last_modified = probe_res
+            .last_modified
+            .clone()
+            .or(record.last_modified.clone());
         self.inner.store.upsert_task(&record)?;
 
         // Load checkpoint for resume support
-        let checkpoint = self.inner.store.load_checkpoint(task_id).map_err(CoreError::from)?;
+        let checkpoint = self
+            .inner
+            .store
+            .load_checkpoint(task_id)
+            .map_err(CoreError::from)?;
         let (checkpoint_written, checkpoint_ranges) = if let Some(cp) = checkpoint {
             // Validate checkpoint against current task and probe
             let cp_valid = cp.total_size == record.total_size
@@ -407,8 +442,12 @@ impl Engine {
         };
 
         // Use checkpoint.written for resume info if available and valid, else disk_len
-        let resume_written = if checkpoint_written > 0 { checkpoint_written } else { disk_len };
-        
+        let resume_written = if checkpoint_written > 0 {
+            checkpoint_written
+        } else {
+            disk_len
+        };
+
         let mut resume_from = 0u64;
         let mut already_complete = false;
         let mut resume_info_opt = None;
@@ -431,6 +470,10 @@ impl Engine {
 
             // Reconcile checkpoint/file length with actual disk length
             let decision = if disk_len < checkpoint_written && checkpoint_written > 0 {
+                ResumeDecision::RestartFromZero
+            } else if checkpoint_written == 0 && disk_len > 0 && record.total_size == Some(disk_len)
+            {
+                // Preallocated sparse file without durable chunk completion: restart from zero
                 ResumeDecision::RestartFromZero
             } else {
                 match val_decision {
@@ -464,9 +507,7 @@ impl Engine {
                         .truncate(true)
                         .create(true)
                         .open(&part_path)
-                        .map_err(|e| {
-                            CoreError::io_with_context(e, "truncate part file to zero")
-                        })?;
+                        .map_err(|e| CoreError::io_with_context(e, "truncate part file to zero"))?;
                     drop(f);
                     record.written = 0;
                     self.inner.store.upsert_task(&record)?;
@@ -592,7 +633,8 @@ impl Engine {
                                 },
                             )
                             .await;
-                        let promoted = self.finish_and_get_promoted(sched_id, QueueTaskStatus::Failed);
+                        let promoted =
+                            self.finish_and_get_promoted(sched_id, QueueTaskStatus::Failed);
                         self.spawn_promoted_tasks(promoted);
                         self.remove_scheduler_id(task_id);
                         return Err(err);
@@ -673,18 +715,18 @@ impl Engine {
                                 },
                             )
                             .await;
-                        let promoted = self.finish_and_get_promoted(sched_id, QueueTaskStatus::Failed);
+                        let promoted =
+                            self.finish_and_get_promoted(sched_id, QueueTaskStatus::Failed);
                         self.spawn_promoted_tasks(promoted);
                         self.remove_scheduler_id(task_id);
                         return Err(err);
                     }
                 };
             }
-
         }
 
         // If already_complete or download completed, continue to verification/finalization
-        if matches!(outcome_status, QueueTaskStatus::Finished) && !already_complete {
+        if matches!(outcome_status, QueueTaskStatus::Finished) || already_complete {
             // Verification and finalization for successful downloads
             let final_status = self
                 .complete_download(task_id, &mut record, &part_path)
@@ -751,9 +793,7 @@ impl Engine {
         record.written = actual_len;
         self.inner.store.upsert_task(record)?;
 
-        let duration_ms = (Utc::now() - record.created_at)
-            .num_milliseconds()
-            .max(0) as u64;
+        let duration_ms = (Utc::now() - record.created_at).num_milliseconds().max(0) as u64;
 
         let _ = self
             .inner
@@ -794,7 +834,12 @@ impl Engine {
 
     /// Handles pause during probing phase.
     async fn handle_pause_during_probing(&self, task_id: TaskId, record: &mut TaskRecord) {
-        let checkpoint = Checkpoint::new(task_id, record.written, record.total_size, vec![(0, record.written)]);
+        let checkpoint = Checkpoint::new(
+            task_id,
+            record.written,
+            record.total_size,
+            vec![(0, record.written)],
+        );
         let _ = self.inner.store.save_checkpoint(&checkpoint);
         let _ = self
             .transition_and_persist(record, DownloadState::Pausing)
@@ -829,11 +874,16 @@ impl Engine {
         for promoted_sched_id in promoted_sched_ids {
             let engine = self.clone();
             tokio::spawn(async move {
-                if let Some(promoted_task_id) = engine.get_task_id_from_scheduler_id(promoted_sched_id) {
-                    let _ = engine.run_promoted_download(promoted_task_id, promoted_sched_id).await;
+                if let Some(promoted_task_id) =
+                    engine.get_task_id_from_scheduler_id(promoted_sched_id)
+                {
+                    let _ = engine
+                        .run_promoted_download(promoted_task_id, promoted_sched_id)
+                        .await;
                 } else {
                     // No mapping: task was cancelled/removed. Release the scheduler slot.
-                    let _ = engine.finish_and_get_promoted(promoted_sched_id, QueueTaskStatus::Cancelled);
+                    let _ = engine
+                        .finish_and_get_promoted(promoted_sched_id, QueueTaskStatus::Cancelled);
                     // Note: finish_and_get_promoted will poll and spawn any newly promoted tasks
                 }
             });
@@ -842,11 +892,10 @@ impl Engine {
 
     /// Runs download for a task that was promoted by the scheduler (skips scheduler enqueue).
     async fn run_promoted_download(&self, task_id: TaskId, sched_id: u64) -> Result<(), CoreError> {
-        let record = self
-            .inner
-            .store
-            .get_task(task_id)?
-            .ok_or_else(|| CoreError::storage("not_found", format!("task {task_id} not found")))?;
+        let record =
+            self.inner.store.get_task(task_id)?.ok_or_else(|| {
+                CoreError::storage("not_found", format!("task {task_id} not found"))
+            })?;
 
         // If task is already terminal (cancelled while queued), don't start download.
         // Release the scheduler slot and promote waiters.
@@ -871,9 +920,14 @@ impl Engine {
 
     /// Gets the TaskId for a scheduler ID, if mapped.
     fn get_task_id_from_scheduler_id(&self, sched_id: u64) -> Option<TaskId> {
-        let map = self.inner.scheduler_id_map.lock().unwrap_or_else(|e| e.into_inner());
+        let map = self
+            .inner
+            .scheduler_id_map
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         // Reverse lookup: find TaskId by scheduler ID (value)
-        map.iter().find_map(|(&task_id, &v)| if v == sched_id { Some(task_id) } else { None })
+        map.iter()
+            .find_map(|(&task_id, &v)| if v == sched_id { Some(task_id) } else { None })
     }
 
     /// Extracts the origin (scheme://host) from a URL string.
@@ -1057,7 +1111,11 @@ impl Engine {
             };
 
             // Load checkpoint if exists
-            let checkpoint = self.inner.store.load_checkpoint(task.id).map_err(CoreError::from)?;
+            let checkpoint = self
+                .inner
+                .store
+                .load_checkpoint(task.id)
+                .map_err(CoreError::from)?;
             let mut checkpoint_valid = false;
             let mut checkpoint_written = 0u64;
             let mut _checkpoint_ranges: Vec<(u64, u64)> = Vec::new();
@@ -1066,10 +1124,12 @@ impl Engine {
                 // Validate checkpoint against task and file
                 // Note: we allow part_len < cp.written (partial file shorter than checkpoint)
                 // as this is handled separately below
-                let cp_corrupt = cp.total_size.is_some() && task.total_size.is_some() && cp.total_size != task.total_size
+                let cp_corrupt = cp.total_size.is_some()
+                    && task.total_size.is_some()
+                    && cp.total_size != task.total_size
                     || cp.written > task.total_size.unwrap_or(u64::MAX)
                     || cp.range_map.iter().any(|(s, e)| s >= e);
-                
+
                 if !cp_corrupt {
                     checkpoint_valid = true;
                     checkpoint_written = cp.written;
@@ -1082,16 +1142,16 @@ impl Engine {
                 } else {
                     // Corrupt checkpoint: discard it
                     let _ = self.inner.store.save_checkpoint(&Checkpoint::new(
-                        task.id, 0, task.total_size, Vec::new()
+                        task.id,
+                        0,
+                        task.total_size,
+                        Vec::new(),
                     ));
                 }
             }
 
             // Check if final file exists and is complete (handles crash after write before finalize)
-            let final_path = self
-                .inner
-                .download_dir
-                .join(&task.filename);
+            let final_path = self.inner.download_dir.join(&task.filename);
             let final_exists = final_path.exists();
             let final_len = if final_exists {
                 tokio::fs::metadata(&final_path)
@@ -1101,14 +1161,16 @@ impl Engine {
             } else {
                 0
             };
-            let final_complete = final_exists 
-                && task.total_size.is_some() 
-                && final_len >= task.total_size.unwrap();
+            let final_complete =
+                final_exists && task.total_size.is_some() && final_len >= task.total_size.unwrap();
 
             // Handle partial file shorter than checkpoint: discard checkpoint entirely to force full restart
             if checkpoint_valid && part_len < checkpoint_written && !final_complete {
                 let new_checkpoint = Checkpoint::new(task.id, 0, task.total_size, Vec::new());
-                self.inner.store.save_checkpoint(&new_checkpoint).map_err(CoreError::from)?;
+                self.inner
+                    .store
+                    .save_checkpoint(&new_checkpoint)
+                    .map_err(CoreError::from)?;
                 checkpoint_valid = false;
                 checkpoint_written = 0;
                 task.written = 0;
@@ -1133,11 +1195,17 @@ impl Engine {
                     // Re-enqueue in scheduler
                     let sched_id = self.get_or_alloc_scheduler_id(task.id);
                     let origin = Self::extract_origin(&task.url)?;
-                    let mut scheduler = self.inner.scheduler.lock().map_err(|_| {
-                        CoreError::scheduler("scheduler mutex poisoned")
-                    })?;
-                    scheduler.enqueue(sched_id).map_err(Self::queue_error_to_core)?;
-                    scheduler.set_origin(sched_id, &origin).map_err(Self::queue_error_to_core)?;
+                    let mut scheduler = self
+                        .inner
+                        .scheduler
+                        .lock()
+                        .map_err(|_| CoreError::scheduler("scheduler mutex poisoned"))?;
+                    scheduler
+                        .enqueue(sched_id)
+                        .map_err(Self::queue_error_to_core)?;
+                    scheduler
+                        .set_origin(sched_id, &origin)
+                        .map_err(Self::queue_error_to_core)?;
                     // Note: we don't poll here; recovered tasks wait for their turn
                 }
                 DownloadState::Paused => {
@@ -1205,9 +1273,11 @@ impl Engine {
 
         // After recovering all tasks, poll scheduler to promote any queued tasks
         let promoted = {
-            let mut scheduler = self.inner.scheduler.lock().map_err(|_| {
-                CoreError::scheduler("scheduler mutex poisoned")
-            })?;
+            let mut scheduler = self
+                .inner
+                .scheduler
+                .lock()
+                .map_err(|_| CoreError::scheduler("scheduler mutex poisoned"))?;
             scheduler.poll(Instant::now())
         };
         self.spawn_promoted_tasks(promoted);
@@ -1263,7 +1333,11 @@ impl Engine {
 
     /// Returns a snapshot of the scheduler occupancy.
     pub async fn queue_stats(&self) -> crate::queue::QueueStats {
-        let scheduler = self.inner.scheduler.lock().unwrap_or_else(|e| e.into_inner());
+        let scheduler = self
+            .inner
+            .scheduler
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         scheduler.stats()
     }
 
@@ -1349,7 +1423,11 @@ mod tests {
             engine.download_dir(),
             "test.zip",
         );
-        engine.inner.store.upsert_task(&record).expect("upsert task");
+        engine
+            .inner
+            .store
+            .upsert_task(&record)
+            .expect("upsert task");
 
         // Deliberately poison active_tasks mutex from a background thread
         engine.poison_active_tasks_for_test();
