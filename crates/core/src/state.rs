@@ -336,24 +336,24 @@ mod tests {
                 }
 
                 // Property 4: All nonterminal states can transition to Cancelling and Failed
-                if !from.is_terminal() {
-                    if to == DownloadState::Cancelling || to == DownloadState::Failed {
-                        assert!(
-                            res.is_ok(),
-                            "Nonterminal {:?} must be able to transition to {:?}",
-                            from,
-                            to
-                        );
-                    }
+                if !from.is_terminal()
+                    && (to == DownloadState::Cancelling || to == DownloadState::Failed)
+                {
+                    assert!(
+                        res.is_ok(),
+                        "Nonterminal {:?} must be able to transition to {:?}",
+                        from,
+                        to
+                    );
                 }
 
-                if res.is_ok() {
-                    valid_count += 1;
-                } else {
-                    invalid_count += 1;
-                    let err = res.unwrap_err();
-                    assert_eq!(err.from, from);
-                    assert_eq!(err.to, to);
+                match res {
+                    Ok(()) => valid_count += 1,
+                    Err(err) => {
+                        invalid_count += 1;
+                        assert_eq!(err.from, from);
+                        assert_eq!(err.to, to);
+                    }
                 }
             }
         }
