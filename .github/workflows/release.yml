@@ -33,6 +33,8 @@ jobs:
   build-installers:
     name: Build Windows Installers
     runs-on: windows-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,12 +42,18 @@ jobs:
       - name: Resolve version
         id: ver
         shell: pwsh
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            $v = "${{ inputs.version }}"
+          # Untrusted values arrive through env, never interpolated into the script.
+          if ($env:EVENT_NAME -eq "workflow_dispatch") {
+            $v = $env:INPUT_VERSION
           } else {
-            $v = "${{ github.ref_name }}" -replace '^v', ''
+            $v = $env:REF_NAME -replace '^v', ''
           }
+          $v = $v.Trim()
           if ($v -notmatch '^\d+\.\d+\.\d+$') {
             Write-Error "Invalid SemVer version '$v'"
             exit 1
@@ -110,15 +118,40 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  attach-to-release:
+    # Separate job on purpose: it is the only place that needs write access, so the
+    # build job (and its third-party actions) keeps the read-only workflow default.
+    name: Attach Artefacts to an Existing Release
+    needs: build-installers
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download built artefacts
+        uses: actions/download-artifact@v4
+        with:
+          name: sayl-${{ needs.build-installers.outputs.version || '' }}-windows-x64
+          path: artefacts
+        continue-on-error: true
+
       - name: Attach artefacts to an existing GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
         run: |
-          $tag = "${{ github.ref_name }}"
-          if (-not (gh release view $tag 2>$null)) {
-            Write-Host "No GitHub Release exists for $tag yet; artefacts are available as a workflow artefact. Publishing releases stays an explicit owner action."
+          # Tag names come from the environment, never from inline interpolation.
+          $tag = $env:TAG_NAME
+          $files = Get-ChildItem -Path artefacts -File -ErrorAction SilentlyContinue
+          if (-not $files) {
+            Write-Host "No artefacts downloaded; nothing to attach."
             exit 0
           }
-          gh release upload $tag releases/SAYL-Setup-x64-*.exe releases/SAYL-Setup-x64-*.msi releases/SAYL-*-source.zip releases/SHA256SUMS.txt --clobber
+          $existing = gh release view $tag --json tagName 2>$null
+          if (-not $existing) {
+            Write-Host "No GitHub Release exists for $tag yet; artefacts stay as a workflow artefact. Publishing releases remains an explicit owner action."
+            exit 0
+          }
+          $files | ForEach-Object { gh release upload $tag $_.FullName --clobber }
+

@@ -94,7 +94,13 @@ if ($manifestData.path -ne $resolvedHostExe) {
 }
 
 if (-not [string]::IsNullOrWhiteSpace($ExtensionId)) {
-    $newOrigin = "chrome-extension://$ExtensionId/"
+    # A Chromium extension id is exactly 32 characters from a-p. Reject anything
+    # else so a malformed value cannot build an unexpected allowed_origins entry.
+    if ($ExtensionId -notmatch '^[a-pA-P]{32}$') {
+        Write-Error "Refusing registration: ExtensionId must be 32 characters in the range a-p (got '$ExtensionId')."
+        exit 1
+    }
+    $newOrigin = "chrome-extension://$($ExtensionId.ToLowerInvariant())/"
     $manifestData.allowed_origins = @($newOrigin)
     $dirty = $true
 }

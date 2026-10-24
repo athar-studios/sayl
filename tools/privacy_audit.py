@@ -113,12 +113,14 @@ ALLOWED_URL_HOST_PATTERNS = [
     r"^https?://hops\.com(?:/.*)?$",
     r"^https?://loop\.com(?:/.*)?$",
     r"^https?://(?:a|origin1|cdn\.other)\.com(?:/.*)?$",
-    # A URL template whose host is filled in at runtime from a bound socket
-    # address, e.g. `format!("http://{}", addr)` in the benchmark harness. Only
-    # loopback fixture servers are bound this way; the host is never a remote
-    # service. The pattern matches solely the empty `{}` placeholder.
-    r"^https?://(?:\{\}|\{:\d+\})$",
 ]
+
+# A URL template whose host is filled in at runtime from a bound socket address,
+# e.g. `format!("http://{}", addr)`. This is only tolerated inside the benchmark
+# harness, which binds loopback fixture servers; it is scoped to that directory
+# so a real remote URL elsewhere cannot hide behind the pattern.
+RUNTIME_HOST_TEMPLATE_REGEX = re.compile(r"^https?://\{\}$")
+RUNTIME_HOST_TEMPLATE_DIRS = ("crates/bench/",)
 
 
 def is_binary_file(file_path: Path) -> bool:
@@ -296,10 +298,16 @@ def run_audit(root_dir: Path) -> dict:
                         cleaned_url = url.rstrip('";,\')')
                         # Check against allowed list
                         is_allowed = any(p.match(cleaned_url) for p in compiled_allowed_urls)
-                        if is_allowed:
+                        runtime_template = (
+                            RUNTIME_HOST_TEMPLATE_REGEX.match(cleaned_url)
+                            and rel_path.replace("\\", "/").startswith(RUNTIME_HOST_TEMPLATE_DIRS)
+                        )
+                        if is_allowed or runtime_template:
                             # Classify allowance reason
                             if "127.0.0.1" in cleaned_url or "localhost" in cleaned_url:
                                 reason = "Localhost/fixture server address"
+                            elif runtime_template:
+                                reason = "Runtime-filled loopback host template (benchmark harness only)"
                             elif "github.com" in cleaned_url:
                                 reason = "Documentation/repository link"
                             elif "w3.org" in cleaned_url:
