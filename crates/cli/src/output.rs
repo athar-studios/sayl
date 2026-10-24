@@ -17,8 +17,14 @@ pub fn print_tasks_table(tasks: &[TaskRecord]) {
     if tasks.is_empty() {
         return;
     }
-    println!("{:<36}  {:<12}  {:>10}  {:>8}  Filename", "ID", "State", "Size", "Progress");
-    println!("{:-<36}  {:-<12}  {:->10}  {:->8}  {:-<20}", "", "", "", "", "");
+    println!(
+        "{:<36}  {:<12}  {:>10}  {:>8}  Filename",
+        "ID", "State", "Size", "Progress"
+    );
+    println!(
+        "{:-<36}  {:-<12}  {:->10}  {:->8}  {:-<20}",
+        "", "", "", "", ""
+    );
     for t in tasks {
         let size_str = match t.total_size {
             Some(s) => format_bytes(s),
