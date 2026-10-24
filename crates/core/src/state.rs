@@ -348,7 +348,7 @@ mod tests {
                 }
 
                 match res {
-                    Ok(()) => valid_count += 1,
+                    Ok(_) => valid_count += 1,
                     Err(err) => {
                         invalid_count += 1;
                         assert_eq!(err.from, from);
