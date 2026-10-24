@@ -8,7 +8,7 @@ Part of the **SAYL** project (High-performance Windows-first download manager in
 
 ## Architecture and Subsystems
 
-`sayl-http` implements the transport layer defined in `docs/MASTER-PLAN.md` §5–§7 and `docs/tasks/HTTP-001.md`:
+`sayl-http` implements the transport layer:
 
 - **`error.rs` (`HttpError`)**:
   Classifies failures into transient/retryable (e.g. 429, 503, connection drops, body truncation), fatal (401, 403, 404, validation errors), and cancellation. Automatically maps to `sayl_core::CoreError`.

@@ -1,4 +1,4 @@
-//! Failure mode scenarios specified in MASTER-PLAN §8.
+//! Failure mode scenarios and protocol edge cases.
 //!
 //! Provides all 27 mandatory download simulation scenarios:
 //! 1. Ok206
@@ -33,7 +33,7 @@ use std::fmt;
 use std::str::FromStr;
 use std::time::Duration;
 
-/// All 27 failure modes and protocol conditions from MASTER-PLAN §8.
+/// All 27 failure modes and protocol conditions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Scenario {
@@ -321,11 +321,7 @@ mod tests {
     #[test]
     fn test_all_27_scenarios_count() {
         let all = Scenario::all();
-        assert_eq!(
-            all.len(),
-            27,
-            "Must contain exactly 27 scenarios from MASTER-PLAN §8"
-        );
+        assert_eq!(all.len(), 27, "Must contain exactly 27 scenarios");
     }
 
     #[test]

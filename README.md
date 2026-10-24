@@ -1,250 +1,222 @@
-# سيل (SAYL) — مدير تحميل مستقل لـ Windows
+# سيل (SAYL)
 
-[![CI](https://github.com/SAYL/SAYL/workflows/CI/badge.svg)](https://github.com/SAYL/SAYL/actions)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](#license)
+[![CI](https://github.com/athar-studios/sayl/actions/workflows/ci.yml/badge.svg)](https://github.com/athar-studios/sayl/actions)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-**سيل (SAYL)** مدير تحميل (Download Manager) مكتوب بلغة Rust، بواجهة سطح مكتب Tauri 2 + Svelte + TypeScript، **Windows أولًا**، مصمم للاستئناف الآمن، التنزيل المتوازي المُحقق، والخصوصية المطلقة.
+<!-- [Screenshot placeholder: صورة واجهة برنامج سيل ستوضع هنا عند توفر لقطات الشاشة الرسمية في docs/screenshots/v0.1.0/] -->
 
-> **حالة المشروع:** مواصفات وتطوير مبكر (ما قبل M1). النواة والمكتبات الأساسية موجودة وتخضع للاختبار؛ واجهة سطح المكتب وتكامل المتصفح والميزات المتقدمة قيد التطوير. راجع [خريطة الطريق](#خريطة-الطريق-roadmap) أدناه.
-
----
-
-## ما هو سيل؟ (What is SAYL?)
-
-| الجانب | الوصف |
-|----------|---------|
-| **الهدف** | مدير تحميل مستقل، مفتوح المصدر، يحترم الخصوصية، لـ Windows (ثم Linux/Android). |
-| **المحرك** | Rust — `sayl-core` (نماذج/حالات/أحداث)، `sayl-http` (نقل HTTP، تحقق النطاقات)، `sayl-storage` (مخزن مهام آمن من التعطل)، `sayl-test-http` (خادم اختبارات حتمي لـ 27 وضع فشل). |
-| **الواجهة** | Tauri 2 + Svelte 5 + TypeScript — عربية أولاً (RTL)، i18n، ثيمات، Timeline حقيقي من المحرك. |
-| **الخصوصية** | لا تحليلات، لا تتبع، لا خطوط خارجية، لا رفع تقارير تعطل تلقائي. البيانات لا تغادر جهازك. |
-| **السلامة** | استئناف مُحقق بالنطاقات (Range validation)، تحقق ETag قوي، أسماء ملفات آمنة، كتابة بـ fsync، استعادة بعد تعطل. |
+**سيل (SAYL)** هو مدير تنزيل مستقل وموثوق لنظام Windows، صُمم ليمنح المستخدم تجربة تنزيل سريعة وآمنة مع الحفاظ التام على الخصوصية. يركز البرنامج على دقة استئناف التنزيلات، وتسريع نقل الملفات عبر الاتصالات المتزامنة، وحماية البيانات دون أي إعلانات أو أدوات تتبع.
 
 ---
 
-## الحالة الحالية (Current Status)
-
-| الحزمة (Crate) | الوصف | اختبارات (Tests) | الحالة |
-|---------------|---------|------------------|--------|
-| `sayl-core` | نماذج المجال، آلة الحالات (11 حالة)، نظام الأخطاء، ناقل الأحداث، مفاتيح عدم التكرار | **33** | ✅ تمر |
-| `sayl-test-http` | خادم اختبارات HTTP حتمي، 27 وضع فشل، توليد بيانات حتمي | **25** | ✅ تمر |
-| `sayl-http` | عميل HTTP، تحقق النطاقات، تتبع إعادة توجيه آمن، استخراج أسماء ملفات آمنة | **132** | ✅ تمر |
-| `sayl-storage` | مخزن مهام WAL + لقطات ذرية، قفل دليل، استعادة بعد تعطل | **18** | ✅ تمر |
-| `sayl-app` | المحرك، الجدولة، الإيجارات، الاسترداد بعد الانهيار | **46** | ✅ تمر |
-| `sayl-cli` | واجهة سطر أوامر | **12** | ✅ تمر |
-| `sayl-bridge` | بروتوكول Native Messaging + ثنائي `sayl-bridge` | **36** | ✅ تمر |
-| `sayl-bench` | منصة قياس أداء محلية | **2** | ✅ تمر |
-| `sayl-media` | مُحول yt-dlp/FFmpeg | — | 📋 مخطط (v0.2.0) |
-| `sayl-torrent` | محول librqbit | — | 📋 مخطط (v0.4.0) |
-| `sayl-plugin-host` | وقت تشغيل WASM، وسيط الصلاحيات | — | 📋 مخطط (v0.5.0) |
-| `apps/desktop` | واجهة Tauri + Svelte (عربي RTL/إنجليزي) | **26** (vitest) | ✅ تُبنى وتُختبر — لم تُشغَّل نافذة Tauri هنا |
-| `apps/website` | موقع تنزيل ثابت (هذا المستودع) | فحص ساكن + تدقيق خصوصية 4/4 | ✅ مكتمل |
-| `extensions/browser` | ملحق Chromium/Edge MV3 (Native Messaging) | — | ✅ مبني — لم يُحمَّل في متصفح فعلي |
-
-> **ملاحظة:** الأرقام أعلاه تعكس اختبارات الوحدة/التكامل الفعلية في المستودع. لا توجد اختبارات زائفة.
+## جدول المحتويات
+- [ما هو سيل؟](#ما-هو-سيل)
+- [التحميل والتثبيت](#التحميل-والتثبيت)
+- [بدء أول تنزيل والميزات الأساسية](#بدء-أول-تنزيل-والميزات-الأساسية)
+- [إضافة المتصفح والتكامل](#إضافة-المتصفح-والتكامل)
+- [الإعدادات](#الإعدادات)
+- [الأسئلة الشائعة (FAQ)](#الأسئلة-الشائعة-faq)
+- [متطلبات التشغيل](#متطلبات-التشغيل)
+- [الترخيص والموقع الرسمي](#الترخيص-والموقع-الرسمي)
+- [English Documentation](#english)
 
 ---
 
-## البناء والتشغيل (Build & Run)
+## ما هو سيل؟
+سيل هو تطبيق لإدارة وتنزيل الملفات عبر بروتوكولات الويب القياسية (HTTP و HTTPS)، يجمع بين الأداء العالي وواجهة عصرية سهلة الاستخدام تدعم اللغة العربية بالكامل. يقوم البرنامج بتقسيم التنزيلات إلى أجزاء متعددة وتنزيلها بالتوازي لرفع سرعة التحميل إلى أقصى حد يتيحه اتصالك، مع التحقق المستمر من صحة الأجزاء المكتملة وتأكيد عدم تلفها.
 
-### المتطلبات
+أهم ما يميز سيل:
+- **استئناف موثوق ومحقق:** فحص دقيق لدعم الخوادم لنطاقات الاستئناف ووسوم التحقق (`ETag`) لمنع أي تداخل أو تلف في الملفات (عند توفر دعم الاستئناف من الخادم وعدم تغير الملف).
+- **أمان ومقاومة للتعطل:** حفظ تلقائي لبيانات التنزيل يضمن استعادة المهام المعلقة فوراً في حال إعادة تشغيل الجهاز أو انقطاع الطاقة.
+- **خصوصية مطلقة:** لا يجمع التطبيق أي إحصائيات، ولا يحتوي على برمجيات تتبع، وتظل جميع روابط التنزيل وسجلاتها محفوظة على جهازك فقط.
 
-- **Rust:** `stable-x86_64-pc-windows-gnu` (GNU toolchain مع `rust-lld`)
-- **Windows:** Windows 10 1903+ x64
-- **للاختبارات فقط:** لا حاجة لـ Windows SDK ولا `link.exe` MSVC
-- **للبناء الإنتاجي (Tauri/MSVC):** مطلوب Windows SDK (تثبيت مرفوع الامتيازات)
+---
 
-### أوامر موثقة (Verified Commands)
+## التحميل والتثبيت
+يمكنك تنزيل أحدث إصدار من البرنامج من صفحة الإصدارات الرسمية على GitHub:  
+👉 **[تحميل سيل — أحدث إصدار](https://github.com/athar-studios/sayl/releases/latest)**
 
-وفقًا لـ `docs/TOOLCHAIN.md`، البيئة الحالية تعمل مع GNU + `rust-lld`:
+### حزم التثبيت المتوفرة
+- **مثبت Windows التنفيذي (موصى به):** `SAYL-Setup-x64-0.1.0.exe`  
+  قم بتنزيل الملف وتشغيله لاتباع خطوات التثبيت القياسية على جهازك.
+- **حزمة التثبيت الموسعة (MSI):** `SAYL-Setup-x64-0.1.0.msi`  
+  خيار بديل ملائم للتثبيت الهادئ أو لمديري الأنظمة في البيئات المؤسسية.
 
+### التحقق من سلامة الملفات
+يتم نشر ملف البصمات الرسمية `SHA256SUMS.txt` إلى جانب حزم التثبيت. للتحقق من سلامة الملف المحمل في Windows PowerShell:
 ```powershell
-# إعداد المسار والعلميات
-$env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
-$env:RUSTFLAGS = "-C linker=rust-lld"
-cd "<path-to-repo>"
-
-# فحص الأنواع
-cargo +stable-x86_64-pc-windows-gnu check -p sayl-core
-cargo +stable-x86_64-pc-windows-gnu check -p sayl-http
-cargo +stable-x86_64-pc-windows-gnu check -p sayl-test-http
-cargo +stable-x86_64-pc-windows-gnu check -p sayl-storage
-
-# تشغيل الاختبارات
-cargo +stable-x86_64-pc-windows-gnu test -p sayl-core
-cargo +stable-x86_64-pc-windows-gnu test -p sayl-http
-cargo +stable-x86_64-pc-windows-gnu test -p sayl-test-http
-cargo +stable-x86_64-pc-windows-gnu test -p sayl-storage
-
-# مساحة العمل كاملة
-cargo +stable-x86_64-pc-windows-gnu test --workspace
+Get-FileHash .\SAYL-Setup-x64-0.1.0.exe -Algorithm SHA256
 ```
-
-> **تحذير:** البناء الإنتاجي لـ Tauri يتطلب toolchain MSVC مع Windows SDK. البناء GNU يعمل للاختبارات فقط.
-
----
-
-## هيكل المستودع (Repository Layout)
-
-```
-.
-├── apps/
-│   ├── desktop/          # Tauri + Svelte Desktop UI (قيد التطوير)
-│   └── website/          # موقع تنزيل ثابت (HTML/CSS/JS)
-├── crates/
-│   ├── core/             # sayl-core — نماذج، حالات، أحداث، أخطاء
-│   ├── http/             # sayl-http — عميل HTTP، تحقق نطاقات، أسماء ملفات
-│   ├── test-http/        # sayl-test-http — خادم اختبارات حتمي (27 وضع)
-│   ├── storage/          # sayl-storage — WAL + لقطات ذرية، قفل دليل
-│   ├── app/              # sayl-app — خدمات تطبيق، أوامر Tauri
-│   ├── cli/              # sayl-cli — واجهة سطر أوامر
-│   ├── media/            # sayl-media — yt-dlp/FFmpeg
-│   ├── torrent/          # sayl-torrent — librqbit
-│   └── plugin-host/      # sayl-plugin-host — WASM runtime
-├── extensions/
-│   └── browser/          # ملحقات المتصفح (Native Messaging)
-├── catalog/
-│   ├── plugins/          # بيانات إضافية مراجعة
-│   └── themes/           # بيانات ثيمات
-├── locales/              # موارد ترجمة نسخة
-├── docs/
-│   ├── MASTER-PLAN.md    # الخطة الموحدة للمنتج
-│   ├── TOOLCHAIN.md      # إعداد سلسلة الأدوات
-│   └── tasks/            # بطاقات مهام مفصلة
-├── .github/
-│   ├── workflows/ci.yml  # GitHub Actions CI
-│   ├── ISSUE_TEMPLATE/   # نماذج Issues
-│   └── PULL_REQUEST_TEMPLATE.md
-├── CONTRIBUTING.md       # دليل المساهمة
-├── SECURITY.md           # سياسة الأمان
-├── CODE_OF_CONDUCT.md    # مدونة السلوك
-├── .editorconfig         # تنسيق محرر موحد
-├── .gitattributes        # خصائص Git
-└── README.md             # هذا الملف
-```
+قارن الناتج بالبصمة المنشورة في ملف `SHA256SUMS.txt` لضمان صحة الملف وعدم تعرضه لأي تعديل.
 
 ---
 
-## خريطة الطريق (Roadmap)
+## بدء أول تنزيل والميزات الأساسية
 
-### ✅ مكتمل /Implemented (ما قبل M1)
+### بدء تنزيل جديد
+1. انقر على زر **«إضافة تنزيل»** في شريط الأدوات، أو اضغط على الاختصار `Ctrl+N`.
+2. أدخل رابط الملف (URL) المطلوب تنزيله في الحقل المخصص.
+3. اضغط على زر **«بدء التنزيل»** للشروع في التحميل فوراً.
 
-- **sayl-core**: آلة حالات 11 حالة، انتقالات محمية، أخطاء مصنفة، ناقل أحداث محدود السعة مع ترقيم تسلسلي، مفاتيح Idempotency مع TTL، معرفات مهام UUID v7.
-- **sayl-test-http**: خادم fixture محلي، 27 وضع فشل (206 صحيح، لا Accept-Ranges، تجاهل Range، Content-Range فاسد، اقتطاع body، TCP reset، ETag متغير، ETag ضعيف، لا validator، 416، HEAD مرفوض، حجم مجهول، ملف فارغ، ترميز غير متوقع، 429 Retry-After، إعادة توجيه بأسرار، لا مساحة، إذن مرفوض، أسماء ملفات خبيثة، إيقاف أثناء probe، عامل بطيء، lease قديم، استعادة عند finalize، proxy/TLS، حدود أصل، اقتطاع ملف، pooling).
-- **sayl-http**: تحقق النطاقات النشط (HEAD → GET range=0-0)، تصنيف الدعم (Supported/Ignored/Unsupported/Unknown)، تتبع إعادة توجيه آمن (حد 5 هوب، تجريد Authorization/Cookie عبر أصول مختلفة، قائمة بيضاء http/https، كشف حلقات)، استخراج أسماء ملفات آمنة (RFC 5987، منع اجتياز مسارات، أسماء أجهزة Windows محجوزة، تحكم، Unicode NFC، حد 255 حرف)، تدفق للملف مع تحقق الطول و fsync.
-- **sayl-storage**: WAL بـ JSON-Lines، لقطات ذرية (tmp → fsync → rename)، تسامح مع ذيول مقطوعة، استعادة عبر snapshot + replay، قفل دليل حصري (Windows `share_mode(0)` + سجل في العملية).
-- **apps/website**: موقع ثابت RTL-first، تبديل لغة، فحص توفر ملفات بـ HEAD، FAQ accordion، لا تبعيات خارجية.
+### السحب والإفلات (Drag and Drop)
+يمكنك سحب أي رابط تنزيل مباشرة من المتصفح أو أي تطبيق آخر وإفلاته داخل نافذة برنامج سيل، وسيتعرف البرنامج على الرابط تلقائياً لتبدأ عملية التنزيل بلمسة واحدة.
 
-### 🚧 قيد التطوير / Under Development
+### اختيار مجلد الحفظ
+- تُحفظ التنزيلات افتراضياً في مجلد التنزيلات القياسي الخاص بالنظام (`Downloads`).
+- يتم تحديد مجلد الحفظ لكافة التنزيلات من خلال شاشة الإعدادات، حيث يمكنك اختيار المسار المناسب عبر مستعرض المجلدات المدمج.
 
-- **sayl-app / apps/desktop**: Tauri 2 + Svelte 5 UI — Timeline حقيقي (نطاقات/leases/checkpoints/splits/retries من المحرك)، بطاقات مهام، طابور، منطقة سحب، اختصارات عامة، ثيمات JSON schema، i18n كامل.
-- **جدولة/طابور**: حد سرعة، جدولة زمنية، أولويات، إعادة تشغيل مهام فاشلة.
-- **تكامل المتصفح**: Native Messaging bridge، ملحقات Chromium/Firefox، صفحة "تكامل المتصفح" داخل التطبيق.
-- **دعم الفيديو**: yt-dlp/FFmpeg pinned، metadata، تقدم هيكلي، دمج/تحويل، قوائم تشغيل.
-- **دعم التورنت**: librqbit — magnet/.torrent، DHT/PEX، اختيار ملفات، بث/Seek.
-- **نظام الإضافات**: WASM runtime، hooks (extract، headers مقيدة، post-process، ui-tile declarative)، وسيط صلاحيات (DNS rebinding defense، allowlist شبكة، حدود ذاكرة/وقود/إخراج).
-- **كتالوج الإضافات/الثيمات**: داخل التطبيق والموقع — اسم/مطور/إصدار/مصدر/رخصة/توافق/صلاحيات/مراجعة/تثبيت/إزالة.
-- **Android**: Kotlin + UniFFI، HTTP Preview، SAF export، WorkManager/UIDT، إشعارات.
-- **التوزيع**: MSI/NSIS موقعة، تحديثات Tauri موقعة، SBOM، فحص تراخيص التبعيات.
-
-### 📋 مخطط / Planned (M5–M8 وما بعده)
-
-- Safari extension (مرحلة macOS منفصلة).
-- WASM plugins catalog مع remote refresh opt-in.
-- مراجعة أمنية قبل الإصدار (Strix).
-- مثبتات clean-machine، ترقية/إلغاء تثبيت نظيفة.
-- Android media/torrent/plugins بعد spikes.
+### الإيقاف المؤقت والاستئناف
+- **الإيقاف المؤقت:** اضغط على زر الإيقاف (`Pause`) لأي مهمة قيد التحميل في أي وقت. يتم إنهاء الاتصالات بأمان وتخزين آخر بايت تم التحقق منه على القرص.
+- **الاستئناف:** اضغط على زر الاستئناف (`Resume`) لمتابعة التنزيل من النقطة التي توقف عندها، شريطة أن يدعم خادم الملف طلبات النطاقات الجزئية (`Accept-Ranges`) وألا يكون الملف قد تغير على الخادم أثناء التوقف.
 
 ---
 
-## المساهمة (Contributing)
-
-راجع **[CONTRIBUTING.md](CONTRIBUTING.md)** لـ:
-
-- إعداد بيئة GNU + `rust-lld`
-- أوامر الاختبار والفحص
-- نمط رسائل الكوميت (English imperative)
-- قاعدة عدم الأوامر التدميرية لـ Git
-- تشغيل اختبارات HTTP fixture الحتمية دون شبكة
-- قائمة فحص Pull Request
+## إضافة المتصفح والتكامل
+يتكامل سيل مع متصفحات الويب المستندة إلى Chromium (مثل Google Chrome وMicrosoft Edge وBrave) عبر الإضافة الرسمية الملحقة:
+- **قائمة الزر الأيمن:** عند النقر بزر الفأرة الأيمن على أي رابط داخل المتصفح، اختر **«التحميل باستخدام سيل»** لإرسال الرابط مباشرة إلى تطبيق سيل لسطح المكتب.
+- **نافذة الإضافة في شريط الأدوات (Popup):** تفحص وتعرض حالة الاتصال بالمضيف المحلي (`com.sayl.downloader`) وتُظهر إصدار التطبيق عند الاتصال.
+- **السلوك التلقائي عند عدم التشغيل:** إذا كان تطبيق سيل مغلقاً أو غير مثبت، تعرض الإضافة أن المضيف غير متصل، ويترك المتصفح الرابط دون تعديل ليتمكن المستخدم من تنزيل الملف عبر المتصفح كالمعتاد.
 
 ---
 
-## الأمان (Security)
-
-راجع **[SECURITY.md](SECURITY.md)** لـ:
-
-- الإصدارات المدعومة
-- كيفية الإبلاغ عن ثغرة أمنية (خاصًا)
-- داخل النطاق / خارج النطاق
-- وعد عدم وجود تتبع/تحليلات
-- المراجعة الأمنية قبل الإصدار
+## الإعدادات
+يمكنك الوصول إلى لوحة الإعدادات عبر النقر على **أيقونة الترس في شريط الأدوات**:
+- **مجلد التنزيل الافتراضي:** تحديد المسار الذي تُحفظ فيه كافة الملفات المكتملة عبر مستعرض المجلدات.
+- **عدد الاتصالات المتزامنة:** تخصيص عدد الاتصالات لكل مهمة (الافتراضي 4 اتصالات متزامنة) لموازنة استهلاك عرض النطاق الترددي.
+- **اللغة والمظهر:** التبديل الفوري بين اللغة العربية (مع اتجاه RTL) واللغة الإنجليزية، واختيار المظهر المناسب (فاتح أو داكن).
 
 ---
 
-## مدونة السلوك (Code of Conduct)
+## الأسئلة الشائعة (FAQ)
 
-راجع **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** — نسخة مختصرة على نمط Contributor Covenant.
+### س: هل يقوم سيل بجمع أي بيانات عن نشاطي أو تتبع ملفاتي؟
+**ج:** لا على الإطلاق. يلتزم سيل بسياسة خصوصية صارمة؛ البرنامج خالٍ تماماً من أدوات التتبع (No Telemetry) أو التحليلات الإحصائية أو الإعلانات. كافة بيانات الروابط وسجلات التنزيل تبقى على جهازك الشخصي حصراً.
 
----
+### س: لماذا يعيد البرنامج تحميل الملف من البداية أحياناً بدلاً من الاستئناف؟
+**ج:** يرجع ذلك لضمان عدم تلف الملف الناتج في الحالات التالية:
+1. إذا كان الخادم البعيد لا يدعم طلبات النطاقات الجزئية (`Accept-Ranges`).
+2. إذا تم تعديل الملف على الخادم أثناء فترة التوقف وتغير وسم التحقق (`ETag`).
 
-## الرخصة (License)
-
-**License: [Apache-2.0](LICENSE)**
-
-لم تُحسم الرخصة بعد. القرار يعود لمالك المشروع.
-
----
-
-## روابط مفيدة
-
-- **الموقع:** `apps/website/` — افتح محليًا بـ `python -m http.server`
-- **Issues:** [GitHub Issues](https://github.com/SAYL/SAYL/issues)
-- **الأمان:** [SECURITY.md](SECURITY.md)
-- **خطة المنتج:** [docs/MASTER-PLAN.md](docs/MASTER-PLAN.md)
-- **سلسلة الأدوات:** [docs/TOOLCHAIN.md](docs/TOOLCHAIN.md)
+### س: هل تضيع الأجزاء المنزلة إذا أُغلق الجهاز فجأة أو انقطع التيار الكهربائي؟
+**ج:** لا. يعتمد سيل على آلية تسجيل متينة مع تفريغ دوري للقرص، مما يتيح له استعادة حالة المهام تلقائياً وجعلها جاهزة للاستئناف فور إعادة فتح البرنامج.
 
 ---
 
-## English Summary
+## متطلبات التشغيل
+- **نظام التشغيل:** Windows 10 (الإصدار 1903 أو أحدث) أو Windows 11، بمعمارية 64 بت (x64).
+- **بيئة التشغيل:** Microsoft Edge WebView2 Runtime (مثبت افتراضياً في معظم أنظمة Windows الحديثة).
+- **المساحة التخزينية:** مساحة كافية على القرص في مجلد الحفظ المختار لاستيعاب الملفات المحملة.
 
-**SAYL** is an independent, open-source, privacy-respecting download manager for Windows, written in Rust with a Tauri 2 + Svelte desktop UI. Arabic-first, RTL, i18n-ready.
+---
 
-### Current Status (v0.1.0, Windows-only)
+## الترخيص والموقع الرسمي
+- **الترخيص:** برنامج سيل منشور كبرمجية مفتوحة المصدر بموجب رخصة **Apache License, Version 2.0**. راجع ملف [`LICENSE`](LICENSE) للاطلاع على البنود والشروط.
+- **الموقع الرسمي:** [https://sayl.site](https://sayl.site)
+- **مستودع الكود والمشاريع:** [https://github.com/athar-studios/sayl](https://github.com/athar-studios/sayl)
 
-| Crate | Description | Tests |
-|-------|-------------|-------|
-| `sayl-core` | Domain models, 11-state machine, error taxonomy, bounded event bus, idempotency keys | 33 |
-| `sayl-test-http` | Deterministic HTTP fixture server, 27 failure modes | 25 |
-| `sayl-http` | HTTP client, range validation, safe redirects, safe filenames | 132 |
-| `sayl-storage` | Crash-safe task store (WAL + atomic snapshots), directory locking | 18 |
-| `sayl-app` | Engine, scheduler, leases, crash recovery | 46 |
-| `sayl-cli` | Command-line interface | 12 |
-| `sayl-bridge` | Native-messaging protocol and `sayl-bridge` host binary | 36 |
-| `sayl-bench` | Local performance harness | 2 |
-| `apps/desktop` | Tauri + Svelte UI (Arabic RTL / English) | 26 (vitest) |
-| `apps/website` | Static download site | static checks + privacy audit 4/4 |
-| `extensions/browser` | Chromium/Edge MV3 extension with native messaging | built, not yet loaded in a real browser |
+---
 
-Video (`sayl-media`), torrent (`sayl-torrent`), WASM plugins (`sayl-plugin-host`) and Android are **not started** — each is planned in `docs/versions/`.
+## English
 
-Total verified Rust tests: **304**.
+# SAYL Download Manager
 
-### Build (Test Environment)
+[![CI](https://github.com/athar-studios/sayl/actions/workflows/ci.yml/badge.svg)](https://github.com/athar-studios/sayl/actions)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
+<!-- [Screenshot placeholder: Application UI screenshot will be added here once official screenshots are published to docs/screenshots/v0.1.0/] -->
+
+**SAYL** is an independent, high-performance download manager for Windows designed for speed, reliable resuming, and complete user privacy. It delivers fast multi-part downloads, resilient state persistence across crashes, and a modern clean interface with zero telemetry and zero ads.
+
+---
+
+### What is SAYL?
+SAYL manages and accelerates file downloads over standard HTTP and HTTPS protocols. It splits files into parallel byte ranges to maximize connection bandwidth, continuously validates received chunks, and ensures that interrupted transfers resume accurately without data corruption.
+
+Key highlights:
+- **Verified Resuming:** Strict byte-range validation and strong ETag checking prevent corrupted resumes when servers or files change (provided the remote server supports range requests and the file has not been modified).
+- **Crash Resilience:** Durable transaction-safe journaling ensures unfinished tasks recover automatically after sudden reboots or power loss.
+- **Absolute Privacy:** No tracking, no analytics SDKs, no ads, and no external telemetry calls. Your download history and URLs stay local on your machine.
+
+---
+
+### Download & Installation
+Download the latest official release for Windows directly from GitHub:  
+👉 **[Download SAYL — Latest Release](https://github.com/athar-studios/sayl/releases/latest)**
+
+#### Available Packages
+- **Standard NSIS Installer (Recommended):** `SAYL-Setup-x64-0.1.0.exe`  
+  Download and run the setup executable to install SAYL on your PC.
+- **Windows Installer Package (MSI):** `SAYL-Setup-x64-0.1.0.msi`  
+  Alternative MSI package suitable for silent installation or enterprise deployment.
+
+#### Verifying Package Integrity
+Each release publishes an accompanying `SHA256SUMS.txt` file. You can verify your installer using PowerShell:
 ```powershell
-$env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
-$env:RUSTFLAGS = "-C linker=rust-lld"
-cargo +stable-x86_64-pc-windows-gnu test --workspace
+Get-FileHash .\SAYL-Setup-x64-0.1.0.exe -Algorithm SHA256
 ```
+Compare the output hash against the one published in `SHA256SUMS.txt`.
 
-Production builds require MSVC toolchain + Windows SDK (elevated install).
+---
 
-### Links
+### Starting Your First Download
 
-- **Website:** `apps/website/` — `python -m http.server` to preview
-- **Issues:** GitHub Issues
-- **Security:** `SECURITY.md`
-- **Roadmap:** `docs/MASTER-PLAN.md`
-- **Toolchain:** `docs/TOOLCHAIN.md`
+#### Adding a Download
+1. Click **"Add Download"** in the toolbar or press `Ctrl+N`.
+2. Paste the target file URL into the dialog.
+3. Click **"Start Download"** to initiate the transfer.
 
-**License:** [Apache-2.0](LICENSE).
+#### Drag and Drop
+Drag any download link directly from your browser or desktop application and drop it into the SAYL window to begin downloading immediately.
+
+#### Save Folder Selection
+- By default, files are saved to your system's `Downloads` folder.
+- The destination directory for all downloads is configured in Settings using the native folder picker.
+
+#### Pause and Resume
+- **Pause:** Click the `Pause` button on any active download at any time. The engine gracefully stops workers and commits written bytes to disk.
+- **Resume:** Click `Resume` to continue transferring from where you left off, provided the remote server supports range requests (`Accept-Ranges`) and the remote file validator has not changed.
+
+---
+
+### Browser Extension & Context Menu
+SAYL integrates with Chromium-based browsers (Google Chrome, Microsoft Edge, Brave) via its companion extension:
+- **Context Menu Integration:** Right-click any link on the web and select **"التحميل باستخدام سيل" / "Download with Sayl"** to send the URL directly to the SAYL desktop application.
+- **Toolbar Popup:** Checks and displays whether the native messaging host (`com.sayl.downloader`) is connected, reporting the running app version.
+- **Fallback Behavior:** If the SAYL application is closed or not installed, the popup indicates that the host is not connected and the browser leaves the link untouched, allowing the user to download through the browser as normal.
+
+---
+
+### Settings
+Open Settings via the **gear button in the toolbar**:
+- **Default Download Directory:** Configure where all downloaded files are saved using the native directory picker.
+- **Concurrency & Connections:** Adjust maximum concurrent connections per download (default is 4).
+- **Appearance & Language:** Toggle between Arabic (with full RTL support) and English, and select Dark or Light theme modes.
+
+---
+
+### Frequently Asked Questions (FAQ)
+
+#### Q: Does SAYL collect any data about my downloads or usage?
+**A:** No. SAYL is built with a zero-telemetry policy. There are no tracking scripts, no third-party analytics, and no remote telemetry servers. All download records and URLs remain strictly on your local device.
+
+#### Q: Why does a download occasionally restart from 0% instead of resuming?
+**A:** This safeguards against file corruption if:
+1. The remote web server does not support HTTP Range requests (`Accept-Ranges`).
+2. The file on the remote server changed while paused (validator or `ETag` mismatch).
+
+#### Q: Are downloaded parts lost if my computer crashes or loses power?
+**A:** No. SAYL maintains a write-ahead journal and regularly flushes state to disk. When reopened, any incomplete downloads are restored and ready for resumption.
+
+---
+
+### System Requirements
+- **Operating System:** Windows 10 (version 1903 or later) or Windows 11, 64-bit (x64).
+- **Runtime:** Microsoft Edge WebView2 Runtime (pre-installed on modern Windows systems).
+- **Storage:** Adequate free disk space and write permissions on the designated download directory.
+
+---
+
+### License & Website
+- **License:** Licensed under the **Apache License, Version 2.0**. See [`LICENSE`](LICENSE) for details.
+- **Official Website:** [https://sayl.site](https://sayl.site)
+- **Repository & Issues:** [https://github.com/athar-studios/sayl](https://github.com/athar-studios/sayl)

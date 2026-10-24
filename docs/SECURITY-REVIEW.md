@@ -163,7 +163,7 @@
 ## 5. مخاطر مقبولة معروفة
 
 - لا توقيع رمزي (code signing) — المثبتات NSIS/MSI غير موقعة.
-- اعتراف هوية النموذج على متغيّرات البيئة (`SAYL_PRIMARY_*`)، وليس تشفيرياً — انظر `docs/REPORT-CONTRACT.md:9`.
+- اعتراف هوية النموذج يعتمد على متغيّرات البيئة (`SAYL_PRIMARY_*`)، وليس تشفيرياً.
 - `doctest` معطّل لحزمة sayl-http (`crates/http/Cargo.toml:11`) بسبب انهيار native-tls/Schannel على الاستهداف GNU.
 - تداخل Smart App Control — قد يمنع تشغيل الـ binaries الجديدة (`os error 4551`).
 - عدم وجود ملف LICENSE — الخيار يبقى على المالك.
@@ -174,7 +174,7 @@
 
 ## 6. الحدود الصريحة
 
-- مراجعة read-only على مستوى المصدر — **لم تتم** تشغيل الـ binaries المدمجة (Tauri test executable) بسبب `STATUS_ENTRYPOINT_NOT_FOUND` على WebView2Loader (انظر STATUS.json).
+- مراجعة read-only على مستوى المصدر — **لم تتم** تشغيل الـ binaries المدمجة (Tauri test executable) بسبب `STATUS_ENTRYPOINT_NOT_FOUND` على WebView2Loader.
 - لم يتم التحقّق من الاستغلاب الديناميكي لأي حيثية — جميع النتائج بناءً على قراءة الشيفرة الكودية.
 - لم يتم فحص بروتوكول TLS بشكل ديناميكي — الاعتماد على `reqwest 0.12.28` مع `native-tls` (Schannel) على Windows.
 - لا يمكن إثبات أن ثغرة SSRF (S2) قابلة للاستغلال في بيئة معيّنة — يعتمد ذلك على بنية الشبكة المحلية.

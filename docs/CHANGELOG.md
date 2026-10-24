@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### TEST-001: Deterministic HTTP Fixture Server
 - Implemented `sayl-test-http` in-memory test fixture server binding strictly to `127.0.0.1:0`.
-- Simulated all 27 failure modes and protocol edge cases specified in MASTER-PLAN §8 (including `Ok206`, `NoAcceptRanges`, `IgnoredRange200`, `BadContentRange`, `BodyTruncation`, `ConnectionReset`, `ETagChanged`, `WeakETagOnly`, `NoValidator`, `416RangeNotSatisfiable`, `HeadRejected`, `UnknownSize`, `EmptyFile`, `UnexpectedEncoding`, `429RetryAfter`, `RedirectWithSecrets`, `NoSpace`, `PermissionDenied`, `MaliciousFilename`, `PauseCancelDuringProbe`, `SlowWorker`, `OldLease`, `RecoveryAtFinalize`, `ProxyTLS`, `LimitsOrigin`, `FileTruncation`, `Pooling`).
+- Simulated all 27 failure modes and protocol edge cases (including `Ok206`, `NoAcceptRanges`, `IgnoredRange200`, `BadContentRange`, `BodyTruncation`, `ConnectionReset`, `ETagChanged`, `WeakETagOnly`, `NoValidator`, `416RangeNotSatisfiable`, `HeadRejected`, `UnknownSize`, `EmptyFile`, `UnexpectedEncoding`, `429RetryAfter`, `RedirectWithSecrets`, `NoSpace`, `PermissionDenied`, `MaliciousFilename`, `PauseCancelDuringProbe`, `SlowWorker`, `OldLease`, `RecoveryAtFinalize`, `ProxyTLS`, `LimitsOrigin`, `FileTruncation`, `Pooling`).
 - Implemented deterministic byte generator `BodyGenerator` with pattern verification and request audit log.
 - Verified with 25 passing unit and integration tests.
 

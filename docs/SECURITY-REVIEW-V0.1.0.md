@@ -11,7 +11,7 @@
 4. **تطبيق سطح المكتب Tauri وواجهة Svelte:** `apps/desktop/src-tauri/src/lib.rs`، `apps/desktop/src-tauri/capabilities/default.json`، `apps/desktop/src-tauri/tauri.conf.json`، `apps/desktop/src/lib/tauri.js`، `apps/desktop/src/App.svelte`، `apps/desktop/src/lib/SettingsPanel.svelte`.
 5. **موقع الويب والترجمة:** `apps/website/{index.html, app.js, styles.css}`.
 6. **سير العمل وأتمتة الإطلاق:** `.github/workflows/{ci.yml, release.yml}`، `tools/release.ps1`.
-7. **فحص الخصوصية والأسرار المتقاطعة:** `tools/privacy_audit.py`، `assets/brand`، `docs/versions`.
+7. **فحص الخصوصية والأسرار المتقاطعة:** `tools/privacy_audit.py`، `assets/brand`.
 
 ### الحدود الصريحة وما لم يتم اختباره في هذه البيئة:
 - **لم يتم تشغيل متصفح تفاعلي حقيقي**، ولم يتم تحميل إضافة المتصفح داخل Chrome أو Edge لاختبار تكامل Native Messaging الحي، لعدم توفر متصفح مرئي في هذه الحاوية.
@@ -246,7 +246,7 @@
 
 ### السطح 7: الأسرار والخصوصية وتقييم أداة الفحص
 - **البحث المتقاطع عن الأسرار والمسارات الشخصية:**
-  - لم يُعثر على أي مفاتيح سرية أو رموز وصول (Tokens) أو مسارات مستخدمين شخصية في `assets/brand` أو `extensions` أو `apps/website` أو `docs/versions`.
+  - لم يُعثر على أي مفاتيح سرية أو رموز وصول (Tokens) أو مسارات مستخدمين شخصية في `assets/brand` أو `extensions` أو `apps/website`.
 - **أداة فحص الخصوصية:**
   - تم تقييم نمط القوالب `{}` في `tools/privacy_audit.py` كحيثية منخفضة توفر نقطة عمياء محتملة في الفحص البرمجي الساكن (انظر الحيثية 5).
 

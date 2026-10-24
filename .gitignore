@@ -8,6 +8,27 @@ reports/
 artifacts/
 .agent-runtime/
 
+# Internal development and agent workflow files
+/STATUS.json
+/AGENTS.md
+/agents.config.json
+/KIT-VALIDATION.json
+/MANIFEST.sha256.json
+/STAGE-GATE.md
+/START-HERE-PROMPT.md
+/SAYL-FULL-EXECUTION-PROMPT.md
+/CONTINUE-AFTER-PHASE-1.md
+/prompts/
+/catalog/
+/templates/
+/docs/agent/
+/docs/versions/
+/docs/tasks/
+/docs/REPORT-CONTRACT.md
+/docs/DEBATER-SYSTEM.md
+/docs/MASTER-PLAN.md
+/tools/workflow.py
+
 # Build targets and dependencies
 target/
 node_modules/

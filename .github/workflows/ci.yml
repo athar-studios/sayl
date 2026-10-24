@@ -200,22 +200,9 @@ jobs:
 
       - name: Validate JSON manifests
         run: |
-          python -c "import json,glob; [json.load(open(p,encoding='utf-8')) for p in glob.glob('extensions/browser/**/*.json', recursive=True) + ['apps/desktop/src-tauri/tauri.conf.json','STATUS.json']]; print('all manifests valid')"
+          python -c "import json,glob; [json.load(open(p,encoding='utf-8')) for p in glob.glob('extensions/browser/**/*.json', recursive=True) + ['apps/desktop/src-tauri/tauri.conf.json']]; print('all manifests valid')"
         shell: pwsh
 
       - name: Run privacy audit
         run: python tools/privacy_audit.py
-        shell: pwsh
-
-      - name: Validate release plan docs exist
-        run: |
-          $missing = @()
-          foreach ($v in @('v0.2.0','v0.3.0','v0.4.0','v0.5.0','v1.0.0')) {
-            foreach ($f in @('PLAN.md','STATUS.md')) {
-              $p = "docs/versions/$v/$f"
-              if (-not (Test-Path $p)) { $missing += $p }
-            }
-          }
-          if ($missing.Count -gt 0) { Write-Error "Missing release plan files: $($missing -join ', ')"; exit 1 }
-          Write-Host "All release plan files present"
         shell: pwsh

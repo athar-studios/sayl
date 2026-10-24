@@ -62,7 +62,7 @@ Relates to #<issue-number>
 ### Documentation
 - [ ] README.md updated if user-facing change
 - [ ] Crate-level README.md updated if crate API changed
-- [ ] MASTER-PLAN.md updated if architectural change
+- [ ] Architecture documentation updated if architectural change
 - [ ] CHANGELOG.md updated (when it exists)
 
 ### Git Hygiene

@@ -1,8 +1,7 @@
 //! Core error types and classifications.
 //!
-//! Provides [`CoreError`] covering the seven failure categories defined in
-//! `docs/tasks/CORE-001.md`: `Http`, `Io`, `Storage`, `Scheduler`, `Validation`,
-//! `Cancelled`, and `Internal`.
+//! Provides [`CoreError`] covering the seven failure categories:
+//! `Http`, `Io`, `Storage`, `Scheduler`, `Validation`, `Cancelled`, and `Internal`.
 
 use std::fmt;
 use std::io;
@@ -141,7 +140,7 @@ impl CoreError {
 
     /// Returns `true` if this error is transient and safe to retry according to policy.
     ///
-    /// Following `docs/MASTER-PLAN.md` §6:
+    /// Retry policy rules:
     /// - 429, 503, network drops, timeouts, and transient I/O are retryable with backoff.
     /// - 401, 403, 404, validation errors, and cancellation are NOT retryable.
     pub fn is_retryable(&self) -> bool {

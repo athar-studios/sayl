@@ -199,7 +199,7 @@ Before opening a PR, ensure:
 - [ ] **Tests** pass locally: `cargo test --workspace` (GNU toolchain)
 - [ ] **No network calls** in tests — all HTTP tests use `sayl-test-http`
 - [ ] **No external dependencies** added without justification (avoid C deps, prefer pure Rust)
-- [ ] **Documentation** updated if public API changed (README, crate docs, MASTER-PLAN if architectural)
+- [ ] **Documentation** updated if public API changed (README, crate docs, architecture docs if architectural)
 - [ ] **No secrets** in code, logs, or commit history
 - [ ] **No telemetry/tracking** code added
 - [ ] **Accessibility** considered for UI changes (WCAG AA, RTL, focus rings)
@@ -237,7 +237,7 @@ feat / fix / refactor / perf / test / docs / chore / build / ci
 - `sayl-app` — Application services, Tauri commands/events. Coordinates core/storage/http.
 - `apps/desktop` — Tauri + Svelte UI. **No direct DB/shell access**. Uses Tauri commands only.
 
-### Safety Invariants (from MASTER-PLAN)
+### Safety Invariants
 
 - Ranges are `[start, end_exclusive)` internally, `u64` with checked arithmetic
 - Writer actor owns file + bounded queue; every write carries segment ID + lease generation

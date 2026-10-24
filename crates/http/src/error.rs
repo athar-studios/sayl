@@ -153,7 +153,7 @@ impl HttpError {
 
     /// Returns `true` if this error represents a transient condition suitable for retry.
     ///
-    /// Following `docs/MASTER-PLAN.md` §6:
+    /// Retry classification rules:
     /// - 429, 500, 502, 503, 504 are transient.
     /// - Connection drops, timeouts, body truncations are transient.
     /// - 401, 403, 404, 410, redirect failures, validation, and cancellation are NOT retryable.

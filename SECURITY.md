@@ -73,7 +73,7 @@ The following are explicitly **out of scope**:
   4. Browser extension Native Messaging (user-installed, explicit permission)
 - Logs are local, user-deletable, and exportable after redacting sensitive data
 
-See [README.md#privacy](README.md#الخصوصية-privacy) and [MASTER-PLAN §14](docs/MASTER-PLAN.md#14-الخصوصية-وإثباتها) for the full privacy statement.
+See [README.md](README.md) for the full privacy statement.
 
 ## Security Review Process
 

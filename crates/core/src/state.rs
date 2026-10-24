@@ -1,7 +1,6 @@
 //! Core download state machine and transition logic.
 //!
-//! Implements the 11 download states and explicit, guarded state transitions
-//! defined in `docs/MASTER-PLAN.md` §7.
+//! Implements the 11 download states and explicit, guarded state transitions.
 
 use std::fmt;
 
