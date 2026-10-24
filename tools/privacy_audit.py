@@ -113,6 +113,11 @@ ALLOWED_URL_HOST_PATTERNS = [
     r"^https?://hops\.com(?:/.*)?$",
     r"^https?://loop\.com(?:/.*)?$",
     r"^https?://(?:a|origin1|cdn\.other)\.com(?:/.*)?$",
+    # A URL template whose host is filled in at runtime from a bound socket
+    # address, e.g. `format!("http://{}", addr)` in the benchmark harness. Only
+    # loopback fixture servers are bound this way; the host is never a remote
+    # service. The pattern matches solely the empty `{}` placeholder.
+    r"^https?://(?:\{\}|\{:\d+\})$",
 ]
 
 
