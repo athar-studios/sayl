@@ -97,6 +97,49 @@ impl RedirectPolicy {
         // Also strip any custom sensitive headers if present
         headers.remove(HeaderName::from_static("x-auth-token"));
     }
+
+    /// Converts this redirect policy to a `reqwest::redirect::Policy`.
+    ///
+    /// The returned policy enforces the maximum hop count and uses a custom
+    /// redirect handler that applies our security rules (scheme validation,
+    /// private target blocking, credential stripping, loop detection).
+    pub fn to_reqwest_policy(&self) -> reqwest::redirect::Policy {
+        let policy = self.clone();
+        reqwest::redirect::Policy::custom(move |attempt| {
+            // Check max hops (previous() excludes the initial URL, so we use >= max_hops)
+            if attempt.previous().len() >= policy.max_hops {
+                return attempt.stop();
+            }
+
+            let previous = attempt.previous().last();
+            let next = attempt.url();
+
+            // Validate scheme
+            if next.scheme() != "http" && next.scheme() != "https" {
+                return attempt.stop();
+            }
+
+            // Block private targets from public origins
+            if let Some(prev_url) = previous {
+                if policy.block_private_redirect_targets
+                    && !is_private_or_loopback_host(prev_url)
+                    && is_private_or_loopback_host(next)
+                {
+                    return attempt.stop();
+                }
+
+                // Check for loops
+                for prev in attempt.previous() {
+                    if prev.as_str() == next.as_str() {
+                        return attempt.stop();
+                    }
+                }
+            }
+
+            // Follow the redirect
+            attempt.follow()
+        })
+    }
 }
 
 /// Tracks visited URLs during sequential redirect following to enforce loop detection
