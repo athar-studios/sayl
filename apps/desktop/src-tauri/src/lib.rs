@@ -834,17 +834,25 @@ mod tests {
 
     #[test]
     fn test_settings_validation_view_mode() {
-        let mut s = Settings::default();
-        s.view_mode = "cards".to_string();
-        assert!(validate_settings(&s).is_ok());
+        let cards = Settings {
+            view_mode: "cards".to_string(),
+            ..Settings::default()
+        };
+        assert!(validate_settings(&cards).is_ok());
 
-        s.view_mode = "table".to_string();
-        assert!(validate_settings(&s).is_ok());
+        let table = Settings {
+            view_mode: "table".to_string(),
+            ..Settings::default()
+        };
+        assert!(validate_settings(&table).is_ok());
 
-        s.view_mode = "grid".to_string();
-        assert!(validate_settings(&s).is_err());
+        let grid = Settings {
+            view_mode: "grid".to_string(),
+            ..Settings::default()
+        };
+        assert!(validate_settings(&grid).is_err());
         assert_eq!(
-            validate_settings(&s).unwrap_err(),
+            validate_settings(&grid).unwrap_err(),
             "View mode must be cards or table"
         );
     }

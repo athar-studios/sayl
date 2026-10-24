@@ -40,13 +40,10 @@ pub fn shutdown_decision(states: &[DownloadState]) -> ShutdownDecision {
     if states.is_empty() {
         return ShutdownDecision::Blocked("no_tasks");
     }
-    if states.iter().any(|s| *s == DownloadState::Failed) {
+    if states.contains(&DownloadState::Failed) {
         return ShutdownDecision::Blocked("failed_download");
     }
-    if states
-        .iter()
-        .any(|s| *s == DownloadState::Paused || *s == DownloadState::Pausing)
-    {
+    if states.contains(&DownloadState::Paused) || states.contains(&DownloadState::Pausing) {
         return ShutdownDecision::Blocked("paused_download");
     }
     if states.iter().any(|s| {
