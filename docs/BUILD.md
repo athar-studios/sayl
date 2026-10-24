@@ -13,8 +13,8 @@
 - **بيئة الويب (Frontend):**
   - Node.js (الإصدار 18 أو أحدث)
   - مدير الحزم npm (أو pnpm)
-- **اختياري (للبناء الإنتاجي النهائي لـ Tauri عبر MSVC):**
-  - Visual Studio 2022 Build Tools مع مكون **Windows SDK**.
+- **للبناء الإنتاجي الكامل لـ Tauri عبر MSVC:**
+  - Visual Studio 2022 Build Tools (14.44.35207) مع حزمة **Windows SDK (10.0.26100.0)** مثبتة وجاهزة للربط عبر `vcvars64.bat`.
 
 ---
 
@@ -83,40 +83,37 @@ cargo +stable-x86_64-pc-windows-gnu test --workspace
 
 ---
 
-## 4. لماذا يتعذر استخدام MSVC حالياً؟ وكيف يتم إصلاحه؟
+## 4. مسار البناء الإنتاجي عبر MSVC (MSVC Production Toolchain)
 
-### المشكلة والتشخيص الفني (Missing Windows SDK)
+### حالة بيئة MSVC و Windows SDK (Verified MSVC Status)
 - أدوات البناء الرسمية لـ Visual Studio 2022 (`MSVC 14.44.35207`) والرابط `link.exe` مثبتة على النظام في المسار:  
   `C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools`
-- ولكن، **حزمة تطوير برمجيات ويندوز (Windows SDK) غير مثبتة**.
-- عند محاولة الربط بواسطة أداة MSVC الافتراضية (`stable-x86_64-pc-windows-msvc`)، يفشل البناء فوراً بالخطأ:
-  ```text
-  LINK : fatal error LNK1181: cannot open input file 'kernel32.lib'
-  ```
-- السبب: ملفات النظام الأساسية مثل `kernel32.lib` و `user32.lib` و `shell32.lib` ورؤوس Win32 تتبع حزمة Windows SDK وليس مجمع MSVC نفسه.
+- **حزمة تطوير برمجيات ويندوز (Windows SDK):** مثبتة بإصدار `10.0.26100.0` (المكتبة الأساسية: `C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\um\x64\kernel32.lib`).
+- **حالة الربط عبر MSVC:** ربط MSVC يعمل بنجاح تام بعد تفعيل بيئة `vcvars64.bat`. خطأ `LNK1181: cannot open input file 'kernel32.lib'` السابق تم حله بالكامل.
+- **تكامل Tauri وخط الإصدار:** مجمّع Tauri وحزم المثبتات (NSIS و WiX) يُبنى بنجاح عبر سلسلة أدوات MSVC الرسمية.
+- **مسار GNU البديل:** يظل مسار `stable-x86_64-pc-windows-gnu` المقترن بـ `rust-lld` مساراً صالحاً ومتاحاً لاختبارات الوحدات والفحص السريع.
 
-### الحل المطلوب لتفعيل MSVC
-إذا أردت تفعيل مسار MSVC للبناء النهائي الكامل:
-1. افتح **Visual Studio Installer** بصلاحيات مسؤول النظام (Run as administrator).
-2. اختر **تعديل (Modify)** لتثبيت Build Tools 2022 الحالي.
-3. من علامة تبويب المكونات الفردية (Individual Components)، حدد:  
-   **Windows 11 SDK (10.0.22621.0)** أو **Windows 10 SDK (10.0.19041.0)**.
-4. أتمم التثبيت؛ فور انتهاء التثبيت سيتعرف `link.exe` تلقائياً على مسارات المكتبات.
+### كيفية تفعيل بيئة MSVC للبناء
+للبناء عبر MSVC، يتم تهيئة بيئة المطور أولاً عبر سطر الأوامر:
+```cmd
+call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+cargo build --release -p sayl-desktop
+```
 
 ---
 
-## 5. مصفوفة الأوامر: ما يعمل الآن مقابل ما يحتاج Windows SDK
+## 5. مصفوفة الأوامر وحالة الدعم (Command Support Matrix)
 
-| الأمر / الإجراء | الحالة الحالية | الأداة المستخدمة | متطلبات إضافية |
+| الأمر / الإجراء | الحالة الحالية | الأداة المستخدمة | ملاحظات |
 |---|---|---|---|
-| `cargo check` لكافة الحزم | ✅ يعمل فوراً | GNU toolchain | لا شيء |
-| `cargo check -p sayl-desktop` | ✅ يعمل فوراً | GNU toolchain | لا شيء |
-| `cargo test` لجميع حزم النواة | ✅ يعمل فوراً | GNU + `rust-lld` | لا شيء |
-| اختبارات واجهة Svelte (Vitest) | ✅ يعمل فوراً (21 اختباراً) | Node.js / npm | لا شيء |
-| بناء واجهة Svelte للإنتاج (`npm run build`) | ✅ يعمل فوراً | Node.js / Vite | لا شيء |
-| `cargo test` عبر MSVC toolchain | ❌ يتعطل حالياً (`LNK1181`) | MSVC `link.exe` | يتطلب تثبيت Windows SDK |
-| `cargo build -p sayl-desktop` (إنتاجي) | ❌ يتعطل حالياً (`LNK1181`) | MSVC `link.exe` | يتطلب تثبيت Windows SDK |
-| `cargo tauri build` (حزم المثبت) | ❌ يتعطل حالياً | Tauri CLI + MSVC | يتطلب تثبيت Windows SDK وصلاحيات رفع |
+| `cargo check` لكافة الحزم | ✅ يعمل بنجاح | GNU أو MSVC | فحص الشفرة والأنواع |
+| `cargo check -p sayl-desktop` | ✅ يعمل بنجاح | GNU أو MSVC | فحص كود الواجهة الخلفية لسطح المكتب |
+| `cargo test` لجميع حزم النواة | ✅ يعمل بنجاح | GNU + `rust-lld` / MSVC | اختبارات كاملة |
+| اختبارات واجهة Svelte (Vitest) | ✅ يعمل بنجاح (21 اختباراً) | Node.js / npm | اختبارات المكونات الأمامية |
+| بناء واجهة Svelte للإنتاج (`npm run build`) | ✅ يعمل بنجاح | Node.js / Vite | توليد مخرجات `dist/` |
+| `cargo test` عبر MSVC toolchain | ✅ يعمل بنجاح | MSVC `link.exe` | يتطلب تهيئة بيئة `vcvars64.bat` |
+| `cargo build -p sayl-desktop` (إنتاجي) | ✅ يعمل بنجاح | MSVC `link.exe` | ينتج الثنائي الإنتاجي لسطح المكتب |
+| `npm run tauri -- build` (حزم المثبت) | ✅ يعمل بنجاح | Tauri CLI + MSVC | ينتج مثبت NSIS (.exe) ومثبت WiX (.msi) |
 
 ---
 

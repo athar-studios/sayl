@@ -21,7 +21,7 @@
   - المساحة الإجمالية: 375.86 جيجابايت (403,571,732,480 بايت).
   - المساحة الشاغرة: 190.12 جيجابايت (204,134,633,472 بايت) بنسبة 50.58% مساحة خالية.
 - **الأدوات البرمجية المتوفرة على PATH:**  
-  - `python`: الإصدار `3.12.10` في المسار `C:\Users\Dragonfly\AppData\Local\Programs\Python\Python312\python.EXE`.
+  - `python`: الإصدار `3.12.10`.
   - `node`: الإصدار `v26.8.1` في المسار `C:\Program Files\nodejs\node.EXE`.
   - `npm`: الإصدار `11.19.0` في المسار `C:\Program Files\nodejs\npm.CMD`.
   - `git`: الإصدار `git version 2.55.0.windows.5` في المسار `C:\Program Files\Git\cmd\git.EXE`.

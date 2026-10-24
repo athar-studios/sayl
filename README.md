@@ -61,7 +61,7 @@
 # إعداد المسار والعلميات
 $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
 $env:RUSTFLAGS = "-C linker=rust-lld"
-cd "C:\Users\Dragonfly\Downloads\Download Manager"
+cd "<path-to-repo>"
 
 # فحص الأنواع
 cargo +stable-x86_64-pc-windows-gnu check -p sayl-core

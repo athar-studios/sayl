@@ -58,7 +58,7 @@ apps/website/
 ## روابط التنزيل (Download Links)
 
 تشير جميع أزرار الحث على التنزيل إلى الرابط الحقيقي:
-`https://github.com/ashrymahrm/sayl/releases/latest`
+`https://github.com/athar-studios/sayl/releases/latest`
 
 مع توضيح صريح وأمين في الصفحة بأن حزم التثبيت الموقعة لنظام Windows لم تُنشر بعد، وأن الروابط تقود إلى صفحة الإصدارات الرسمية على GitHub لمتابعة صدورها.
 

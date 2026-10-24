@@ -26,7 +26,7 @@ $env:RUSTFLAGS = "-C linker=rust-lld"
 ### Verify Setup
 
 ```powershell
-cd "C:\Users\Dragonfly\Downloads\Download Manager"
+cd "<path-to-repo>"
 
 # Type-check all crates
 cargo +stable-x86_64-pc-windows-gnu check --workspace

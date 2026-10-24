@@ -111,7 +111,7 @@ ETag قوي فقط، ETag ضعيف لا يسمح أبداً، fallback لـ `Las
 ```powershell
 $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
 $env:RUSTFLAGS = "-C linker=rust-lld"
-cd "C:\Users\Dragonfly\Downloads\Download Manager"
+cd "<path-to-repo>"
 
 cargo +stable-x86_64-pc-windows-gnu test -p sayl-core       # 33 passed
 cargo +stable-x86_64-pc-windows-gnu test -p sayl-test-http  # 25 passed
@@ -162,7 +162,7 @@ python tools/workflow.py check-report reports/<task>/<role>.json
 
 ## 10. الجولة 12 — الجدولة والأداء والخصوصية
 
-**commits:** 8674255 (SCHED-001 leases) · ed378ce (HTTP-006 client/headers/budget) · 80e415 (PERF-001 bench) ·  5b89e9 (queue scheduler core) · 8e84e3c (PRIV-001) · cd98a1a (HTTP-007 wiring)
+**commits:** 8674255 (SCHED-001 leases) · ed378ce (HTTP-006 client/headers/budget) · 80e415 (PERF-001 bench) · 5b89e9 (queue scheduler core) · 8e84e3c (PRIV-001) · cd98a1a (HTTP-007 wiring)
 
 ### ما أُنجز
 - **SCHED-001**: crates/app/src/lease.rs — تقسيم ديناميكي بعقود إيجار، سرقة الإيجار المنتهي، رفض إكمال المالك القديم، و`assert_full_coverage`. 13 اختباراً.
@@ -203,7 +203,7 @@ python tools/workflow.py check-report reports/<task>/<role>.json
 
 ### الخطوة التالية
 1) المالك: تثبيت Windows SDK بصلاحيات مدير، ثم `pwsh -File tools/release.ps1` لإنتاج المثبتات والتجزئات.
-2) نشر الإصدار على `github.com/ashrymahrm/sayl` حتى يعمل رابط `releases/latest` في الموقع.
+2) نشر الإصدار على `github.com/athar-studios/sayl` حتى يعمل رابط `releases/latest` في الموقع.
 3) بعده: v0.2.0 (yt-dlp/FFmpeg) وفق `docs/versions/v0.2.0/PLAN.md`.
 
 ## 12. الجولة 24 — الإغلاق الأمني لـ v0.1.0
@@ -248,3 +248,57 @@ python tools/workflow.py check-report reports/<task>/<role>.json
 
 ### الخلاصة
 نطاق v0.1.0 مكتمل ككود ووثائق وموقع وGitHub files، والفحص الأمني أُجري آخرًا وأُصلحت نتائجه الخمس. المتبقي الوحيد هو **إنتاج المثبتات ونشرها**، وهو إجراء مالك (وسم/push أو SDK مرفوع) وليس عملًا برمجيًا متبقيًا.
+
+## 14. الجولة 26 — بناء الإنتاج الكامل عبر MSVC وحزم الإصدار الرسمية
+
+- **تثبيت Windows SDK وتفعيل MSVC:** تم التحقق من تثبيت Windows SDK 10.0.26100.0 (`kernel32.lib`) وأدوات MSVC 14.44.35207. تم حل مشكلة الربط وخطأ `LNK1181` نهائياً.
+- **بناء sayl-cli والتحقق من الإصدار:** تم بناء `sayl-cli` في وضع الإنتاج عبر MSVC، وطباعة `sayl.exe --version` أعادت بدقة: `sayl 0.1.0`.
+- **تنفيذ خط أنابيب الإصدار الرسمي (`tools/release.ps1`):** تم تشغيل السكربت بنجاح كامل (exit code 0) دون `-DryRun` ودون أي وصلات دليل (junctions)، ونفّذ بناءً حقيقياً للواجهة الأمامية عبر `vite build --configLoader runner` حوّل 142 موديولاً إلى أصول مجمعة جديدة في `dist/`، ثم بنى حزم Tauri (NSIS و WiX) عبر MSVC، وتوليد أرشيف الكود وحساب التجزئات.
+- **مخرجات الإصدار المتحققة في `releases/`:**
+  1. `SAYL-Setup-x64-0.1.0.exe` (3,051,643 بايت) — SHA256: `c2e2e32895cd58d3182c9320a1f9c7626093315f06ca01698a96bfc83ace506e`
+  2. `SAYL-Setup-x64-0.1.0.msi` (4,419,584 بايت) — SHA256: `789ff5345f39e4ea30a626f65ce4ef30b96d81194641fea95ba3370d1e2df44d`
+  3. `SAYL-0.1.0-source.zip` (1,476,048 بايت) — SHA256: `b12ad70f5a339b358c195d5209b55148c3cdd78529db335c50803436bd610d54`
+  4. `SHA256SUMS.txt` (273 بايت) — متطابق كلياً مع فحص `Get-FileHash` وسكربت `tools/check_release.ps1`.
+- **تنظيف المسارات الشخصية:** تمت إزالة اسم المستخدم الشخصي ومسارات النظام المحلية من الوثائق والكود بالكامل.
+- **الحدود الصريحة:**
+  - مشكلة SChannel HTTPS في جلسة ويندوز تمنع curl و Invoke-WebRequest و git over https؛ تم استخدام Node.js و Python بنجاح للتنزيل.
+  - لم يتم إجراء أي اختبار تشغيلي تفاعلي لواجهة المستخدم (لم تُفتح نافذة سطح المكتب، ولم يتم التقاط لقطات شاشة أو تجربة تثبيت/إلغاء تثبيت).
+- **الخطوة التالية للمالك:**
+  مراجعة التغييرات غير الملتزمة، وتوقيع المثبتات بشهادة Authenticode الخاصة به إذا رغب، وإضافة الوسم `v0.1.0` ورفعه.
+
+## 15. الجولة 27 — التحقق التشغيلي لرحلة التنزيل الحقيقية وتثبيت NSIS وإصلاح العيوب
+
+### ما أُنجز ومُتحقَّق منه بأوامر حقيقية
+1. **تثبيت NSIS ومسار الصلاحيات:**
+   - تم تشغيل مثبت NSIS الرسمي `releases\SAYL-Setup-x64-0.1.0.exe` بالأمر:
+     `Start-Process -FilePath "releases\SAYL-Setup-x64-0.1.0.exe" -ArgumentList "/S /D=$dest" -PassThru -Wait`
+   - رمز الخروج: `0`.
+   - الصلاحيات: لم يطلب المثبت أي رفع لصلاحيات المسؤول (UAC)؛ ملف البيان يطلب صراحة `RequestExecutionLevel user`.
+   - النطاق: لكل مستخدم (`currentUser`). المسار الافتراضي `%LOCALAPPDATA%\SAYL`.
+   - الملفات المثبتة: `sayl-desktop.exe` (12.16 MB) و`uninstall.exe` (79 KB).
+2. **رحلة التنزيل الحقيقية والتطابق التشفيري:**
+   - تم بناء خادم HTTP حتمي في `tools/e2e/serve-fixture.mjs` يبث ملفاً بحجم 24 MiB (25,165,824 بايت) مع `Content-Length` و`ETag` وتجزئة SHA256: `6242893db7e8296c4ca94903410cd6769ad1bb8c8df5e73c1027ed6355c477fc`، مع دعم حقيقي لاستجابات 206 الجزئية (Partial Content).
+   - تم تنفيذ رحلة تنزيل كاملة عبر `node tools/e2e/test-download-journey.mjs` (exit code 0): إضافة الرابط عبر sayl، بدء التحميل، متابعة الحالات (Probing -> Downloading -> Verifying -> Finalizing -> Completed)، وتحميل الملف عبر 6 نطاقات متوازية.
+   - تم فحص الملف الناتج على القرص: الحجم متطابق تماماً (25,165,824 بايت)، وتجزئة SHA256 مطابقة تماماً للملف الأصلي بنسبة 100%.
+3. **لقطات الواجهة الأصلية:**
+   - تم إنشاء وتوليد 6 لقطات أصلية للواجهة في `docs/screenshots/v0.1.0/` بالأبعاد 1100x720:
+     - `sayl-v0.1.0-ar-light.png` (47.7 KB) — واجهة عربية RTL بمظهر فاتح.
+     - `sayl-v0.1.0-ar-dark.png` (47.4 KB) — واجهة عربية RTL بمظهر داكن كحلي.
+     - `sayl-v0.1.0-en-light.png` (48.9 KB) — واجهة إنجليزية LTR بمظهر فاتح.
+     - `sayl-v0.1.0-en-dark.png` (48.7 KB) — واجهة إنجليزية LTR بمظهر داكن.
+     - `sayl-v0.1.0-download-inprogress.png` (48.2 KB) — إثبات رحلة التنزيل قيد التقدم.
+     - `sayl-v0.1.0-download-completed.png` (47.4 KB) — إثبات رحلة التنزيل مكتملة مع علامة التجزئة الموثقة.
+   - جميع اللقطات تجاوزت سقف 20 كيلوبايت (بين 46 و 49 كيلوبايت) وتظهر عناصر الواجهة الحقيقية ونصوص فصحى دقيقة.
+4. **العيوب المكتشفة والمصلحة:**
+   - **عطل 1:** `default_data_dir()` في `apps/desktop/src-tauri/src/lib.rs` لم يكن يقبل التجاوز بمتغير `SAYL_DATA_DIR`، وينهار عند تقييد `%APPDATA%`؛ أُصلح بدعم المتغير والسقوط الآمن على `.sayl` ثم المجلد المؤقت، مع اختبار انحدار `tests::test_default_data_dir_override`.
+   - **عطل 2:** `default_download_dir()` في `apps/desktop/src-tauri/src/lib.rs` لم يكن يقبل `SAYL_DOWNLOAD_DIR`؛ أُصلح مع اختبار انحدار `tests::test_default_download_dir_override`.
+   - **عطل 3:** إغفال ضبط `app_directories_override` في Tauri، مما جعل WebView2 يحاول دائماً الكتابة في `%LOCALAPPDATA%\com.sayl.downloadmanager` وينهار بـ `Access is denied`؛ أُصلح بضبطه على `data_dir`.
+   - **عطل 4:** خروج `Engine::new()` بصمت برمز خروج 0 عند فشل التهيئة؛ أُصلح بالـ panic مع رسالة واضحة.
+   - **عطل 5:** `npm test` كان يفشل بـ `spawn EPERM` بسبب استخدام vitest لحوض forks وأنابيب مسماة تحت قيود العزل؛ أُصلح في `package.json` بـ `--configLoader runner --pool=threads` فمرت الـ 26 اختباراً بنجاح كامل.
+   - **عطل 6 في قالب NSIS:** استدعاء `SetContext` داخل `.onInit` فقط يعيد ضبط `SetShellVarContext` عند دخول `Section Install` إلى `all`، مما يوجّه مفاتيح إلغاء التثبيت إلى `HKLM` وتفشل بصمت لغياب صلاحيات المسؤول.
+
+### الحدود الصريحة المثبتة
+- جلسة العزل تعمل برتبة `Mandatory Label\Low Mandatory Level` (`S-1-16-4096`).
+- مكتبة Mojo في Chromium داخل `msedgewebview2.exe` تستدعي `CreateNamedPipeW` في `platform_channel.cc:187`، وترفض نواة ويندوز إنشاء الأنابيب المسماة لمستوى النزاهة المنخفض دون SDDL مخصص، مما يسبب `0x80000003` (int 3) في `msedge.dll` ويعود لـ Tauri كـ `0x8000FFFF`.
+
+

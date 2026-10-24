@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param (
     [Parameter(Mandatory = $false)]
     [string]$Version,
@@ -12,6 +12,9 @@ param (
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+
+# Set by the bundle-location step when a needed installer is missing.
+$MissingBundles = $false
 
 # ------------------------------------------------------------------------------
 # 1. Resolve Repository Root & Version
@@ -174,23 +177,52 @@ if ($DryRun) {
         New-Item -ItemType Directory -Path $ReleasesDir -Force | Out-Null
     }
 
-    # Locate generated NSIS / MSI from Tauri bundle or installer output
-    $TauriBundleDir = Join-Path $DesktopDir "src-tauri\target\release\bundle"
-    $FoundExe = Get-ChildItem -Path (Join-Path $TauriBundleDir "nsis\*.exe") -ErrorAction SilentlyContinue | Select-Object -First 1
-    $FoundMsi = Get-ChildItem -Path (Join-Path $TauriBundleDir "msi\*.msi") -ErrorAction SilentlyContinue | Select-Object -First 1
+    # Locate generated NSIS / MSI from Tauri bundle or installer output.
+    # Get-ChildItem -Path with a wildcard treats [ and ] in a directory name as a
+    # character class, so a checkout path such as "C:\work\sayl[dev]" silently
+    # matches nothing; -LiteralPath is used for every directory here.
+    $TauriBundleDirs = @(
+        (Join-Path $RepoRoot "target\release\bundle"),
+        (Join-Path $DesktopDir "src-tauri\target\release\bundle")
+    )
+    $FoundExe = $null
+    $FoundMsi = $null
+    foreach ($dir in $TauriBundleDirs) {
+        $nsisDir = Join-Path $dir "nsis"
+        $msiDir = Join-Path $dir "msi"
+        if (-not $FoundExe -and (Test-Path -LiteralPath $nsisDir)) {
+            $FoundExe = Get-ChildItem -LiteralPath $nsisDir -Filter "*.exe" -File -ErrorAction SilentlyContinue |
+                Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        }
+        if (-not $FoundMsi -and (Test-Path -LiteralPath $msiDir)) {
+            $FoundMsi = Get-ChildItem -LiteralPath $msiDir -Filter "*.msi" -File -ErrorAction SilentlyContinue |
+                Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        }
+    }
+
+    Write-Host "Searched bundle directories: $($TauriBundleDirs -join '; ')"
 
     if ($FoundExe) {
         Copy-Item -LiteralPath $FoundExe.FullName -Destination $TargetExePath -Force
         Write-Host "Command: Copy-Item '$($FoundExe.FullName)' -> '$TargetExePath' | ExitCode: 0" -ForegroundColor DarkGray
     } else {
-        Write-Host "[تحذير / WARNING] لم يتم العثور على مثبت NSIS لنسخه إلى releases." -ForegroundColor Yellow
+        Write-Host "[خطأ / ERROR] لم يتم العثور على مثبت NSIS لنسخه إلى releases." -ForegroundColor Red
+        $MissingBundles = $true
     }
 
     if ($FoundMsi) {
         Copy-Item -LiteralPath $FoundMsi.FullName -Destination $TargetMsiPath -Force
         Write-Host "Command: Copy-Item '$($FoundMsi.FullName)' -> '$TargetMsiPath' | ExitCode: 0" -ForegroundColor DarkGray
     } else {
-        Write-Host "[تحذير / WARNING] لم يتم العثور على مثبت MSI لنسخه إلى releases." -ForegroundColor Yellow
+        Write-Host "[خطأ / ERROR] لم يتم العثور على مثبت MSI لنسخه إلى releases." -ForegroundColor Red
+        $MissingBundles = $true
+    }
+
+    if ($MissingBundles) {
+        # A pipeline that finishes without the installers must not report success.
+        Write-Host "[خطأ فادح / FATAL] اكتمل البناء دون مخرجات المثبتات؛ راجع مخرجات Tauri أعلاه." -ForegroundColor Red
+        Write-Host "Command: Locate-Bundles | ExitCode: 1" -ForegroundColor DarkGray
+        exit 1
     }
 }
 
@@ -228,6 +260,7 @@ if ($DryRun) {
 } else {
     $ArtefactsToHash = @($TargetExePath, $TargetMsiPath, $TargetZipPath)
     $Lines = [System.Collections.Generic.List[string]]::new()
+    $HashFailures = 0
 
     foreach ($file in $ArtefactsToHash) {
         if (Test-Path -LiteralPath $file) {
@@ -235,7 +268,10 @@ if ($DryRun) {
             $fileName = [System.IO.Path]::GetFileName($file)
             $Lines.Add("$hash  $fileName")
         } else {
-            Write-Host "[تحذير / WARNING] الملف غير موجود لحساب تجزئته: $file" -ForegroundColor Yellow
+            # Every artefact is required: a short SHA256SUMS.txt would silently
+            # publish an incomplete release.
+            Write-Host "[خطأ / ERROR] الملف غير موجود لحساب تجزئته: $file" -ForegroundColor Red
+            $HashFailures++
         }
     }
 
@@ -244,6 +280,12 @@ if ($DryRun) {
         [System.IO.File]::WriteAllText($Sha256SumsPath, $content, [System.Text.Encoding]::UTF8)
         Write-Host "Command: Write-SHA256SUMS -> $Sha256SumsPath | ExitCode: 0" -ForegroundColor DarkGray
         Write-Host "[نجاح / PASS] تم إنشاء ملف التجزئات بنجاح." -ForegroundColor Green
+    }
+
+    if ($HashFailures -gt 0) {
+        Write-Host "[خطأ فادح / FATAL] $HashFailures من مخرجات الإصدار مفقودة؛ SHA256SUMS.txt غير مكتمل." -ForegroundColor Red
+        Write-Host "Command: Generate-SHA256SUMS | ExitCode: 1" -ForegroundColor DarkGray
+        exit 1
     }
 }
 

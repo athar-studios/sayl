@@ -14,7 +14,7 @@
 ========================================================================
  SAYL Privacy & Network Audit Report
 ========================================================================
-Scan Root:            C:\Users\Dragonfly\Downloads\Download Manager
+Scan Root:            <repo>
 Files Scanned:        176
 Excluded Directories: .git, .idea, .svelte-kit, .vscode, __pycache__, artifacts, build, dist, gen, node_modules, reports, target
 ------------------------------------------------------------------------
