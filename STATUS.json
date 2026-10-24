@@ -2,9 +2,9 @@
   "schema_version": 1,
   "project": "sayl-downloader",
   "milestone": "M1",
-  "current_task": "M1 closed — CLI delivered, independent security review completed and remediated",
+  "current_task": "Engine scheduler wired — queue, per-origin and concurrency limits now govern real downloads; benchmark harness and privacy audit delivered",
   "state": "in_progress",
-  "last_verified_commit": "ff5409e",
+  "last_verified_commit": "cd98a1a",
   "toolchain": {
     "test_command": "cargo +stable-x86_64-pc-windows-gnu test -p <crate>",
     "required_env": {
@@ -17,6 +17,31 @@
     "reference": "docs/TOOLCHAIN.md"
   },
   "checks": [
+    {
+      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-http",
+      "exit_code": 0,
+      "result": "132 tests (98 lib + 22 client + 12 integration), 0 failed, after HTTP-006 client/header/budget work"
+    },
+    {
+      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-app",
+      "exit_code": 0,
+      "result": "40 tests (14 lib + 13 integration + 13 lease), 0 failed, including 4 scheduler-wiring tests; required relinking after Smart App Control blocked the fresh binaries"
+    },
+    {
+      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-cli",
+      "exit_code": 0,
+      "result": "12 tests pass after the engine scheduler wiring"
+    },
+    {
+      "command": "cargo +stable-x86_64-pc-windows-gnu run --release -p sayl-bench -- --size 33554432",
+      "exit_code": 0,
+      "result": "real measured table: sequential 687 MB/s, 4 conns 1734 MB/s (2.52x), 8 conns 1862 MB/s (2.71x), range ratio 1.0000, peak RSS ~42.6 MiB, loopback fixture only"
+    },
+    {
+      "command": "python tools/privacy_audit.py",
+      "exit_code": 0,
+      "result": "4/4 categories PASS: no telemetry identifiers, no violating absolute paths, no secrets, no unauthorised outbound URLs"
+    },
     {
       "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-core",
       "exit_code": 0,
@@ -99,6 +124,6 @@
     "Model identity attestation for status=passed reports is env-var based (SAYL_PRIMARY_*), not cryptographic, per docs/REPORT-CONTRACT.md:9.",
     "LICENSE choice is still the project owner's decision; README records `License: to be decided by the project owner` and no LICENSE file exists yet."
   ],
-  "next_task": "Security review and remediation are DONE (7c7b8ae review, ff5409e fixes). Remaining phases from MASTER-PLAN: SCHED-001 scheduler/lease hardening, PERF-001 benchmark harness vs aria2, REC-001/002 recovery drills, MEDIA-001..003, PLUG-001..003, WEB-001..005 browser bridge, CATALOG-001, PRIV-001, AND-001..002, and REL-002..004 installer builds which require one elevated Windows SDK install from the owner.",
+  "next_task": "Queue scheduler is now wired into the engine. Remaining: REC-002 parallel crash/finalize recovery drills, MEDIA-001..003, PLUG-001..003, WEB-001..005 browser bridge, CATALOG-001, AND-001..002, and REL-002..004 installer builds which still need one elevated Windows SDK install from the owner.",
   "notes": "Round 11. Added a real CLI (12 tests, smoke-tested) and ran the final security gate the owner asked for. SEC-STRIX-001 was an independent read-only review by a separate model: docs/SECURITY-REVIEW.md carries 11 findings with path:line evidence. The four I re-verified myself and the two most severe: (S1, Critical) tauri.conf.json had \"csp\": null so the webview ran with no Content-Security-Policy; (S2, High) RedirectTracker::step enforced scheme/hop/loop/credential-stripping but had no private-target guard, so a public server could pivot the app onto a LAN or loopback service; (S3) neutralize_reserved_device_names only compared text before the first dot, so `CON .txt` slipped through; (S4) is_disallowed_char filtered C0/DEL but not bidi overrides or zero-width characters; (S5) engine.rs:213 called .lock().unwrap() where the six other sites handle poisoning. SEC-FIX-001 remediated all of them plus download-dir validation, store-path re-sanitization, noreferrer links, and a vitest 5 upgrade: sayl-http 65->68 tests, sayl-app 9->11, npm audit 3 advisories -> 0. Residual risks are documented in the review's accepted-risks section: the CSP is set but cannot be proven enforced without a WebView2 runtime, DNS-rebinding pivots after the redirect check are uncovered, and store files inherit the default DACL. Earlier rounds: toolchain solved with GNU+rust-lld (MSVC lacks the Windows SDK), state-machine self-transition fix, fixture server, HTTP-001/002, STORE-001, APP-001, SITE-001, UI-001, DOCS-001, REL-001. 150 crate tests plus 21 frontend tests are green; totals now core 33, test-http 25, http 68, storage 18, app 11, cli 12, desktop 3 (unrunnable locally), frontend 21."
 }

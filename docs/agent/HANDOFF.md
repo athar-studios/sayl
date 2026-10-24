@@ -159,3 +159,26 @@ python tools/workflow.py check-report reports/<task>/<role>.json
 - Smart App Control يحجب بعض الثنائيات الجديدة (حل: حذف الثنائي لإعادة الربط).
 - لم يُوثَّق ترخيص المشروع بعد: قرار المالك.
 - لم تبدأ بعد: SCHED/PERF/REC/MEDIA/TORRENT/PLUGIN/CATALOG/PRIV/AND و`SEC-STRIX-001` (الأخير في النهاية كما طُلب).
+
+## 10. الجولة 12 — الجدولة والأداء والخصوصية
+
+**commits:** 8674255 (SCHED-001 leases) · ed378ce (HTTP-006 client/headers/budget) · 80e415 (PERF-001 bench) ·  5b89e9 (queue scheduler core) · 8e84e3c (PRIV-001) · cd98a1a (HTTP-007 wiring)
+
+### ما أُنجز
+- **SCHED-001**: crates/app/src/lease.rs — تقسيم ديناميكي بعقود إيجار، سرقة الإيجار المنتهي، رفض إكمال المالك القديم، و`assert_full_coverage`. 13 اختباراً.
+- **HTTP-006**: `client.rs`/`headers.rs`/`budget.rs` — حجب بيانات اعتماد الـproxy في كل رسالة خطأ، منع حقن CRLF في الترويسات، رفض `Host`/`Content-Length`/`Transfer-Encoding`/`Proxy-Authorization`/`If-Range` من المستخدم، وحد اتصالات لكل أصل. sayl-http: 68 إلى 132 اختباراً.
+- **HTTP-007**: `crates/app/src/queue.rs` (Scheduler + TokenBucket + ميزانية إعادة المحاولة) وربطها بـ`Engine`. 4 اختبارات ربط.
+- **PERF-001**: حزمة `crates/bench` بأرقام مقيسة فعلاً و`docs/PERF.md` شفاف يصرّح بغياب المقارنة مع aria2.
+- **PRIV-001**: `docs/PRIVACY.md` + `tools/privacy_audit.py` (4/4 PASS) + `docs/PRIVACY-AUDIT.md` + تحديث نص الخصوصية في الموقع.
+
+### أخطاء حقيقية اكتُشفت وأُصلحت
+1. `run_download` كان يعيد `Ok(())` حتى عند فشل التنزيل — كشفه اختبار جذع الملف.
+2. `cancel()` كان يزيل خريطة الـscheduler قبل إلغائه، فلا يُلغى المهمة المنتظرة فعلياً في الـscheduler.
+3. اختبار الإلغاء كان يعُدّ طلب `probe` الذي يجريه `Engine::add` ويعدّه تنزيلاً — صُحّح بأخذ خط أساس بعد `add`.
+
+### فشل الأدوات المتكرر
+ثلاث محاولات إيفاد لوحدة `queue.rs` أعادت صفر ملفات (استنفاد budget). كُتبت الوحدة يدوياً وأُعلن ذلك في التقرير.
+
+### عقبات بيئية ما زالت قائمة
+- Smart App Control يحجب أحياناً binaries حديثة الربط (`os error 4551`)؛ الحل المؤقت حذف `target\\debug\\deps\\sayl_app-*.exe` وإعادة الربط. هذا يجعل CI على runner عادي هو الإثبات الدائم.
+- Windows SDK غائب: لا تطبيق فعلي ولا EXE/MSI/NSIS.
