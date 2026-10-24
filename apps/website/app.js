@@ -198,6 +198,7 @@
     function toggleLanguage() {
         const nextLang = currentLang === 'ar' ? 'en' : 'ar';
         applyLanguage(nextLang);
+        saveLang(nextLang);
     }
 
     // ==========================================================================
@@ -334,8 +335,40 @@
     // ==========================================================================
     // Initialization
     // ==========================================================================
+    function saveLang(lang) {
+        try { localStorage.setItem('sayl-lang', lang); } catch (e) {}
+    }
+
+    function showLangChooser() {
+        const ov = document.createElement('div');
+        ov.className = 'lang-chooser';
+        ov.setAttribute('role', 'dialog');
+        ov.setAttribute('aria-modal', 'true');
+        ov.setAttribute('aria-label', 'اختر اللغة / Choose language');
+        ov.innerHTML = '<div class="lang-chooser-card">' +
+            '<img src="favicon.svg" alt="" width="64" height="44" aria-hidden="true">' +
+            '<p class="lang-chooser-title">اختر اللغة · Choose your language</p>' +
+            '<div class="lang-chooser-actions">' +
+            '<button type="button" class="btn btn-primary" data-pick="ar" lang="ar">العربية</button>' +
+            '<button type="button" class="btn btn-secondary" data-pick="en" lang="en">English</button>' +
+            '</div></div>';
+        ov.addEventListener('click', e => {
+            const b = e.target.closest('[data-pick]');
+            if (!b) return;
+            applyLanguage(b.dataset.pick);
+            saveLang(b.dataset.pick);
+            ov.remove();
+        });
+        document.body.appendChild(ov);
+        const first = ov.querySelector('button');
+        if (first) first.focus();
+    }
+
     function init() {
-        applyLanguage('ar');
+        let saved = null;
+        try { saved = localStorage.getItem('sayl-lang'); } catch (e) {}
+        applyLanguage(saved === 'en' ? 'en' : 'ar');
+        if (saved !== 'ar' && saved !== 'en') showLangChooser();
 
         const langToggle = $('#lang-toggle');
         if (langToggle) {
