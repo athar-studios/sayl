@@ -8,8 +8,8 @@ fn test_complete_download_lifecycle() {
     let (event_sender, mut event_receiver) = event_channel(32);
 
     let mut state = DownloadState::Queued;
-    assert_eq!(state.is_terminal(), false);
-    assert_eq!(state.is_active(), false);
+    assert!(!state.is_terminal());
+    assert!(!state.is_active());
 
     // Queued -> Probing
     state = transition(state, DownloadState::Probing).expect("Queued -> Probing");

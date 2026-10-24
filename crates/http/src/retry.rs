@@ -62,10 +62,7 @@ impl RetryPolicy {
             .base_delay
             .as_millis()
             .saturating_mul(1u128 << attempt.min(32));
-        // clippy::unnecessary_cast is a false positive across toolchains: on
-        // newer `Duration` it is a no-op, on older ones it converts u64 to u128.
-        #[allow(clippy::unnecessary_cast)]
-        let capped = Duration::from_millis(exp.min(self.max_delay.as_millis() as u128) as u64);
+        let capped = Duration::from_millis(exp.min(self.max_delay.as_millis()) as u64);
         if !self.jitter {
             return capped;
         }

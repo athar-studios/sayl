@@ -83,11 +83,7 @@ pub fn validate_download_dir(dir: &str) -> Result<(), String> {
     }
 
     // Reject empty path components (e.g. repeated separators "//" or "\\")
-    let check_str = if trimmed.starts_with(r"\\") {
-        &trimmed[2..]
-    } else {
-        trimmed
-    };
+    let check_str = trimmed.strip_prefix(r"\\").unwrap_or(trimmed);
     if check_str.contains("//")
         || check_str.contains(r"\\")
         || check_str.contains(r"/\")
@@ -526,11 +522,11 @@ pub fn run() {
                                 };
                                 let _ = app_handle.emit("sayl://progress", &progress);
                             }
-                            sayl_core::event::EventPayload::StateChanged { to, .. } => {
-                                if to.is_terminal() || *to == DownloadState::Paused {
-                                    if let Ok(mut stats) = live_stats.lock() {
-                                        stats.remove(&task_id);
-                                    }
+                            sayl_core::event::EventPayload::StateChanged { to, .. }
+                                if to.is_terminal() || *to == DownloadState::Paused =>
+                            {
+                                if let Ok(mut stats) = live_stats.lock() {
+                                    stats.remove(&task_id);
                                 }
                             }
                             _ => {}

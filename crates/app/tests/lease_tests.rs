@@ -30,14 +30,13 @@ use tokio_util::sync::CancellationToken;
 
 #[test]
 fn test_chunk_math_divisible() {
-    let table = LeaseTable::new(1000, 250);
+    let mut table = LeaseTable::new(1000, 250);
     assert_eq!(table.total_chunks(), 4);
     assert_eq!(table.total_size(), 1000);
     assert_eq!(table.chunk_size(), 250);
 
     let now = Instant::now();
     let ttl = Duration::from_secs(10);
-    let mut table = table;
 
     let c0 = table.claim_next(0, now, ttl).unwrap();
     assert_eq!(c0.start, 0);
@@ -64,12 +63,11 @@ fn test_chunk_math_divisible() {
 
 #[test]
 fn test_chunk_math_not_divisible_and_final_partial_chunk() {
-    let table = LeaseTable::new(1000, 300);
+    let mut table = LeaseTable::new(1000, 300);
     assert_eq!(table.total_chunks(), 4);
 
     let now = Instant::now();
     let ttl = Duration::from_secs(10);
-    let mut table = table;
 
     let c0 = table.claim_next(0, now, ttl).unwrap();
     assert_eq!(c0.start, 0);
@@ -363,12 +361,7 @@ async fn test_slow_worker_triggers_steal_and_file_is_correct() {
     let range0_attempts_clone = Arc::clone(&range0_attempts);
 
     let server_task = tokio::spawn(async move {
-        loop {
-            let (mut socket, _) = match listener.accept().await {
-                Ok(s) => s,
-                Err(_) => break,
-            };
-
+        while let Ok((mut socket, _)) = listener.accept().await {
             let expected_data = expected_data_clone.clone();
             let range0_attempts = Arc::clone(&range0_attempts_clone);
 
@@ -477,12 +470,7 @@ async fn test_worker_failing_mid_chunk_retried_by_another_worker_and_completes()
     let range1_attempts_clone = Arc::clone(&range1_attempts);
 
     let server_task = tokio::spawn(async move {
-        loop {
-            let (mut socket, _) = match listener.accept().await {
-                Ok(s) => s,
-                Err(_) => break,
-            };
-
+        while let Ok((mut socket, _)) = listener.accept().await {
             let expected_data = expected_data_clone.clone();
             let range1_attempts = Arc::clone(&range1_attempts_clone);
 
