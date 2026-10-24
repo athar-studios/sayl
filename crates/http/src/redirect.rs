@@ -9,6 +9,7 @@
 
 use reqwest::header::{HeaderMap, HeaderName, AUTHORIZATION, COOKIE, PROXY_AUTHORIZATION};
 use std::collections::HashSet;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use url::Url;
 
 use crate::error::HttpError;
@@ -23,6 +24,8 @@ pub struct RedirectPolicy {
     max_hops: usize,
     /// Whether cross-origin credential and cookie stripping is enabled (default `true`).
     strip_sensitive_headers_cross_origin: bool,
+    /// Whether redirects from a public host to private or loopback targets are blocked (default `true`).
+    pub block_private_redirect_targets: bool,
 }
 
 impl Default for RedirectPolicy {
@@ -30,6 +33,7 @@ impl Default for RedirectPolicy {
         Self {
             max_hops: DEFAULT_MAX_REDIRECT_HOPS,
             strip_sensitive_headers_cross_origin: true,
+            block_private_redirect_targets: true,
         }
     }
 }
@@ -40,7 +44,14 @@ impl RedirectPolicy {
         Self {
             max_hops,
             strip_sensitive_headers_cross_origin: true,
+            block_private_redirect_targets: true,
         }
+    }
+
+    /// Sets whether redirects to private/loopback targets are blocked when originating from public hosts.
+    pub fn with_block_private_redirect_targets(mut self, block: bool) -> Self {
+        self.block_private_redirect_targets = block;
+        self
     }
 
     /// Returns the maximum allowed hops.
@@ -158,6 +169,17 @@ impl RedirectTracker {
 
         RedirectPolicy::validate_scheme(&next_url)?;
 
+        if self.policy.block_private_redirect_targets
+            && !is_private_or_loopback_host(&self.current_url)
+            && is_private_or_loopback_host(&next_url)
+        {
+            return Err(HttpError::redirect(format!(
+                "redirect from public host '{}' to private or loopback target '{}' is blocked",
+                self.current_url.host_str().unwrap_or("<unknown>"),
+                next_url
+            )));
+        }
+
         let url_key = canonical_url_key(&next_url);
         if self.visited_set.contains(&url_key) {
             return Err(HttpError::redirect(format!(
@@ -186,6 +208,88 @@ fn canonical_url_key(url: &Url) -> String {
     // Fragment identifiers are not sent to servers and do not affect loop semantics
     key.set_fragment(None);
     key.to_string()
+}
+
+/// Checks whether a host IP or domain resolves to a private, loopback, or link-local address.
+///
+/// Covers:
+/// - `localhost`, `*.localhost`, `*.local`
+/// - IPv4 loopback (`127.0.0.0/8`)
+/// - IPv4 private (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`)
+/// - IPv4 link-local (`169.254.0.0/16`)
+/// - IPv4 unspecified (`0.0.0.0`)
+/// - IPv6 loopback (`::1`)
+/// - IPv6 link-local (`fe80::/10`)
+/// - IPv6 unique local (`fc00::/7`)
+/// - IPv6 unspecified (`::`)
+/// - IPv4-mapped / IPv4-compatible IPv6 addresses representing any of the above.
+pub fn is_private_or_loopback_host(url: &Url) -> bool {
+    let host = match url.host() {
+        Some(h) => h,
+        None => return false,
+    };
+
+    match host {
+        url::Host::Domain(domain) => {
+            let lower = domain.to_ascii_lowercase();
+            if lower == "localhost"
+                || lower.ends_with(".localhost")
+                || lower == "local"
+                || lower.ends_with(".local")
+            {
+                return true;
+            }
+            if let Ok(ip) = lower.parse::<IpAddr>() {
+                is_private_or_loopback_ip(&ip)
+            } else {
+                false
+            }
+        }
+        url::Host::Ipv4(v4) => is_private_or_loopback_ipv4(&v4),
+        url::Host::Ipv6(v6) => is_private_or_loopback_ipv6(&v6),
+    }
+}
+
+fn is_private_or_loopback_ipv4(ip: &Ipv4Addr) -> bool {
+    let octets = ip.octets();
+    ip.is_loopback()
+        || ip.is_private()
+        || ip.is_link_local()
+        || ip.is_unspecified()
+        || octets[0] == 0
+}
+
+fn is_private_or_loopback_ipv6(ip: &Ipv6Addr) -> bool {
+    if ip.is_loopback() || ip.is_unspecified() {
+        return true;
+    }
+    if let Some(ipv4) = ip.to_ipv4_mapped() {
+        if is_private_or_loopback_ipv4(&ipv4) {
+            return true;
+        }
+    }
+    if let Some(ipv4) = ip.to_ipv4() {
+        if is_private_or_loopback_ipv4(&ipv4) {
+            return true;
+        }
+    }
+    let seg0 = ip.segments()[0];
+    // fe80::/10 (Link-local unicast: 1111 1110 10xx xxxx)
+    if (seg0 & 0xffc0) == 0xfe80 {
+        return true;
+    }
+    // fc00::/7 (Unique local address: 1111 110x xxxx xxxx)
+    if (seg0 & 0xfe00) == 0xfc00 {
+        return true;
+    }
+    false
+}
+
+fn is_private_or_loopback_ip(ip: &IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => is_private_or_loopback_ipv4(v4),
+        IpAddr::V6(v6) => is_private_or_loopback_ipv6(v6),
+    }
 }
 
 #[cfg(test)]
@@ -281,5 +385,111 @@ mod tests {
         // Loop back to start
         let err = tracker.step("https://a.com/start", &mut headers).unwrap_err();
         assert!(err.to_string().contains("redirect loop detected"));
+    }
+
+    #[test]
+    fn test_is_private_or_loopback_host_all_ranges() {
+        // Domains: localhost, *.localhost, *.local
+        assert!(is_private_or_loopback_host(&Url::parse("http://localhost").unwrap()));
+        assert!(is_private_or_loopback_host(&Url::parse("http://LOCALHOST").unwrap()));
+        assert!(is_private_or_loopback_host(&Url::parse("http://foo.localhost").unwrap()));
+        assert!(is_private_or_loopback_host(&Url::parse("http://sub.deep.localhost").unwrap()));
+        assert!(is_private_or_loopback_host(&Url::parse("http://printer.local").unwrap()));
+        assert!(is_private_or_loopback_host(&Url::parse("http://local").unwrap()));
+
+        // IPv4 loopback: 127.0.0.0/8
+        assert!(is_private_or_loopback_host(&Url::parse("http://127.0.0.1").unwrap()));
+        assert!(is_private_or_loopback_host(&Url::parse("http://127.255.255.254").unwrap()));
+
+        // IPv4 private 10.0.0.0/8
+        assert!(is_private_or_loopback_host(&Url::parse("http://10.0.0.1").unwrap()));
+        assert!(is_private_or_loopback_host(&Url::parse("http://10.254.1.99").unwrap()));
+
+        // IPv4 private 172.16.0.0/12
+        assert!(is_private_or_loopback_host(&Url::parse("http://172.16.0.1").unwrap()));
+        assert!(is_private_or_loopback_host(&Url::parse("http://172.31.255.255").unwrap()));
+        assert!(!is_private_or_loopback_host(&Url::parse("http://172.15.255.255").unwrap()));
+        assert!(!is_private_or_loopback_host(&Url::parse("http://172.32.0.1").unwrap()));
+
+        // IPv4 private 192.168.0.0/16
+        assert!(is_private_or_loopback_host(&Url::parse("http://192.168.0.1").unwrap()));
+        assert!(is_private_or_loopback_host(&Url::parse("http://192.168.100.200").unwrap()));
+
+        // IPv4 link-local 169.254.0.0/16
+        assert!(is_private_or_loopback_host(&Url::parse("http://169.254.169.254").unwrap()));
+        assert!(is_private_or_loopback_host(&Url::parse("http://169.254.1.1").unwrap()));
+
+        // IPv4 unspecified 0.0.0.0
+        assert!(is_private_or_loopback_host(&Url::parse("http://0.0.0.0").unwrap()));
+        assert!(is_private_or_loopback_host(&Url::parse("http://0.1.2.3").unwrap()));
+
+        // IPv6 loopback ::1
+        assert!(is_private_or_loopback_host(&Url::parse("http://[::1]").unwrap()));
+
+        // IPv6 link-local fe80::/10
+        assert!(is_private_or_loopback_host(&Url::parse("http://[fe80::1]").unwrap()));
+        assert!(is_private_or_loopback_host(&Url::parse("http://[febf::ffff]").unwrap()));
+
+        // IPv6 unique local fc00::/7
+        assert!(is_private_or_loopback_host(&Url::parse("http://[fc00::1]").unwrap()));
+        assert!(is_private_or_loopback_host(&Url::parse("http://[fd12:3456:789a::1]").unwrap()));
+
+        // IPv4-mapped IPv6 forms
+        assert!(is_private_or_loopback_host(&Url::parse("http://[::ffff:127.0.0.1]").unwrap()));
+        assert!(is_private_or_loopback_host(&Url::parse("http://[::ffff:192.168.1.1]").unwrap()));
+        assert!(is_private_or_loopback_host(&Url::parse("http://[::ffff:10.0.0.1]").unwrap()));
+        assert!(is_private_or_loopback_host(&Url::parse("http://[::ffff:172.16.0.1]").unwrap()));
+        assert!(is_private_or_loopback_host(&Url::parse("http://[::ffff:169.254.169.254]").unwrap()));
+        assert!(is_private_or_loopback_host(&Url::parse("http://[::ffff:0.0.0.0]").unwrap()));
+
+        // Public hosts must NOT be private/loopback
+        assert!(!is_private_or_loopback_host(&Url::parse("https://example.com").unwrap()));
+        assert!(!is_private_or_loopback_host(&Url::parse("http://93.184.216.34").unwrap()));
+        assert!(!is_private_or_loopback_host(&Url::parse("http://8.8.8.8").unwrap()));
+        assert!(!is_private_or_loopback_host(&Url::parse("http://[2606:4700:4700::1111]").unwrap()));
+    }
+
+    #[test]
+    fn test_redirect_policy_private_target_blocking() {
+        let mut headers = HeaderMap::new();
+
+        // 1. Public server redirecting to 127.0.0.1 is blocked by default
+        let mut tracker =
+            RedirectTracker::new(Url::parse("https://public-cdn.com/download").unwrap()).unwrap();
+        let err = tracker.step("http://127.0.0.1:8080/internal/secret", &mut headers).unwrap_err();
+        assert!(err.to_string().contains("blocked"));
+        assert!(err.to_string().contains("private or loopback target"));
+
+        // 2. Public server redirecting to 169.254.169.254 (cloud metadata) is blocked
+        let mut tracker =
+            RedirectTracker::new(Url::parse("https://public-cdn.com/download").unwrap()).unwrap();
+        let err = tracker.step("http://169.254.169.254/latest/meta-data", &mut headers).unwrap_err();
+        assert!(err.to_string().contains("blocked"));
+
+        // 3. Public server redirecting to localhost is blocked
+        let mut tracker =
+            RedirectTracker::new(Url::parse("https://public-cdn.com/download").unwrap()).unwrap();
+        let err = tracker.step("http://localhost:3000/api", &mut headers).unwrap_err();
+        assert!(err.to_string().contains("blocked"));
+
+        // 4. Public to public redirect is permitted
+        let mut tracker =
+            RedirectTracker::new(Url::parse("https://public-cdn.com/start").unwrap()).unwrap();
+        assert!(tracker.step("https://cdn2.public-cdn.com/file.zip", &mut headers).is_ok());
+
+        // 5. Private server redirecting to private server is permitted (e.g. test fixture or LAN)
+        let mut local_tracker =
+            RedirectTracker::new(Url::parse("http://127.0.0.1:8080/first").unwrap()).unwrap();
+        assert!(local_tracker.step("http://127.0.0.1:8080/second", &mut headers).is_ok());
+
+        let mut lan_tracker =
+            RedirectTracker::new(Url::parse("http://192.168.1.50/first").unwrap()).unwrap();
+        assert!(lan_tracker.step("http://192.168.1.51/second", &mut headers).is_ok());
+
+        // 6. Explicitly disabling block_private_redirect_targets allows public to private redirect
+        let policy = RedirectPolicy::new(5).with_block_private_redirect_targets(false);
+        let mut permissive_tracker =
+            RedirectTracker::with_policy(policy, Url::parse("https://public-cdn.com/download").unwrap()).unwrap();
+        assert!(permissive_tracker.step("http://127.0.0.1:8080/file", &mut headers).is_ok());
     }
 }

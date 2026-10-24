@@ -210,7 +210,11 @@ impl Engine {
         let cancel_token = CancellationToken::new();
         let pause_token = CancellationToken::new();
         {
-            let mut active = self.inner.active_tasks.lock().unwrap();
+            let mut active = self
+                .inner
+                .active_tasks
+                .lock()
+                .map_err(|_| CoreError::scheduler("active_tasks mutex poisoned"))?;
             if active.contains_key(&task_id) {
                 return Err(CoreError::scheduler("task is already running"));
             }
@@ -310,10 +314,13 @@ impl Engine {
         self.inner.store.upsert_task(&record)?;
 
         // 6. Resume check
-        let part_path = self
-            .inner
-            .download_dir
-            .join(format!("{}.part", record.filename));
+        let safe_filename = sayl_http::filename::sanitize_filename(&record.filename);
+        if record.filename != safe_filename {
+            record.filename = safe_filename.clone();
+            let _ = self.inner.store.upsert_task(&record);
+        }
+        let part_filename = format!("{safe_filename}.part");
+        let part_path = self.resolve_destination_path(&part_filename)?;
         let disk_len = if part_path.exists() {
             tokio::fs::metadata(&part_path)
                 .await
@@ -525,7 +532,7 @@ impl Engine {
         self.transition_and_persist(&mut record, DownloadState::Finalizing)
             .await?;
 
-        let final_path = self.inner.download_dir.join(&record.filename);
+        let final_path = self.resolve_destination_path(&record.filename)?;
         if final_path.exists() {
             let _ = tokio::fs::remove_file(&final_path).await;
         }
@@ -825,5 +832,104 @@ impl Engine {
             )
             .await;
         Ok(())
+    }
+
+    /// Resolves a safe destination path within `download_dir` from an untrusted filename,
+    /// re-sanitizing it and asserting `download_dir` is its ancestor.
+    pub fn resolve_destination_path(&self, raw_filename: &str) -> Result<PathBuf, CoreError> {
+        let safe_filename = sayl_http::filename::sanitize_filename(raw_filename);
+        let target_path = self.inner.download_dir.join(&safe_filename);
+        if !target_path.starts_with(&self.inner.download_dir) {
+            return Err(CoreError::scheduler(format!(
+                "destination path traversal detected: '{raw_filename}' escapes download directory"
+            )));
+        }
+        Ok(target_path)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn poison_active_tasks_for_test(&self) {
+        let lock = std::sync::Arc::clone(&self.inner.active_tasks);
+        let _ = std::thread::spawn(move || {
+            let _guard = lock.lock().unwrap();
+            panic!("deliberately poisoning active_tasks mutex for test");
+        })
+        .join();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_test_temp_dir() -> tempfile::TempDir {
+        if let Ok(cargo_tmp) = std::env::var("CARGO_TARGET_TMPDIR") {
+            let _ = std::fs::create_dir_all(&cargo_tmp);
+            if let Ok(dir) = tempfile::tempdir_in(&cargo_tmp) {
+                return dir;
+            }
+        }
+        let target_tmp = std::path::Path::new("target").join("test-tmp");
+        let _ = std::fs::create_dir_all(&target_tmp);
+        if let Ok(dir) = tempfile::tempdir_in(&target_tmp) {
+            return dir;
+        }
+        tempfile::tempdir().expect("create temp dir")
+    }
+
+    #[tokio::test]
+    async fn test_poisoned_mutex_handled_gracefully() {
+        let temp_dir = make_test_temp_dir();
+        let engine =
+            Engine::open_in_memory(temp_dir.path(), EngineConfig::default()).expect("open engine");
+
+        let task_id = TaskId::new();
+        let record = TaskRecord::with_id(
+            task_id,
+            "http://example.com/test.zip",
+            engine.download_dir(),
+            "test.zip",
+        );
+        engine.inner.store.upsert_task(&record).expect("upsert task");
+
+        // Deliberately poison active_tasks mutex from a background thread
+        engine.poison_active_tasks_for_test();
+
+        // Starting the task must return a CoreError rather than panicking
+        let result = engine.start(task_id).await;
+        assert!(result.is_err(), "expected error on poisoned mutex, got Ok");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("poisoned"),
+            "expected error message to mention poisoning, got: {err_msg}"
+        );
+    }
+
+    #[test]
+    fn test_resolve_destination_path_resanitizes_and_prevents_traversal() {
+        let temp_dir = make_test_temp_dir();
+        let engine =
+            Engine::open_in_memory(temp_dir.path(), EngineConfig::default()).expect("open engine");
+
+        // 1. Path traversal attempt: ..\..\evil.exe
+        let path_traversal = engine
+            .resolve_destination_path("..\\..\\evil.exe")
+            .expect("resolves safely");
+        assert!(path_traversal.starts_with(engine.download_dir()));
+        assert_eq!(path_traversal, temp_dir.path().join("evil.exe"));
+
+        // Also test unix style traversal
+        let unix_traversal = engine
+            .resolve_destination_path("../../evil.exe")
+            .expect("resolves safely");
+        assert!(unix_traversal.starts_with(engine.download_dir()));
+        assert_eq!(unix_traversal, temp_dir.path().join("evil.exe"));
+
+        // 2. Absolute path attempt
+        let abs_path = engine
+            .resolve_destination_path("C:\\Windows\\System32\\calc.exe")
+            .expect("resolves safely");
+        assert!(abs_path.starts_with(engine.download_dir()));
+        assert_eq!(abs_path, temp_dir.path().join("calc.exe"));
     }
 }

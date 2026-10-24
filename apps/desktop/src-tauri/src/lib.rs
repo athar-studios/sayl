@@ -43,11 +43,65 @@ impl Default for Settings {
     }
 }
 
-/// Validates settings bounds and allowed enum values.
-pub fn validate_settings(settings: &Settings) -> Result<(), String> {
-    if settings.download_dir.trim().is_empty() {
+/// Validates a download directory path:
+/// - Must not be empty
+/// - Must be an absolute path
+/// - Must not be a bare drive root
+/// - Must not contain `..` or `.` components
+/// - Must not contain empty path components (e.g. repeated slashes)
+pub fn validate_download_dir(dir: &str) -> Result<(), String> {
+    let trimmed = dir.trim();
+    if trimmed.is_empty() {
         return Err("Download directory cannot be empty".to_string());
     }
+
+    let path = std::path::Path::new(trimmed);
+    if !path.is_absolute() {
+        return Err("Download directory must be an absolute path".to_string());
+    }
+
+    // Bare drive root check: must have at least one normal path component
+    let normal_components_count = path
+        .components()
+        .filter(|c| matches!(c, std::path::Component::Normal(_)))
+        .count();
+    if normal_components_count == 0 {
+        return Err("Download directory cannot be a bare drive root".to_string());
+    }
+
+    // Reject '..' and '.' components
+    for component in path.components() {
+        match component {
+            std::path::Component::ParentDir => {
+                return Err("Download directory cannot contain '..' components".to_string());
+            }
+            std::path::Component::CurDir => {
+                return Err("Download directory cannot contain '.' components".to_string());
+            }
+            _ => {}
+        }
+    }
+
+    // Reject empty path components (e.g. repeated separators "//" or "\\")
+    let check_str = if trimmed.starts_with(r"\\") {
+        &trimmed[2..]
+    } else {
+        trimmed
+    };
+    if check_str.contains("//")
+        || check_str.contains(r"\\")
+        || check_str.contains(r"/\" )
+        || check_str.contains(r"\/")
+    {
+        return Err("Download directory cannot contain empty path components".to_string());
+    }
+
+    Ok(())
+}
+
+/// Validates settings bounds and allowed enum values.
+pub fn validate_settings(settings: &Settings) -> Result<(), String> {
+    validate_download_dir(&settings.download_dir)?;
     if settings.max_concurrent_tasks == 0 || settings.max_concurrent_tasks > 32 {
         return Err("Concurrent tasks must be between 1 and 32".to_string());
     }
@@ -542,6 +596,36 @@ mod tests {
             ..Settings::default()
         };
         assert!(validate_settings(&invalid_lang).is_err());
+    }
+
+    #[test]
+    fn test_download_dir_validation_strict() {
+        // Valid paths: absolute directories with at least one normal component
+        assert!(validate_download_dir("C:\\Users\\User\\Downloads").is_ok());
+        assert!(validate_download_dir("C:\\Downloads").is_ok());
+        assert!(validate_download_dir("D:\\Media\\Files").is_ok());
+
+        // Relative paths rejected
+        assert!(validate_download_dir("downloads").is_err());
+        assert!(validate_download_dir(".\\downloads").is_err());
+        assert!(validate_download_dir("relative/path").is_err());
+        assert!(validate_download_dir("").is_err());
+        assert!(validate_download_dir("   ").is_err());
+
+        // ParentDir '..' components rejected
+        assert!(validate_download_dir("C:\\Downloads\\..\\evil").is_err());
+        assert!(validate_download_dir("C:\\..\\Windows").is_err());
+        assert!(validate_download_dir("C:/Downloads/../evil").is_err());
+
+        // Bare drive root rejected
+        assert!(validate_download_dir("C:\\").is_err());
+        assert!(validate_download_dir("C:/").is_err());
+        assert!(validate_download_dir("D:\\").is_err());
+        assert!(validate_download_dir("C:").is_err());
+
+        // Empty components (repeated separators) rejected
+        assert!(validate_download_dir("C:\\Downloads\\\\sub").is_err());
+        assert!(validate_download_dir("C:/Downloads//sub").is_err());
     }
 
     #[test]

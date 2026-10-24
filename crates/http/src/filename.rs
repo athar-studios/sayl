@@ -25,11 +25,25 @@ const WINDOWS_RESERVED_NAMES: &[&str] = &[
     "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
 ];
 
-/// Characters disallowed in Windows filenames: `< > : " / \ | ? *` and ASCII control chars (0x00..=0x1F, 0x7F).
+/// Characters disallowed in Windows filenames:
+/// - Windows reserved characters: `< > : " / \ | ? *`
+/// - ASCII control characters: `0x00..=0x1F`, `0x7F`
+/// - BiDi control characters: U+202A–U+202E, U+2066–U+2069, U+200E, U+200F, U+061C
+/// - Zero-width formatters: U+200B–U+200D, U+FEFF
 fn is_disallowed_char(c: char) -> bool {
     matches!(c, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*')
         || (c as u32) <= 0x1F
         || (c as u32) == 0x7F
+        || matches!(
+            c,
+            '\u{202A}'..='\u{202E}'
+                | '\u{2066}'..='\u{2069}'
+                | '\u{200E}'
+                | '\u{200F}'
+                | '\u{200B}'..='\u{200D}'
+                | '\u{FEFF}'
+                | '\u{061C}'
+        )
 }
 
 /// Derives a safe, sanitized filename from `Content-Disposition`, URL, or fallback.
@@ -166,16 +180,20 @@ pub fn sanitize_filename(raw: &str) -> String {
 }
 
 /// Checks if the base stem of a filename is a Windows reserved name, and prefixes `_` if so.
+///
+/// Normalizes the stem before comparison: trims whitespace and trailing dots from the stem
+/// and collapses repeated spaces, so `CON .txt`, `NUL.`, `aux `, and `LPT1 .log` are all neutralized.
 fn neutralize_reserved_device_names(name: &str) -> String {
     let base_stem = match name.find('.') {
         Some(first_dot) => &name[..first_dot],
         None => name,
     };
-    let base_stem_upper = base_stem.to_uppercase();
+    let collapsed = base_stem.split_whitespace().collect::<Vec<_>>().join(" ");
+    let normalized_stem = collapsed.trim_matches(|c| c == ' ' || c == '.').to_uppercase();
 
     let is_reserved = WINDOWS_RESERVED_NAMES
         .iter()
-        .any(|&res| base_stem_upper == res);
+        .any(|&res| normalized_stem == res);
 
     if is_reserved {
         format!("_{name}")
@@ -268,9 +286,47 @@ mod tests {
         assert_eq!(sanitize_filename("lpt9.log"), "_lpt9.log");
         assert_eq!(sanitize_filename("PRN"), "_PRN");
 
+        // F3: Stem variants with trailing spaces and dots
+        assert_eq!(sanitize_filename("CON .txt"), "_CON .txt");
+        assert_eq!(sanitize_filename("CON   .txt"), "_CON   .txt");
+        assert_eq!(sanitize_filename("NUL."), "_NUL");
+        assert_eq!(sanitize_filename("aux "), "_aux");
+        assert_eq!(sanitize_filename("LPT1 .log"), "_LPT1 .log");
+
         // Normal files with "con" in substring should NOT be affected
         assert_eq!(sanitize_filename("contact.txt"), "contact.txt");
         assert_eq!(sanitize_filename("icon.png"), "icon.png");
+    }
+
+    #[test]
+    fn test_bidi_and_zero_width_characters_disallowed() {
+        // F4: RLO extension spoofing neutralization
+        let spoofed = "invoice\u{202E}txt.exe";
+        assert_eq!(sanitize_filename(spoofed), "invoice_txt.exe");
+
+        // Test each bidi control character range: U+202A-U+202E
+        assert_eq!(sanitize_filename("a\u{202A}b.txt"), "a_b.txt"); // LRE
+        assert_eq!(sanitize_filename("a\u{202B}b.txt"), "a_b.txt"); // RLE
+        assert_eq!(sanitize_filename("a\u{202C}b.txt"), "a_b.txt"); // PDF
+        assert_eq!(sanitize_filename("a\u{202D}b.txt"), "a_b.txt"); // LRO
+        assert_eq!(sanitize_filename("a\u{202E}b.txt"), "a_b.txt"); // RLO
+
+        // Test isolates range: U+2066-U+2069
+        assert_eq!(sanitize_filename("a\u{2066}b.txt"), "a_b.txt"); // LRI
+        assert_eq!(sanitize_filename("a\u{2067}b.txt"), "a_b.txt"); // RLI
+        assert_eq!(sanitize_filename("a\u{2068}b.txt"), "a_b.txt"); // FSI
+        assert_eq!(sanitize_filename("a\u{2069}b.txt"), "a_b.txt"); // PDI
+
+        // Test directional marks: U+200E, U+200F, U+061C
+        assert_eq!(sanitize_filename("a\u{200E}b.txt"), "a_b.txt"); // LRM
+        assert_eq!(sanitize_filename("a\u{200F}b.txt"), "a_b.txt"); // RLM
+        assert_eq!(sanitize_filename("a\u{061C}b.txt"), "a_b.txt"); // ALM
+
+        // Test zero-width formatters: U+200B-U+200D, U+FEFF
+        assert_eq!(sanitize_filename("a\u{200B}b.txt"), "a_b.txt"); // ZWSP
+        assert_eq!(sanitize_filename("a\u{200C}b.txt"), "a_b.txt"); // ZWNJ
+        assert_eq!(sanitize_filename("a\u{200D}b.txt"), "a_b.txt"); // ZWJ
+        assert_eq!(sanitize_filename("a\u{FEFF}b.txt"), "a_b.txt"); // BOM / ZWNBSP
     }
 
     #[test]
@@ -293,6 +349,10 @@ mod tests {
         let arabic_name = "ملف_تجريبي_سيل_2026.docx";
         let sanitized = sanitize_filename(arabic_name);
         assert_eq!(sanitized, arabic_name);
+
+        // F4: Ensure Arabic letters, diacritics/tashkeel, and Eastern Arabic digits remain untouched
+        let full_arabic = "تَقْرِيرُ_المَبِيعَاتِ_١٤٤٥_سَيْل.pdf";
+        assert_eq!(sanitize_filename(full_arabic), full_arabic);
     }
 
     #[test]
