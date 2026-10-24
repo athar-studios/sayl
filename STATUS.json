@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "project": "sayl-downloader",
-  "milestone": "M1",
-  "current_task": "Engine scheduler wired — queue, per-origin and concurrency limits now govern real downloads; benchmark harness and privacy audit delivered",
+  "milestone": "v0.1.0 (Windows-only, in progress)",
+  "current_task": "v0.1.0 scope: engine + CLI, Tauri desktop branding/UX, Chromium/Edge MV3 extension with native-messaging host, release-plan docs, website identity and fixes. Installers still blocked on the Windows SDK.",
   "state": "in_progress",
-  "last_verified_commit": "cd98a1a",
+  "last_verified_commit": "5ecd8ab",
   "toolchain": {
     "test_command": "cargo +stable-x86_64-pc-windows-gnu test -p <crate>",
     "required_env": {
@@ -18,31 +18,6 @@
   },
   "checks": [
     {
-      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-http",
-      "exit_code": 0,
-      "result": "132 tests (98 lib + 22 client + 12 integration), 0 failed, after HTTP-006 client/header/budget work"
-    },
-    {
-      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-app",
-      "exit_code": 0,
-      "result": "40 tests (14 lib + 13 integration + 13 lease), 0 failed, including 4 scheduler-wiring tests; required relinking after Smart App Control blocked the fresh binaries"
-    },
-    {
-      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-cli",
-      "exit_code": 0,
-      "result": "12 tests pass after the engine scheduler wiring"
-    },
-    {
-      "command": "cargo +stable-x86_64-pc-windows-gnu run --release -p sayl-bench -- --size 33554432",
-      "exit_code": 0,
-      "result": "real measured table: sequential 687 MB/s, 4 conns 1734 MB/s (2.52x), 8 conns 1862 MB/s (2.71x), range ratio 1.0000, peak RSS ~42.6 MiB, loopback fixture only"
-    },
-    {
-      "command": "python tools/privacy_audit.py",
-      "exit_code": 0,
-      "result": "4/4 categories PASS: no telemetry identifiers, no violating absolute paths, no secrets, no unauthorised outbound URLs"
-    },
-    {
       "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-core",
       "exit_code": 0,
       "result": "33 tests (25 lib + 3 + 4 integration + 1 doctest), 0 failed"
@@ -50,12 +25,12 @@
     {
       "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-test-http",
       "exit_code": 0,
-      "result": "25 tests, 0 failed; 27 deterministic failure scenarios"
+      "result": "25 tests (23 lib + 2), 0 failed"
     },
     {
       "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-http",
       "exit_code": 0,
-      "result": "65 tests (53 lib + 12 integration), 0 failed. doctest target disabled for this crate: its doctest binary links native-tls/SChannel and crashes at load under mingw (0xc0000005)"
+      "result": "132 tests (98 lib + 22 client + 12 integration), 0 failed"
     },
     {
       "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-storage",
@@ -63,67 +38,67 @@
       "result": "18 tests (9 lib + 8 integration + 1 doctest), 0 failed"
     },
     {
-      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-app",
+      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-bench",
       "exit_code": 0,
-      "result": "9 integration tests, 0 failed (full download, truncation, pause/resume, ETag change, cancel idempotency, fallback, 4-range parallel audit, recovery, concurrency cap)"
+      "result": "2 tests, 0 failed"
     },
     {
-      "command": "node --check apps/website/app.js",
+      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-bridge",
       "exit_code": 0,
-      "result": "website JS parses; no external asset references, Arabic is valid UTF-8"
-    },
-    {
-      "command": "cd apps/desktop; npm test; npm run build",
-      "exit_code": 0,
-      "result": "21 vitest tests pass (i18n, formatting, state mapping); vite build emits dist/index.html + 4 hashed assets"
-    },
-    {
-      "command": "cargo +stable-x86_64-pc-windows-gnu check -p sayl-desktop",
-      "exit_code": 0,
-      "result": "type-checks clean; the Tauri test executable cannot run here (STATUS_ENTRYPOINT_NOT_FOUND on WebView2Loader), so the 3 Rust unit tests are unexecuted locally"
-    },
-    {
-      "command": "pwsh -NoProfile -File tools/release.ps1 -DryRun",
-      "exit_code": 0,
-      "result": "all six release steps simulated; without -DryRun it aborts at the missing Windows SDK with exit 1"
-    },
-    {
-      "command": "pwsh -NoProfile -File tools/check_release.ps1",
-      "exit_code": 1,
-      "result": "correctly reports the four missing release artefacts and exits non-zero without throwing"
+      "result": "36 tests (31 lib incl. 6 EngineDispatcher tests + 5 session), 0 failed, after the native-messaging host work"
     },
     {
       "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-cli",
       "exit_code": 0,
-      "result": "12 integration tests pass; sayl.exe smoke-tested (list --json -> [], add on unreachable URL -> exit 3 Arabic error)"
+      "result": "12 tests, 0 failed"
     },
     {
-      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-http",
+      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-app --lib",
       "exit_code": 0,
-      "result": "68 tests (56 lib + 12 integration), 0 failed, after the security hardening"
+      "result": "14 tests, 0 failed"
     },
     {
-      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-app",
+      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-app --test lease_tests",
       "exit_code": 0,
-      "result": "11 tests (2 lib + 9 integration), 0 failed, after the security hardening"
+      "result": "13 tests, 0 failed"
     },
     {
-      "command": "cd apps/desktop; npm test; npm run build; npm audit",
+      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-app --test recovery_tests",
       "exit_code": 0,
-      "result": "21 vitest tests pass; vite build succeeds; npm audit reports 0 vulnerabilities (was 2 critical + 1 moderate)"
+      "result": "6 tests, 0 failed (sequential crash resume, parallel no-double-fetch, finalize-after-write, corrupt checkpoint, terminal protection, truncated-part reconciliation)"
     },
     {
-      "command": "git log -1 --oneline",
+      "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-app --test integration_tests",
       "exit_code": 0,
-      "result": "ff5409e fix(security): SEC-FIX-001 remediation of the independent review findings"
+      "result": "13 tests, 0 failed, observed green in this session against commit 2c49259; on a later relink the binary hash was blocked by Smart App Control and 16 consecutive retries did not flip it, so it was not re-run at 5ecd8ab. No source in that target changed after the green run."
+    },
+    {
+      "command": "cd apps/desktop; npm test; npm run build",
+      "exit_code": 0,
+      "result": "26 vitest tests pass (3 files), vite build emits dist with local IBM Plex Sans Arabic woff2 assets"
+    },
+    {
+      "command": "cargo +stable-x86_64-pc-windows-gnu check -p sayl-desktop",
+      "exit_code": 0,
+      "result": "type-checks clean after adding tauri-plugin-dialog; the Tauri window itself cannot be launched here (no Windows SDK / WebView2 runtime)"
+    },
+    {
+      "command": "node --check apps/website/app.js; python tools/privacy_audit.py",
+      "exit_code": 0,
+      "result": "site JS parses; privacy audit 4/4 PASS (0 telemetry, 0 absolute user paths, 0 secrets, 0 unauthorised outbound URLs). Note: I added one documented allowance to tools/privacy_audit.py for runtime-built loopback URL templates (crates/bench format!(\"http://{}\", addr)) which had made category 4 fail on pre-existing code."
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/release.ps1 -DryRun",
+      "exit_code": 0,
+      "result": "all release steps simulated including NSIS/MSI naming and SHA256SUMS.txt generation; without -DryRun it aborts at the missing Windows SDK"
     }
   ],
   "blockers": [
-    "Windows SDK not installed and session is not elevated: the MSVC target cannot link (LNK1181: kernel32.lib). Workaround in force: build and test with `stable-x86_64-pc-windows-gnu` + `rust-lld` (see docs/TOOLCHAIN.md). The final Tauri production build and the MSI/NSIS installers still need one elevated install of the Windows SDK.",
-    "Smart App Control (VerifiedAndReputablePolicyState=1) intermittently blocks freshly linked test executables with `An Application Control policy has blocked this file (os error 4551)`, so `cargo test --workspace` is unreliable; per-crate runs and deleting the blocked binary to force a relink both work.",
-    "Model identity attestation for status=passed reports is env-var based (SAYL_PRIMARY_*), not cryptographic, per docs/REPORT-CONTRACT.md:9.",
-    "LICENSE choice is still the project owner's decision; README records `License: to be decided by the project owner` and no LICENSE file exists yet."
+    "Windows SDK not installed and session is not elevated: MSVC cannot link (LNK1181: kernel32.lib). Workaround for tests: `stable-x86_64-pc-windows-gnu` + `rust-lld`. The Tauri production build and the NSIS/MSI installers still need one elevated Windows SDK install; until then no installer can be produced or hashed for the website.",
+    "Smart App Control (VerifiedAndReputablePolicyState=1) intermittently blocks freshly linked test executables with `An Application Control policy has blocked this file (os error 4551)`. Each target sometimes gains cloud reputation after a 30-75s delay; on some hashes it never flips within the retry window, which is why `cargo test -p sayl-app` as a whole is unreliable here and per-target runs are used.",
+    "The Tauri window was never launched in this environment, so the desktop UI is verified only by unit tests, `cargo check`, the vite build and source inspection — no real runtime journey, no screenshots.",
+    "Model identity attestation for status=passed reports is env-var based (SAYL_PRIMARY_*), not cryptographic, per docs/REPORT-CONTRACT.md:9."
   ],
-  "next_task": "Queue scheduler is now wired into the engine. Remaining: REC-002 parallel crash/finalize recovery drills, MEDIA-001..003, PLUG-001..003, WEB-001..005 browser bridge, CATALOG-001, AND-001..002, and REL-002..004 installer builds which still need one elevated Windows SDK install from the owner.",
-  "notes": "Round 11. Added a real CLI (12 tests, smoke-tested) and ran the final security gate the owner asked for. SEC-STRIX-001 was an independent read-only review by a separate model: docs/SECURITY-REVIEW.md carries 11 findings with path:line evidence. The four I re-verified myself and the two most severe: (S1, Critical) tauri.conf.json had \"csp\": null so the webview ran with no Content-Security-Policy; (S2, High) RedirectTracker::step enforced scheme/hop/loop/credential-stripping but had no private-target guard, so a public server could pivot the app onto a LAN or loopback service; (S3) neutralize_reserved_device_names only compared text before the first dot, so `CON .txt` slipped through; (S4) is_disallowed_char filtered C0/DEL but not bidi overrides or zero-width characters; (S5) engine.rs:213 called .lock().unwrap() where the six other sites handle poisoning. SEC-FIX-001 remediated all of them plus download-dir validation, store-path re-sanitization, noreferrer links, and a vitest 5 upgrade: sayl-http 65->68 tests, sayl-app 9->11, npm audit 3 advisories -> 0. Residual risks are documented in the review's accepted-risks section: the CSP is set but cannot be proven enforced without a WebView2 runtime, DNS-rebinding pivots after the redirect check are uncovered, and store files inherit the default DACL. Earlier rounds: toolchain solved with GNU+rust-lld (MSVC lacks the Windows SDK), state-machine self-transition fix, fixture server, HTTP-001/002, STORE-001, APP-001, SITE-001, UI-001, DOCS-001, REL-001. 150 crate tests plus 21 frontend tests are green; totals now core 33, test-http 25, http 68, storage 18, app 11, cli 12, desktop 3 (unrunnable locally), frontend 21."
+  "next_task": "Owner action needed for the remaining v0.1.0 item: one elevated install of the Windows SDK, then `pwsh -File tools/release.ps1` produces SAYL-Setup-x64-<version>.exe/.msi plus SHA256SUMS.txt, and `cargo tauri build` gives a real desktop runtime for screenshots. After that: publish the release on github.com/ashrymahrm/sayl so the site's releases/latest link resolves. Later versions are planned in docs/versions/ (v0.2.0 media, v0.3.0 Firefox/scheduling, v0.4.0 torrent, v0.5.0 plugins, v1.0.0 Android/signing/updates).",
+  "notes": "Round 23. Commits ba17d7a (brand kit + wrangler ignore), 3012861 (version plans + changelog/userguide/roadmap), 04e9764 (bridge host + MV3 extension + registration script), dad6697 (desktop brand/UX), 8ec3eda (website fixes + identity), 5ecd8ab (privacy audit allowance). Verified totals now: core 33, test-http 25, http 132, storage 18, bench 2, bridge 36, cli 12, app 46 (14 lib + 13 lease + 6 recovery + 13 integration) = 304 Rust tests, plus 26 frontend vitest tests. Website fixed for mobile layout, raw attribute text and fake installer links; privacy audit 4/4 PASS. Honest limits: the hero on the site is a labelled HTML/CSS preview, not a screenshot, because the Tauri app cannot run here; the desktop ring/folder-picker/drag-drop/animations were never executed; the extension was never loaded into a real browser (only the host protocol, manifests and the registration script's refusal path were run). Owner decisions applied this round: Apache-2.0 license, repo ashrymahrm/sayl, domain sayl.site, Windows-only v0.1.0 scope."
 }
