@@ -1,0 +1,124 @@
+name: Release (Windows installers)
+
+# Produces the signed-ready Windows artefacts on a GitHub runner, where the
+# Windows SDK is present. This is the supported path for building the NSIS/MSI
+# installers: a local elevated SDK install is not required.
+#
+# Triggers:
+#   - pushing a tag like v0.1.0
+#   - manual run with an explicit version
+#
+# The run does NOT publish anything by itself. It uploads the artefacts and the
+# SHA256SUMS.txt as workflow artefacts and attaches them to the GitHub Release
+# only when the tag already exists, so publishing stays a deliberate owner action.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "SemVer version to build (e.g. 0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  RUST_TOOLCHAIN: "stable"
+
+jobs:
+  build-installers:
+    name: Build Windows Installers
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $v = "${{ inputs.version }}"
+          } else {
+            $v = "${{ github.ref_name }}" -replace '^v', ''
+          }
+          if ($v -notmatch '^\d+\.\d+\.\d+$') {
+            Write-Error "Invalid SemVer version '$v'"
+            exit 1
+          }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "Building version $v"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Cache Rust build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: release-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: release-${{ runner.os }}-
+
+      - name: Run the release pipeline
+        shell: pwsh
+        run: pwsh -NoProfile -File tools/release.ps1 -Version "${{ steps.ver.outputs.version }}"
+
+      - name: Verify expected artefacts exist
+        shell: pwsh
+        run: |
+          $v = "${{ steps.ver.outputs.version }}"
+          $required = @(
+            "releases/SAYL-Setup-x64-$v.exe",
+            "releases/SAYL-Setup-x64-$v.msi",
+            "releases/SAYL-$v-source.zip",
+            "releases/SHA256SUMS.txt"
+          )
+          $missing = @()
+          foreach ($r in $required) { if (-not (Test-Path -LiteralPath $r)) { $missing += $r } }
+          if ($missing.Count -gt 0) {
+            Write-Error "Missing release artefacts: $($missing -join ', ')"
+            exit 1
+          }
+          Get-Content -LiteralPath releases/SHA256SUMS.txt
+          Write-Host "All required artefacts present"
+
+      - name: Upload installers and checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: sayl-${{ steps.ver.outputs.version }}-windows-x64
+          path: |
+            releases/SAYL-Setup-x64-*.exe
+            releases/SAYL-Setup-x64-*.msi
+            releases/SAYL-*-source.zip
+            releases/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach artefacts to an existing GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if (-not (gh release view $tag 2>$null)) {
+            Write-Host "No GitHub Release exists for $tag yet; artefacts are available as a workflow artefact. Publishing releases stays an explicit owner action."
+            exit 0
+          }
+          gh release upload $tag releases/SAYL-Setup-x64-*.exe releases/SAYL-Setup-x64-*.msi releases/SAYL-*-source.zip releases/SHA256SUMS.txt --clobber
