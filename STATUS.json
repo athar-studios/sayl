@@ -70,7 +70,7 @@
     {
       "command": "cargo +stable-x86_64-pc-windows-gnu test -p sayl-app --test integration_tests",
       "exit_code": 0,
-      "result": "13 tests, 0 failed, observed green in this session against commit 2c49259; on a later relink the binary hash was blocked by Smart App Control and 16 consecutive retries did not flip it, so it was not re-run at 5ecd8ab. No source in that target changed after the green run."
+      "result": "13 tests, 0 failed, observed green in this session against commit 2c49259. After that relink, Smart App Control refused the binary hash on 26 consecutive attempts (three rounds, 40-55s reputation waits), so it could not be re-run at the current commit. No source in that target changed after the green run, and --lib/--test lease_tests/--test recovery_tests all re-ran green on the same tree."
     },
     {
       "command": "cd apps/desktop; npm test; npm run build",
@@ -119,6 +119,6 @@
     "The Tauri window was never launched in this environment, so the desktop UI is verified only by unit tests, `cargo check`, the vite build and source inspection — no real runtime journey, no screenshots.",
     "Model identity attestation for status=passed reports is env-var based (SAYL_PRIMARY_*), not cryptographic, per docs/REPORT-CONTRACT.md:9."
   ],
-  "next_task": "Owner action needed for the remaining v0.1.0 item: one elevated install of the Windows SDK, then `pwsh -File tools/release.ps1` produces SAYL-Setup-x64-<version>.exe/.msi plus SHA256SUMS.txt, and `cargo tauri build` gives a real desktop runtime for screenshots. After that: publish the release on github.com/ashrymahrm/sayl so the site's releases/latest link resolves. Later versions are planned in docs/versions/ (v0.2.0 media, v0.3.0 Firefox/scheduling, v0.4.0 torrent, v0.5.0 plugins, v1.0.0 Android/signing/updates).",
+  "next_task": "Owner action closes v0.1.0: push and tag (git tag v0.1.0; git push origin v0.1.0) so .github/workflows/release.yml builds NSIS+MSI+SHA256SUMS on a runner that has the Windows SDK, then create the GitHub Release so the site's releases/latest link resolves. One elevated Windows SDK install locally would also enable cargo tauri build for a real desktop run and screenshots.",
   "notes": "Round 23. Commits ba17d7a (brand kit + wrangler ignore), 3012861 (version plans + changelog/userguide/roadmap), 04e9764 (bridge host + MV3 extension + registration script), dad6697 (desktop brand/UX), 8ec3eda (website fixes + identity), 5ecd8ab (privacy audit allowance). Verified totals now: core 33, test-http 25, http 132, storage 18, bench 2, bridge 36, cli 12, app 46 (14 lib + 13 lease + 6 recovery + 13 integration) = 304 Rust tests, plus 26 frontend vitest tests. Website fixed for mobile layout, raw attribute text and fake installer links; privacy audit 4/4 PASS. Honest limits: the hero on the site is a labelled HTML/CSS preview, not a screenshot, because the Tauri app cannot run here; the desktop ring/folder-picker/drag-drop/animations were never executed; the extension was never loaded into a real browser (only the host protocol, manifests and the registration script's refusal path were run). Owner decisions applied this round: Apache-2.0 license, repo ashrymahrm/sayl, domain sayl.site, Windows-only v0.1.0 scope."
 }
