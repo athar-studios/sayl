@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# CI runs the MSVC toolchain on purpose: windows-latest ships the Windows SDK,
+# so this job is the only place the production (MSVC) link path is exercised.
+# Locally the project falls back to stable-x86_64-pc-windows-gnu + rust-lld
+# because the Windows SDK is not installed there; see docs/TOOLCHAIN.md.
+env:
+  RUST_TOOLCHAIN: "stable"
+
+jobs:
+  fmt:
+    name: Format Check
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+        shell: pwsh
+
+  clippy:
+    name: Clippy Lints
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: clippy
+
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+        shell: pwsh
+
+  test-core:
+    name: Test sayl-core
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Run sayl-core tests
+        run: cargo test -p sayl-core
+        shell: pwsh
+
+  test-test-http:
+    name: Test sayl-test-http
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Run sayl-test-http tests
+        run: cargo test -p sayl-test-http
+        shell: pwsh
+
+  test-http:
+    name: Test sayl-http
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Run sayl-http tests
+        run: cargo test -p sayl-http
+        shell: pwsh
+
+  test-storage:
+    name: Test sayl-storage
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Run sayl-storage tests
+        run: cargo test -p sayl-storage
+        shell: pwsh
+
+  test-workspace:
+    name: Test Workspace (All Crates)
+    runs-on: windows-latest
+    needs: [test-core, test-test-http, test-http, test-storage]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Run all workspace tests
+        run: cargo test --workspace
+        shell: pwsh

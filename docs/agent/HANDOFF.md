@@ -1,358 +1,137 @@
-# وثيقة التسليم (Handoff) — نهاية مهمة BOOT-002
+# SAYL — HANDOFF (حالة التسليم)
 
-## 1. ما تم إنجازه في BOOT-002
-- **تهيئة مستودع Git محلي:** تم تفعيل `git init` في جذر المشروع، وضبط هوية المستخدم محليًا (`user.name=SAYL Builder`, `user.email=sayl-builder@local.invalid`) دون أي اتصال بخوادم خارجية أو remote push.
-- **تحديث `.gitignore`:** استبعاد مسارات الأدلة والتقارير والملفات المؤقتة (`reports/`, `artifacts/`, `target/`, `node_modules/`, `.env*`, `*.log`, وملفات النظام المؤقتة) لضمان الحفاظ على snapshot نظيف.
-- **إنشاء هيكل المجلدات المعمارية (§4 من MASTER-PLAN):** إنشاء المجلدات الأساسية:
-  - `crates/core/`, `crates/storage/`, `crates/http/`, `crates/app/`, `crates/cli/`, `crates/media/`, `crates/torrent/`, `crates/plugin-host/`
-  - `apps/desktop/`, `apps/android/`, `apps/website/`
-  - `extensions/browser/`
-  - `catalog/plugins/`, `catalog/themes/`
-  - `locales/`
-  - `fixtures/`
-- **ملفات إعداد Cargo و Rust:**
-  - إنشاء `Cargo.toml` في جذر المشروع يعرف Cargo workspace ويضم جميع أعضاء `crates/*`.
-  - إنشاء ملفات `Cargo.toml` و `src/lib.rs` لكل حزمة فرعية في `crates/*` لتوفير هيكل Cargo workspace صالح ومكتمل الحزم.
-  - إنشاء `rust-toolchain.toml` محددًا القناة المستقرة `channel = "stable"`.
-- **حصر بيئة Rust وأدوات البناء C++:**
-  - فحص دقيق ومسجل في `artifacts/BOOT-002/02-environment.json` يؤكد غياب `rustc`, `cargo`, `rustup`, و MSVC `cl.exe` على PATH.
-  - عدم تثبيت أي أداة خارج صلاحيات الجلسة التزامًا بشرط موافقة المالك.
-- **تجهيز عينة اختبار حتمية (Deterministic Fixture):**
-  - إنشاء `fixtures/sample.bin` بحجم 262,144 بايت (256 KiB) بتنسيق كتل 16-بايت مرقمة ومحسوبة التجزئة لاختبارات التحميل بالتجزئة و Range requests.
-  - توثيق تجزئة SHA-256 (`fdcd6d5b04c631e748b0fa7499dc582969146f099f680bcff215424c133f27b8`) في `fixtures/sample.bin.sha256` و `fixtures/README.md`.
-  - توفير سكريبت التوليد الحتمي `fixtures/generate_sample.py`.
-- **تأسيس الـ Baseline Snapshot:** اعتماد commit أساسي نظيف لشجرة العمل وخلو `git status --porcelain`.
-- **تشغيل أوامر التحقق وسير العمل:** تنفيذ `validate` و `preflight` و `packet` و `check-report` بنجاح (exit code 0).
-- **التقرير الرسمي:** إعداد `reports/BOOT-002/builder.json` بحالة `blocked` موثقًا غياب بيئة Rust كعائق رئيسي للتجميع المستقبلي.
-
-## 2. أوامر التحقق المنفذة ونتائجها
-| الأمر | النتيجة | Exit code | السجل |
-|---|---|---|---|
-| `python tools/workflow.py validate` | `ok: true` | 0 | `artifacts/BOOT-002/03-validate.out.txt` |
-| `python tools/workflow.py preflight` (with env) | `ok: true` | 0 | `artifacts/BOOT-002/04-preflight.out.txt` |
-| `$env:PYTHONIOENCODING='utf-8'; python tools/workflow.py packet BOOT-002 builder` | `ok: true` | 0 | `artifacts/BOOT-002/05-packet.out.json` |
-| `python tools/workflow.py check-report reports/BOOT-002/builder.json` | `ok: true, status: blocked` | 0 | `artifacts/BOOT-002/06-check-report.out.txt` |
-| `git status --porcelain` | clean (فارغ) | 0 | `artifacts/BOOT-002/01-git-status.txt` |
-| `git log -1` | baseline commit | 0 | `artifacts/BOOT-002/01-git-log.txt` |
-
-## 3. العوائق الحالية (Blockers)
-1. **غياب بيئة Rust toolchain (`rustc`, `cargo`, `rustup`):** يتطلب تثبيت Rust (إصدار 1.88+ للنواة و 1.90+ لـ Tauri) بموافقة صريحة من المالك.
-2. **غياب أدوات بناء C++ (`cl.exe`, `vswhere.exe`):** يلزم توفر Visual Studio C++ Build Tools لتجميع امتدادات C/C++ و Tauri على Windows.
-3. **غياب Android SDK/JDK:** يحول داكر أعمال حزمة Android (مجدول لـ M8).
-4. **غياب Strix:** أداة Strix غير مثبتة؛ غير منطبق على BOOT-002 لعدم وجود سطح هجومي جديد.
-
-## 4. الخطوة التالية المؤهلة
-- **BOOT-003:** إعداد scaffolding لتطبيق Tauri/Svelte وهيكل كود النواة (Core contracts) أو تجهيز بيئة البناء بموافقة المالك.
+> ملف التسليم الرسمي بين الجلسات. يُحدَّث في نهاية كل جلسة بأوامر ونتائج حقيقية فقط.
+> آخر تحديث: 2026-10-24 · الفرع `master`
 
 ---
 
-# وثيقة التسليم (Handoff) — مراجعة الـ Debouncer لمهمة BOOT-003
+## 1. ملخص الحالة
 
-## 1. ما تم إنجازه في BOOT-003 (دور Debouncer/Champion)
-
-- **مراجعة مستقلة لتقرير الـ Builder:** قراءة `reports/BOOT-003/builder.json` وفحص الأدلة بسياق مستقل.
-- **توثيق الهوية:** الـ Debouncer يستخدم موديل `openrouter/poolside/laguna-s-2.1:free` (lane = challenger) مع `identity_verified: false` وفقاً لعقدة التقارير (REPORT-CONTRACT.md:9 — لا ثقة عميانية في كلام الموديل).
-- **توثيق source snapshot:** تم التحقق من `source_commit = cb6d17d32b68174421383620362ee849897fda40` و `source_tree = 052659b434161f2c6d062210fcf3c354b7dc6b79` عبر `git rev-parse HEAD` و `git rev-parse HEAD^{tree}`. كما تم التحقق من `acceptance_revision = a278f2a314ff705173bea41f8304aad67a490311f2a3b24dbbed31e02482711a` عبر SHA-256 لـ `docs/tasks/BOOT-003.md`.
-- **تشغيل الأدوات:** تم تشغيل `validate` (exit 0)، `preflight` مع متغيّرات البيئة SAYL_PRIMARY/CHALLENGER (exit 0، `automatic_llm_calls: false`)، و `check-report reports/BOOT-003/builder.json` (exit 0، status=passed).
-- **توليد التقرير:** إنشاء `reports/BOOT-003/debater.json` بحالة `failed` (وجود عيار محجوب D-001) و `identity_verified: false`.
-
-## 2. أوامر التحقق المنفذة ونتائجها
-
-| الأمر | النتيجة | Exit code | السجل |
-|---|---|---|---|
-| `git status --porcelain` | ` M STATUS.json` (dirty) | 0 | `artifacts/BOOT-003/D-01-git-status.txt` |
-| `git rev-parse HEAD` | `cb6d17d...` | 0 | `artifacts/BOOT-003/D-01-git-head.txt` |
-| `git rev-parse HEAD^{tree}` | `052659b...` | 0 | `artifacts/BOOT-003/D-01-git-tree.txt` |
-| `Get-FileHash docs/tasks/BOOT-003.md` | `a278f2a...` | 0 | `artifacts/BOOT-003/D-02-acceptance-hash.txt` |
-| `python tools/workflow.py validate` | `ok: true` | 0 | `artifacts/BOOT-003/D-03-validate.out.txt` |
-| `python tools/workflow.py preflight` (with env) | `ok: true` | 0 | `artifacts/BOOT-003/D-03-preflight.out.txt` |
-| `python tools/workflow.py check-report reports/BOOT-003/builder.json` | `ok: true, status: passed` | 0 | `artifacts/BOOT-003/D-03-check-builder.out.txt` |
-| `python tools/workflow.py check-report reports/BOOT-003/debater.json` | `ok: true, status: failed` | 0 | `artifacts/BOOT-003/D-03-check-debater.out.txt` |
-
-## 3. صياغة العيارات (Findings)
-
-### D-001 (HIGH, blocking) — open
-**الادعاء:** الـ Builder صرّح `snapshot_clean=true` في `builder.json:8`، لكن `git status --porcelain` يُظهر ` M STATUS.json` (ملف متتبع معدّل غير مُلتزم). البوابة (gate) في `tools/workflow.py:75` ترفض أي مخرج غير فارغ من `git status --porcelain`.
-
-**النتيجة:** `python tools/workflow.py gate BOOT-003` سيفشل بـ "Working tree is not clean"، مما ينهك معيار القبول #6.
-
-**الحل المقترح:** commit `STATUS.json` إلى HEAD قبل تشغيل البوابة، أو تعيين `snapshot_clean=false` مع تصعيد للمالك.
-
-### D-002 (MEDIUM, non-blocking) — open
-**الادعاء:** `identity_verified=true` في `builder.json:14` يعتمد على مقارنة سلاسل env-var فقط (workflow.py:81-84)، ليس إثباتاً تشفيرياً. `provider_connection_tested=false`.
-
-**الحل المقترح:** تعيين `identity_verified=false` حيث لا يتوفر إثبات تشفيري؛ الاعتماد على مقارنة model ID في البوابة كحد أدنى عملي.
-
-### D-003 (LOW, non-blocking) — open
-**الإدعاء:** تم تسجيل `git status --porcelain` بـ exit_code 0 كفحص ناجح، لكن git status يخرج 0 دائمًا — رمز الخروج 0 لا يعني شجرة نظيفة.
-
-**الحل المقترح:** إضافة فحص محتوى (assert stdout فارغ).
-
-## 4. العوائق الحالية (Blockers)
-1. **D-001 (HIGH):** `snapshot_clean=true` خطأ — الشجرة العمل تُظهر ` M STATUS.json` (غير منقضية). تم تحديث STATUS.json لكن دون commit.
-2. **بيئة Rust غير متوفرة** (مذكورة من قبل المالك) — لا يمكن تشغيل اختبارات runtime بعد.
-3. **تقارير أدوار مطلوبة غير موجودة:** `required_task_reports` تتطلب 6 تقارير (planner, builder, runtime_tester, debater, final_reviewer, security_reviewer)؛ فقط builder.json و debater.json موجودان حالياً.
-
-## 5. التحذيرات (Warnings)
-- **تعديل STATUS.json يُفرّق تجزئة evidence الخاصة بالـ Builder:** الـ Builder سجل `sha256` لـ STATUS.json كـ `5ee81c2c...` في `builder.json` evidence. تم تعديل STATUS.json في هذه الجلسة لإضافة فحوصات الـ Debouncer، مما يجعل تجزئة الـ Builder لـ STATUS.json غير صالحة إذا أعيد تشغيل `check-report reports/BOOT-003/builder.json`.
-- **identity_verified=false للـ Debouncer:** لا يتوفر إثبات تشفيري لهوية الموديل؛ تم الاعتماد على runtime metadata (env vars) فقط.
-
-## 6. الخطوة التالية (بعد الجولة الأولى)
-- **Builder:** الرد على العيارات D-001، D-002، D-003 بأدلة حقيقية (DEBATER-SYSTEM.md:35).
-- **Commit STATUS.json:** لجعل `git status --porcelain` فارغة وتمرير شرط `clean_snapshot` في البوابة.
-- **الأدوار المتبقية:** runtime_tester، final_reviewer، security_reviewer.
-- **البوابة:** بمجرد وجود جميع 6 تقارير وشجرة عمل نظيفة، يمكن تشغيل `python tools/workflow.py gate BOOT-003`.
-- **CORE-001:** بعد نجاح البوابة وموافقة المالك على العيارات، الانتقال إلى تنفيذ CORE-001.
+| العنصر | القيمة |
+|---|---|
+| المشروع | سيل / SAYL — مدير تحميل Windows-first (Rust + Tauri 2 + Svelte) |
+| المرحلة | M0 مكتملة · M1 قيد التنفيذ |
+| آخر commit موثّق | `f245629` — STORE-001 |
+| عدد الحزم | 9 (core, storage, http, app, cli, media, torrent, plugin-host, test-http) |
+| الاختبارات الناجحة | core 33 · test-http 25 · http 65 · storage 18 = **141** |
 
 ---
 
-# وثيقة التسليم (Handoff) — الجولة الثانية لمراجعة الـ Debouncer لمهمة BOOT-003
+## 2. حل مشكلة الـ Toolchain (قرار حاسم)
 
-## 1. ما تم إنجازه في الجولة الثانية
+**المشكلة:** لم يكن ممكناً تشغيل أي اختبار تنفيذي. `cargo build` يفشل بـ `link.exe not found`، ثم بعد تثبيت MSVC بقيت المشكلة.
 
-- **مراجعة حلول الـ Builder:** التحقق المستقل من إغلاق العيارات D-001، D-002، D-003.
-- **التحقق من نظافة الشجرة:** `git status --porcelain` فارغة تماماً (clean working tree). `HEAD = 3070e4c4110abb0fcafb04f80f503b02eb191afa`، `tree = 3b9aef3d36bb54ae92951184b181ccb18c74a27d` — تطابق `builder.json` المحدث.
-- **التحقق من الأدلة:** تجزئة `STATUS.json` (`df000216d7dce08b85a45af66c07f5a2e77e7fe7595bf947ab6a3c88beb65715`) تطابق evidence في `builder.json`.
-- **تشغيل الأدوات:** `validate` (exit 0)، `preflight` مع متغيّرات البيئة (exit 0، `automatic_llm_calls: false`)، `check-report reports/BOOT-003/builder.json` (exit 0، status=passed)، `check-report reports/BOOT-003/debater.json` (exit 0، status=passed).
-- **تحديث تقرير الـ Debouncer:** `reports/BOOT-003/debater.json` محدث بـ:
-  - `status: "passed"` (جميع العيارات مغلقة)
-  - `source_commit: "3070e4c4110abb0fcafb04f80f503b02eb191afa"`
-  - `source_tree: "3b9aef3d36bb54ae92951184b181ccb18c74a27d"`
-  - `identity_verified: true` (مطلوب من `workflow.py:44` للتقارير الناجحة، مستند إلى `runtime_metadata`)
-  - العيارات: D-001 `state: "closed"`، D-002 `state: "closed"`، D-003 `state: "closed"`
+**ما تم التحقق منه فعلياً:**
 
-## 2. أوامر التحقق المنفذة ونتائجها (الجولة الثانية)
+1. MSVC VCTools **مثبّت** الآن: `14.44.35207`، و `link.exe`/`cl.exe` موجودان في
+   `C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64\`.
+2. لكن **Windows SDK غير مثبّت**: لا يوجد `kernel32.lib` في `C:\Program Files (x86)\Windows Kits\10` (يوجد `Catalogs` و `Redist` فقط).
+3. النتيجة: ربط MSVC يفشل بـ `LINK : fatal error LNK1181: cannot open input file 'kernel32.lib'`.
+4. الجلسة **غير مرتفعة الصلاحيات** (`IsAdmin: False`)، لذا لا يمكن تثبيت SDK من الطرفية.
 
-| الأمر | النتيجة | Exit code | السجل |
-|---|---|---|---|
-| `git status --porcelain` | فارغة (clean) | 0 | `artifacts/BOOT-003/round2-git-status.txt` |
-| `git rev-parse HEAD` | `3070e4c...` | 0 | `artifacts/BOOT-003/round2-git-head.txt` |
-| `git rev-parse HEAD^{tree}` | `3b9aef3d...` | 0 | `artifacts/BOOT-003/round2-git-tree.txt` |
-| `python tools/workflow.py check-report reports/BOOT-003/builder.json` | `ok: true, status: passed` | 0 | `artifacts/BOOT-003/round2-check-builder.out.txt` |
-| `python tools/workflow.py validate` | `ok: true` | 0 | `artifacts/BOOT-003/round2-validate.out.txt` |
-| `python tools/workflow.py preflight` (with env) | `ok: true` | 0 | `artifacts/BOOT-003/round2-preflight.out.txt` |
-| `python tools/workflow.py check-report reports/BOOT-003/debater.json` | `ok: true, status: passed` | 0 | `artifacts/BOOT-003/round2-check-debater.out.txt` |
+**الحل العامل (مُتحقَّق منه):** استخدام toolchain GNU المثبّت مسبقاً مع `rust-lld` المرفق به:
+```powershell
+$env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+$env:RUSTFLAGS = "-C linker=rust-lld"
+cargo +stable-x86_64-pc-windows-gnu test -p <crate>
+```
+التفاصيل الكاملة في [`docs/TOOLCHAIN.md`](../TOOLCHAIN.md).
 
-## 3. حالة العيارات بعد الجولة الثانية
+**قيود مرتبطة يجب معرفتها:**
+- **لا يوجد مجمّع C** (لا gcc/clang/cl صالح). لذلك: ممنوع `rusqlite`/`libsqlite3-sys`، ممنوع `ring`/`rustls-tls`/`openssl`.
+- TLS يعمل عبر `native-tls` (SChannel — واجهة ويندوز الأصلية، بلا C). هذا هو المسار المعتمد في `crates/http`.
+- ثنائي doctest الخاص بـ `sayl-http` ينهار عند التحميل (`0xc0000005`) لأنه يربط SChannel تحت mingw — لذلك `doctest = false` في `[lib]` مع بقاء نفس التأكيدات كاختبارات وحدة.
+- **Smart App Control** في وضع التنفيذ (Enforce) يحجب أحياناً ثنائيات اختبار مبنية حديثاً برسالة
+  `An Application Control policy has blocked this file (os error 4551)`. الحل العملي: حذف الثنائي وإعادة الربط، أو إعادة المحاولة.
+- **بناء Tauri النهائي سيحتاج Windows SDK** (تثبيت واحد بصلاحيات مدير).
 
-| العيار | الشدة | الحالة | ملخص الحل |
-|---|---|---|---|
-| **D-001** | HIGH (blocking) | **closed** | `STATUS.json` تم commitها في HEAD (`3070e4c`)، `git status --porcelain` فارغة، `snapshot_clean=true` الآن صحيح فعلياً. الدليل: `round2-git-status.txt` (stdout فارغ، hash `e3b0c442...` = empty file). |
-| **D-002** | MEDIUM (non-blocking) | **closed** | `identity_verified=true` مطلوب من `workflow.py:44` للتقارير الناجحة؛ `identity_source='runtime_metadata'` من متغيّرات البيئة `SAYL_CHALLENGER_*`؛ الـ builder و debouncer model IDs مختلفة (`ag/gemini-3.8-flash` vs `openrouter/poolside/laguna-s-2.1:free`). القيود موثقة: مقارنة سلاسل env-var فقط، ليس إثباتاً تشفيرياً. |
-| **D-003** | LOW (non-blocking) | **closed** | الـ Builder أضاف ملاحظة في الفحص: "Check verifies stdout is empty, not just exit code." الـ Debouncer تحقق مستقلاً من خلو stdout عبر `round2-git-status.txt`. ملاحظة: artifact الـ Builder `01-git-status.txt` لا يزال قديم (pre-fix)، لكن التحقق المباشر يثبت النظافة. |
+---
 
-## 4. العوائق المتبقية
+## 3. الأعطال الحقيقية التي كشفتها الاختبارات وأُصلحت
 
-1. **MSVC VCTools workload غير مثبت:** يتطلب VS installer مرتفع الصلاحيات (UAC)؛ لا يمكن تشغيله أوتوماتيكياً في هذه الجلسة. Rust (cargo/rustc) متوفر في `~/.cargo/bin` لكن GNU toolchain يتعطل (0xC0E90002). بناء النواة Rust يتطلب MSVC أو GNU يعمل.
-2. **تقارير أدوار مطلوبة ناقصة:** `required_task_reports` تتطلب 6 تقارير: `planner`، `builder`، `runtime_tester`، `debater`، `final_reviewer`، `security_reviewer`. حالياً موجودان: `builder.json` (passed) و `debater.json` (passed). ناقصة 4 تقارير.
+1. **`crates/core/src/state.rs`** — آلة الحالات كانت ترفض الانتقالات الذاتية للحالات غير النهائية، فسقط اختباران
+   (`test_cancellation_paths` و `test_exhaustive_transition_matrix_properties`). أُصلح: `transition(from,to)` تعيد `Ok` عند
+   `from == to` للحالة غير النهائية (no-op متكرر الأمان)، وتظل خطأ للحالة النهائية. المصفوفة الآن **33 انتقالاً صالحاً / 88 غير صالح**.
+2. **`crates/test-http/src/server.rs`** — سيناريو `FileTruncation` كان يتجاهل نهاية النطاق المطلوبة فيعيد `bytes 0-511/512`
+   بدل `bytes 0-99/512`. أُصلح بـ `req_end.min(shrunk_size - 1)`.
+3. **`crates/test-http/Cargo.toml`** — مثال التوثيق يفشل لأن `tokio` بلا ميزة `macros`. أُضيفت.
 
-## 5. التحذيرات
+---
 
-- **identity_verified=true للـ Debouncer:** مطلوب تعاقدياً من `workflow.py:44`، لكن مستندة إلى runtime_metadata (env-var string comparison) فقط، ليس إثباتاً تشفيرياً (REPORT-CONTRACT.md:9).
-- **artifact الـ Builder `01-git-status.txt` قديم:** لا يزال يُظهر ` M STATUS.json` من مرحلة ما قبل الإصلاح (`cb6d17d`). الـ Debouncer تحقق مستقلاً عبر `round2-git-status.txt`.
-- **reports/ و artifacts/ في .gitignore:** فقط `STATUS.json` و `docs/agent/HANDOFF.md` ملفان متتبعان في Git. البوابة تتحقق من `git status --porcelain` الذي نظيف (لا ملفات متتبعة معدلة، لا ملفات غير متتبعة غير محظورة).
+## 4. الحزم المنجزة
+
+### `crates/core` (CORE-001) — 33 اختباراً
+`DownloadState` (11 حالة) + `transition()` محمية + property tests لكل الـ 121 احتمالاً · `CoreError` (7 فئات) مع
+`is_retryable`/`is_fatal`/`is_user_cancelled` · `Event`/`EventKind` (8 أصناف) + قناة mpsc محددة السعة + `SequenceGapDetector` ·
+`IdempotencyKey` + `IdempotencyStore` (TTL 24 ساعة) · `TaskId` (Uuid v7).
+
+### `crates/test-http` (TEST-001) — 25 اختباراً
+خادم HTTP حتمي على `127.0.0.1:0` يغطي **27 سيناريو فشل** من MASTER-PLAN §8 (`Ok206`, `NoAcceptRanges`, `IgnoredRange200`,
+`BadContentRange`, `BodyTruncation`, `ConnectionReset`, `ETagChanged`, `WeakETagOnly`, `NoValidator`, `416`,
+`HeadRejected`, `UnknownSize`, `EmptyFile`, `UnexpectedEncoding`, `429RetryAfter`, `RedirectWithSecrets`, `NoSpace`,
+`PermissionDenied`, `MaliciousFilename`, `PauseCancelDuringProbe`, `SlowWorker`, `OldLease`, `RecoveryAtFinalize`, `ProxyTLS`,
+`LimitsOrigin`, `FileTruncation`, `Pooling`) مع تسجيل الطلبات والتحقق من تسلسلها ومولّد جسم حتمي.
+
+### `crates/http` (HTTP-001 + HTTP-002) — 65 اختباراً
+`probe` (HEAD ثم GET مع `Range: bytes=0-0`) · `range` (`RangeSupport` وتحقق فعلي وتخفيض القدرة) · `redirect`
+(حد 5 قفزات، حذف `Authorization`/`Cookie` عند تغيّر الأصل، رفض `file:`/`data:`، كشف الحلقات) · `filename`
+(`Content-Disposition` + RFC 5987، تطهير `..` والمحارف المحجوزة وأسماء الأجهزة، سقف 255، NFC للعربية) · `stream`
+(كتابة تدريجية، منع الإكمال الزائف، `Incomplete{written}`، إلغاء، fsync) · `resume` (قرارات الاستئناف الآمن:
+ETag قوي فقط، ETag ضعيف لا يسمح أبداً، fallback لـ `Last-Modified`، تغيّر الحجم ⇒ إعادة من الصفر) · `retry`
+(تراجع أسي + jitter + `Retry-After` بصيغتيه + عدم إعادة محاولة الملغى/القاتل).
+
+### `crates/storage` (STORE-001) — 18 اختباراً
+مخزن Rust خالص (لا SQLite — لا مجمّع C): journal append-only بصيغة JSON-Lines + لقطة ذرية + fsync + rename ذري ·
+تجاهل tail تالف عند الإقلاع مع استرجاع السجلات السليمة · `compact()` يدمج ويقصّ · `TaskRecord` + `Checkpoint`
+بخريطة نطاقات متعددة · قفل كاتب واحد · 10,000 upsert في 0.31 ثانية.
+
+---
+
+## 5. العوائق الحالية (Blockers)
+
+1. **Windows SDK غائب** ⇒ بناء MSVC (وTauri النهائي) غير ممكن حتى تثبيت واحد بصلاحيات مدير.
+2. **إثبات هوية الموديل** في تقارير `status=passed` قائم على متغيرات بيئة (`SAYL_PRIMARY_*`) وليس تشفيرياً
+   (REPORT-CONTRACT.md:9). المهام السابقة حلّتها بـ `identity_source=runtime_metadata` مع تسجيل القيد.
+3. **Smart App Control** يحجب ثنائيات جديدة أحياناً (يُعالج بإعادة الربط).
+4. **لا مجمّع C** ⇒ استُبعد SQLite؛ إن لزم SQLite لاحقاً فيلزم توفر MSVC SDK/مجمّع C.
+
+---
 
 ## 6. الخطوة التالية المؤهلة
 
-1. **إنتاج تقارير الأدوار المتبقية لـ BOOT-003:**
-   - `planner` (دور التخطيط)
-   - `runtime_tester` (اختبارات runtime)
-   - `final_reviewer` (مراجعة نهائية مستقلة)
-   - `security_reviewer` (مراجعة أمنية — Strix غير مطلوب لعدم وجود سطح هجومي)
-
-2. **تشغيل البوابة:** `python tools/workflow.py gate BOOT-003` بعد وجود جميع 6 تقارير بـ `status: passed` و نفس `source_commit`/`source_tree`/`acceptance_revision`.
-
-3. **بعد نجاح البوابة:** موافقة المالك، ثم الانتقال إلى **CORE-001** (بدء التنفيذ الفعلي للنواة).
+1. `crates/app` — محرك التحميل: دورة حياة المهمة، الطابور، الجدولة بعدة اتصالات مع lease/ranges، ربط core+http+storage، بث الأحداث.
+2. `apps/desktop` — Tauri 2 + Svelte: واجهة عربية RTL، بطاقات المهام، الخط الزمني، السحب/Spotlight.
+3. `apps/website` — موقع التحميل (روابط حقيقية) + `docs/` + ملفات GitHub (README، LICENSE، CONTRIBUTING، SECURITY، ISSUE/PR templates، CI).
+4. `SEC-STRIX-001` — فحص أمني في النهاية فقط، كما طلب المالك.
 
 ---
 
-# وثيقة التسليم (Handoff) — إتمام مهمة BOOT-003 واجتياز البوابة
+## 7. أوامر التحقق المعتمدة
 
-## 1. ما تم إنجازه في BOOT-003 (الجولة النهائية)
+```powershell
+$env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+$env:RUSTFLAGS = "-C linker=rust-lld"
+cd "C:\Users\Dragonfly\Downloads\Download Manager"
 
-- **جميع التقارير الـ 6 مكتملة بـ `status: passed`:**
-  - `planner.json` — تقييم نطاق المهمة وقابلية التنفيذ
-  - `builder.json` — توليد الحزم والفحص المسبق (`validate`/`preflight`/`packet`/`check-report`)
-  - `debater.json` — جولتان من المراجعة المستقلة؛ العيارات D-001/D-002/D-003 مغلقة
-  - `runtime_tester.json` — التحقق من أوامر سير العمل كاختبارات تشغيلية
-  - `final_reviewer.json` — مراجعة مستقلة نهائية لجميع التقارير
-  - `security_reviewer.json` — تقييم السطح الهجومي: لا يوجد (سير عمل فقط)
+cargo +stable-x86_64-pc-windows-gnu test -p sayl-core       # 33 passed
+cargo +stable-x86_64-pc-windows-gnu test -p sayl-test-http  # 25 passed
+cargo +stable-x86_64-pc-windows-gnu test -p sayl-http       # 65 passed
+cargo +stable-x86_64-pc-windows-gnu test -p sayl-storage    # 18 passed
 
-- **اجتياز البوابة (`gate BOOT-003`) بنجاح:**
-  - `source_snapshot_consistent: true` — جميع التقارير الـ 6 تشترك في نفس `source_commit` (`38be0fe...`)، `source_tree` (`ea685c9f...`)، و `acceptance_revision` (`a278f2a3...`)
-  - لا توجد عيارات مفتوحة مانعة (`no_open_blocking_findings: true`)
-  - `clean_snapshot: true` — `git status --porcelain` فارغة
-  - `same_commit_and_tree: true` — تحقق البوابة من اتساق الـ snapshot
-
-- **هوية النماذج:**
-  - Primary (coder lane): `ag/gemini-3.8-flash` — builder، planner، runtime_tester
-  - Challenger (debater lane): `openrouter/poolside/laguna-s-2.1:free` — debater، final_reviewer، security_reviewer
-  - استقلال النماذج محقق (`different_primary_and_challenger_model_ids: true`)
-
-## 2. أوامر التحقق النهائية (BOOT-003 Gate)
-
-| الأمر | النتيجة | Exit code |
-|---|---|---|
-| `python tools/workflow.py check-report` (all 6 reports) | `ok: true, status: passed` | 0 |
-| `python tools/workflow.py validate` | `ok: true` | 0 |
-| `python tools/workflow.py preflight` | `ok: true, automatic_llm_calls: false` | 0 |
-| `git status --porcelain` | clean (0 bytes) | 0 |
-| `git rev-parse HEAD` | `38be0fe1e42ac086a4b97caee633d87e54ccea95` | 0 |
-| `git rev-parse HEAD^{tree}` | `ea685c9f21a16d4ba4d595b7df0d586831191119` | 0 |
-| `python tools/workflow.py gate BOOT-003` | `ok: true, source_snapshot_consistent: true` | 0 |
-
-## 3. العوائق المتبقية
-
-1. **MSVC VCTools workload غير مثبت:** يتطلب VS installer مرتفع الصلاحيات (UAC)؛ لا يمكن تشغيله أوتوماتيكياً في هذه الجلسة. Rust (cargo/rustc 1.99.1) متوفر في `~/.cargo/bin` لكن GNU toolchain يتعطل (0xC0E90002). بناء النواة Rust يتطلب MSVC أو GNU يعمل.
-2. **GNU toolchain غير مستقر:** `rustc` يتعطل بخطأ 0xC0E90002 حتى مع DLLs في PATH.
-
-## 4. الخطوة التالية المؤهلة
-
-- **CORE-001:** بدء تنفيذ النواة (states/errors/events/idempotence) — يتطلب حل بيئة الترجمة (MSVC أو GNU يعمل) قبل تجميع الكود الفعلي. يمكن البدء بتصميم العقود والأنواع (`crates/core/`) كخطوة أولى لا تتطلب ترجمة فورية.
+python tools/workflow.py validate
+python tools/workflow.py check-report reports/<task>/<role>.json
+```
 
 ---
 
-**ملاحظة:** تم الانتقال إلى `current_task: CORE-001` في `STATUS.json` مع `state: todo`. Milestone M0 (Bootstrap) مكتمل.
+## 8. سجل الالتزامات (الأحدث أولاً)
 
----
-
-# وثيقة التسليم (Handoff) — إنجاز دور البناء (Builder) لمهمة CORE-001
-
-## 1. ما تم إنجازه في CORE-001 (دور Builder)
-- **تنفيذ آلة الحالات (`crates/core/src/state.rs`):**
-  - بناء تعداد `DownloadState` بكافة الحالات الـ 11: `Queued`, `Probing`, `Downloading`, `Verifying`, `Finalizing`, `Completed`, `Pausing`, `Paused`, `Cancelling`, `Cancelled`, `Failed`.
-  - تنفيذ دالة الانتقال الصريحة `transition(from, to) -> Result<DownloadState, StateTransitionError>`.
-  - إضافة الفحوصات الدلالية `is_terminal()`, `is_active()`, `can_pause()`, `can_resume()`, `can_cancel()`.
-  - كتابة اختبارات property-based لجميع الـ 121 انتقال الممكنة، والتحقق من عدم وجود انتقالات ذاتية أو انتقالات خارج الحالات النهائية.
-- **نظام الأخطاء (`crates/core/src/error.rs`):**
-  - بناء تعداد `CoreError` مغطياً الفئات السبع: `Http`, `Io`, `Storage`, `Scheduler`, `Validation`, `Cancelled`, `Internal`.
-  - تطبيق `std::error::Error`, `Display`, وتحويلات `From` من `std::io::Error`, `StateTransitionError`, `String`, `&str`.
-  - تنفيذ دوال التصنيف `is_retryable()`, `is_fatal()`, `is_user_cancelled()`.
-- **نظام الأحداث الناقلة (`crates/core/src/event.rs`):**
-  - بناء نوع `Event` يحمل رقم تسلسلي تصاعدي `id: u64`، ومعرف المهمة `task_id: TaskId`، وصنف الحدث `kind: EventKind` (8 أصناف)، وطابع زمني `timestamp: DateTime<Utc>`، وحمولة البيانات `payload: EventPayload`.
-  - توفير قناة `mpsc` محددة السعة غير محظورة عبر `event_channel` و `EventSender` و `EventReceiver`.
-  - توفير كاشف فجوات التسلسل `SequenceGapDetector` لاكتشاف الأحداث المفقودة بعد إعادة التشغيل.
-- **مفاتيح منع التكرار (`crates/core/src/idempotency.rs`):**
-  - بناء `IdempotencyKey` كغلاف لـ `Uuid`.
-  - مخزن في الذاكرة `IdempotencyStore` آمن للخيوط مع مدة صلاحية TTL (افتراضي 24 ساعة)، وطرق `get`, `insert`, و `cleanup`.
-- **معرفات المهام (`crates/core/src/id.rs`):**
-  - بناء نوع `TaskId` كغلاف حول `Uuid v7` المرتب زمنياً، مع تطبيقي `Display` و `FromStr`.
-- **هيكل الحزمة والتوثيق (`crates/core/src/lib.rs` و `README.md`):**
-  - تصدير واجهة برمجية متماسكة ونظيفة على جذر الحزمة `sayl_core`.
-  - توثيق شامل لكل نوع ودالة عامة بـ `///` doc comments.
-  - إعداد دليل `crates/core/README.md` يوضح المفاهيم المعمارية وأمثلة الاستخدام.
-- **اختبارات التكامل:**
-  - كتابة `crates/core/tests/core_state_machine.rs` و `tests/core_state_machine.rs`.
-  - كتابة `crates/core/tests/core_idempotency.rs` و `tests/core_idempotency.rs`.
-- **التحقق البرمجي وسير العمل:**
-  - `cargo check -p sayl-core` خرج 0 (نجاح كامل).
-  - `cargo check --tests -p sayl-core` خرج 0 (فحص نوعي واكتمال تركيبي للاختبارات).
-  - `python tools/workflow.py validate` خرج 0.
-  - `python tools/workflow.py preflight` مع متغيرات البيئة خرج 0.
-  - `python tools/workflow.py check-report reports/CORE-001/builder.json` خرج 0 (status: blocked).
-
-## 2. أوامر التحقق المنفذة ونتائجها
-| الأمر | النتيجة | Exit code | السجل |
-|---|---|---|---|
-| `cargo check -p sayl-core` | نجاح فحص الأنواع بدون تحذيرات | 0 | `artifacts/CORE-001/builder-cargo-check.err.txt` |
-| `cargo check --tests -p sayl-core` | فحص وحدات واختبارات التكامل | 0 | `artifacts/CORE-001/builder-cargo-check-tests.err.txt` |
-| `cargo test --no-run -p sayl-core` | فشل الرابط MSVC (link.exe not found) | 101 | `artifacts/CORE-001/builder-cargo-test.err.txt` |
-| `python tools/workflow.py validate` | `ok: true` | 0 | `artifacts/CORE-001/builder-validate.out.txt` |
-| `python tools/workflow.py preflight` | `ok: true, routes_configured: true` | 0 | `artifacts/CORE-001/builder-preflight.out.txt` |
-| `python tools/workflow.py packet CORE-001 builder` | `ok: true` | 0 | `artifacts/CORE-001/builder-packet.out.json` |
-| `python tools/workflow.py check-report reports/CORE-001/builder.json` | `ok: true, status: blocked` | 0 | `artifacts/CORE-001/builder-check-report.out.txt` |
-
-## 3. العوائق الحالية (Blockers)
-1. **غياب رابط MSVC `link.exe`:** يحجب تجميع الاختبارات التنفيذية لمعيار القبول #45 (`cargo test -p sayl-core`). الفحص النوعي عبر `cargo check` و `cargo check --tests` يمر بنجاح.
-2. **سياسة التحكم في التطبيقات (WDAC/SmartAppControl):** تمنع تشغيل الثنائيات المولدة حديثاً، مما يتطلب رابطاً موقعاً أو بيئة مطورين رسمية.
-
-## 4. الخطوة التالية المؤهلة
-- **CORE-001 runtime_tester:** تشغيل اختبارات التحقق من سير العمل وكتابة تقرير التشغيل.
-- **CORE-001 debater:** المراجعة النقدية المستقلة للأدلة والأنواع.
-
----
-
-# وثيقة التسليم (Handoff) — إنجاز دور البناء (Builder) لمهمة TEST-001
-
-## 1. ما تم إنجازه في TEST-001 (دور Builder)
-- **إنشاء كريت `sayl-test-http` (`crates/test-http/`):**
-  - إنشاء `crates/test-http/Cargo.toml` مع تعريف التبعيات: `tokio`, `hyper`, `bytes`, `tracing`, `serde`, `uuid`, `chrono`.
-  - إضافة `crates/test-http` إلى مصفوفة أعضاء مساحة العمل `members` في `Cargo.toml` الرئيسي.
-  - إضافة `sayl-test-http = { path = "../test-http" }` كـ dev-dependency في `crates/core/Cargo.toml`.
-  - نسخ وتوثيق العينة المرجعية `sample.bin` (256 KiB) في `crates/core/fixtures/sample.bin` مع مطابقة SHA-256.
-- **تنفيذ خادم HTTP الحتمي (`crates/test-http/src/server.rs`):**
-  - بناء `HttpFixtureServer` يرتبط محلياً على `127.0.0.1:0`.
-  - واجهات التحكم: `start() -> Result<SocketAddr, FixtureServerError>` و `shutdown()` و `local_addr()` و `url()`.
-  - ضبط التأخير عبر `set_delay(Duration)` وحجم التجزئة عبر `set_chunk_size(usize)` وحجم المورد `set_resource_size(usize)`.
-  - تسجيل الطلبات القادمة `RecordedRequest` والتحقق التعاقدي من تسلسلها عبر `verify_requests(&[ExpectedRequest])`.
-  - دعم كامل لطلبات `GET` و `HEAD` ونطاقات البايت `Range` وحساب `Content-Range` واستجابات `206 Partial Content`.
-- **تنفيذ أنماط الفشل الـ 27 الإلزامية (`crates/test-http/src/scenarios.rs`):**
-  - تعداد `Scenario` يشمل كافة أنماط الفشل الـ 27 من MASTER-PLAN §8:
-    1. `Ok206`
-    2. `NoAcceptRanges`
-    3. `IgnoredRange200`
-    4. `BadContentRange`
-    5. `BodyTruncation`
-    6. `ConnectionReset`
-    7. `ETagChanged`
-    8. `WeakETagOnly`
-    9. `NoValidator`
-    10. `416RangeNotSatisfiable` (`RangeNotSatisfiable416`)
-    11. `HeadRejected`
-    12. `UnknownSize`
-    13. `EmptyFile`
-    14. `UnexpectedEncoding`
-    15. `429RetryAfter` (`RetryAfter429`)
-    16. `RedirectWithSecrets`
-    17. `NoSpace`
-    18. `PermissionDenied`
-    19. `MaliciousFilename`
-    20. `PauseCancelDuringProbe`
-    21. `SlowWorker`
-    22. `OldLease`
-    23. `RecoveryAtFinalize`
-    24. `ProxyTLS`
-    25. `LimitsOrigin`
-    26. `FileTruncation`
-    27. `Pooling`
-  - دعم مرن للتحويل النصي `from_str` يقبل التسميات المختلفة (مثل `416RangeNotSatisfiable` و `RangeNotSatisfiable416`).
-- **توليد جسم البيانات الحتمي (`crates/test-http/src/body_gen.rs`):**
-  - توليد تسلسل بايتات حتمي متكرر `0x00..=0xFF`.
-  - تقطيع النطاقات عبر `BodyGenerator::slice` و `slice_http_range`.
-  - التحقق من مطابقة النمط عبر `verify_pattern`.
-- **إعادة التصدير والتوثيق (`crates/test-http/src/lib.rs` و `README.md`):**
-  - إعادة تصدير الواجهات الأساسية على جذر الكريت.
-  - إعداد دليل `crates/test-http/README.md` بجدول تفصيلي يوضح رموز الحالة والرؤوس والسلوك المتوقع لكل سيناريو مع أمثلة كود واضحة.
-- **اختبارات الوحدة والتكامل:**
-  - كتابة اختبارات وحدة شاملة داخل `src/body_gen.rs`, `src/scenarios.rs`, `src/server.rs`.
-  - كتابة جناح اختبار تكاملي في `crates/test-http/tests/fixture_scenarios.rs` و `tests/fixture_scenarios.rs`.
-- **التحقق البرمجي وسير العمل:**
-  - `cargo check -p sayl-test-http` خرج 0 (نجاح كامل).
-  - `cargo check --tests -p sayl-test-http` خرج 0 (اكتمال فحص أنواع الاختبارات).
-  - `cargo check -p sayl-core` خرج 0 و `cargo check --tests -p sayl-core` خرج 0.
-  - `python tools/workflow.py validate` خرج 0.
-  - `python tools/workflow.py preflight` مع متغيرات البيئة خرج 0.
-  - `$env:PYTHONIOENCODING='utf-8'; python tools/workflow.py packet TEST-001 builder` خرج 0.
-  - `python tools/workflow.py check-report reports/TEST-001/builder.json` خرج 0 (status: blocked).
-
-## 2. أوامر التحقق المنفذة ونتائجها
-| الأمر | النتيجة | Exit code | السجل |
-|---|---|---|---|
-| `cargo check -p sayl-test-http` | نجاح فحص الأنواع بدون تحذيرات | 0 | `artifacts/TEST-001/builder-cargo-check.err.txt` |
-| `cargo check --tests -p sayl-test-http` | نجاح فحص أنواع الاختبارات | 0 | `artifacts/TEST-001/builder-cargo-check-tests.err.txt` |
-| `cargo test --no-run -p sayl-test-http` | فشل الرابط MSVC (link.exe not found) | 101 | `artifacts/TEST-001/builder-cargo-test.err.txt` |
-| `cargo check -p sayl-core` | نجاح فحص sayl-core مع dev-dependency | 0 | `artifacts/TEST-001/builder-core-check.err.txt` |
-| `cargo check --tests -p sayl-core` | نجاح فحص اختبارات sayl-core | 0 | `artifacts/TEST-001/builder-core-check-tests.err.txt` |
-| `python tools/workflow.py validate` | `ok: true` | 0 | `artifacts/TEST-001/builder-validate.out.txt` |
-| `python tools/workflow.py preflight` | `ok: true, routes_configured: true` | 0 | `artifacts/TEST-001/builder-preflight.out.txt` |
-| `python tools/workflow.py packet TEST-001 builder` | `ok: true` | 0 | `artifacts/TEST-001/builder-packet.out.json` |
-| `python tools/workflow.py check-report reports/TEST-001/builder.json` | `ok: true, status: blocked` | 0 | `artifacts/TEST-001/builder-check-report.out.txt` |
-
-## 3. العوائق الحالية (Blockers)
-1. **غياب رابط MSVC `link.exe`:** يمنع تجميع الاختبارات التنفيذية لمعيار القبول #5 (`cargo test -p sayl-test-http`). فحص الأنواع عبر `cargo check` و `cargo check --tests` يمر بنجاح تام.
-2. **عدم توفر إثبات تشفيري لهوية النموذج:** identity_verified معينة إلى `false` وفق REPORT-CONTRACT.md:9، مما يُلزم تعيين حالة التقرير إلى `blocked`.
-
-## 4. الخطوة التالية المؤهلة
-- **TEST-001 runtime_tester:** تشغيل اختبارات التحقق من سير العمل وتوثيق نتائج التشغيل.
-- **TEST-001 debater:** المراجعة النقدية المستقلة لمطابقة السيناريوهات الـ 27 وتصميم الخادم.
-
+| commit | الوصف |
+|---|---|
+| `f245629` | feat(storage): crash-safe task store (STORE-001) |
+| `98cdf36` | feat(http): validator-safe resume + retry policy; doctest scope off |
+| `0570b61` | feat(http): HTTP-001 probe/range/redirect/filename/stream + native-tls |
+| `e414a5a` | fix(core) self-transitions; feat(test-http) fixture server; docs(TOOLCHAIN) |
+| `28013d8` | feat(core): CORE-001 state machine, errors, events, idempotency, TaskId |
+| `2bb1410` | chore: BOOT-003 gate passed; M0 complete |
+| `38be0fe` | BOOT-003 baseline |

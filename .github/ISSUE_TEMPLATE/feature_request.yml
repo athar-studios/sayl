@@ -1,0 +1,105 @@
+name: Feature Request
+description: Suggest a new feature or enhancement for SAYL
+title: "[FEAT] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please describe your idea clearly so we can evaluate it against the project roadmap.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which area does this feature relate to?
+      options:
+        - Core / Engine (state machine, scheduler, storage)
+        - HTTP Transport (range validation, redirects, filenames)
+        - Testing Infrastructure (fixture server, failure modes)
+        - Desktop UI (Tauri + Svelte, Timeline, themes, i18n)
+        - Browser Integration (Native Messaging, extensions)
+        - Video / Media (yt-dlp, FFmpeg, playlists)
+        - Torrent (librqbit, selection, streaming)
+        - Plugin System (WASM, hooks, catalog)
+        - Android (Kotlin, UniFFI, SAF)
+        - Distribution (installers, updates, signing)
+        - Website / Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One-sentence summary of the feature.
+      placeholder: Add support for...
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation / Use Case
+      description: Why is this feature needed? What problem does it solve? Who benefits?
+      placeholder: |
+        Currently users cannot...
+        This would enable...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: How should this feature work? Include API sketches, UI mockups, or architecture notes if applicable.
+      placeholder: |
+        Add a new `schedule` field to `TaskRecord`...
+        Implement a `SchedulerService` in `sayl-app`...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What other approaches did you consider? Why is the proposed solution better?
+      placeholder: |
+        Alternative 1: ... (rejected because...)
+        Alternative 2: ... (rejected because...)
+    validations:
+      required: false
+
+  - type: dropdown
+    id: roadmap
+    attributes:
+      label: Roadmap Alignment
+      description: Where does this fit in the MASTER-PLAN roadmap?
+      options:
+        - Pre-M1 (core engine, HTTP, storage, testing)
+        - M1 (CLI, HTTP correctness, resume, parallel, recovery)
+        - M2 (Desktop UI, Timeline, queue, themes, i18n)
+        - M3 (Video: yt-dlp/FFmpeg, playlists)
+        - M4 (Torrent: selection, streaming/seek)
+        - M5 (Browser extensions, scheduling, refresh URL)
+        - M6 (WASM plugins, catalog)
+        - M7 (Website, docs, privacy, distribution)
+        - M8 (Android HTTP Preview)
+        - Post-v1.0 / Not on roadmap yet
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have read the MASTER-PLAN and this aligns with the project direction
+          required: true
+        - label: This is not a duplicate of an existing issue or roadmap item
+          required: true
+        - label: I understand this is a volunteer project and implementation is not guaranteed
+          required: true
+        - label: I am willing to contribute implementation (code, tests, docs)
+          required: false

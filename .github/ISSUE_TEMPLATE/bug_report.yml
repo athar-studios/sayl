@@ -1,0 +1,103 @@
+name: Bug Report
+description: Report a reproducible bug in SAYL
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please fill out the sections below as completely as possible.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version / Commit
+      description: Which version or commit hash are you using? (e.g., `main@abc1234` or `pre-M1`)
+      placeholder: main@abc1234
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: Which part of SAYL is affected?
+      options:
+        - sayl-core (state machine, errors, events, idempotency)
+        - sayl-http (HTTP client, range validation, redirects, filenames)
+        - sayl-test-http (fixture server, failure modes)
+        - sayl-storage (WAL, snapshots, recovery, locking)
+        - sayl-app (Tauri commands, app services)
+        - apps/desktop (Tauri + Svelte UI)
+        - apps/website (static site)
+        - extensions/browser (Native Messaging, extensions)
+        - Other / Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Clear and concise description of the bug.
+      placeholder: What happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Minimal steps to reproduce the bug. Include code snippets or CLI commands if applicable.
+      placeholder: |
+        1. Run `cargo test -p sayl-http`
+        2. Observe failure in `test_range_validation`
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should have happened?
+      placeholder: The test should pass / the download should resume / ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened? Include error messages, stack traces, log output.
+      placeholder: |
+        Error: ...
+        Stack trace: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Rust toolchain, relevant configuration.
+      placeholder: |
+        - OS: Windows 11 23H2 x64
+        - Rust: stable-x86_64-pc-windows-gnu
+        - RUSTFLAGS: -C linker=rust-lld
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues and found no duplicate
+          required: true
+        - label: I can reproduce this on the latest `main` branch
+          required: true
+        - label: This is not a security vulnerability (report those privately per SECURITY.md)
+          required: true
+        - label: I have included all relevant logs and error output
+          required: false

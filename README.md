@@ -1,46 +1,239 @@
-# SAYL — حزمة تسليم المشروع إلى AI Coding Agent
+# سيل (SAYL) — مدير تحميل مستقل لـ Windows
 
-هذه حزمة مواصفات وكونفيج وعقود مراجعة، وليست التطبيق النهائي. الاسم «سيل / SAYL» اقتراح لم يُفحص تجاريًا.
+[![CI](https://github.com/SAYL/SAYL/workflows/CI/badge.svg)](https://github.com/SAYL/SAYL/actions)
+[![License](https://img.shields.io/badge/license-TBD-lightgrey.svg)](#license)
 
-## البداية
-1. فك الحزمة داخل مجلد مشروع جديد، أو ادمج الملفات بعد مراجعة التعارضات. لا تستبدل تغييرات مستخدم قائمة.
-2. اقرأ docs/MASTER-PLAN.md ثم AGENTS.md.
-3. سلّم START-HERE-PROMPT.md إلى Agent البرمجة مع صلاحية قراءة المجلد.
-4. شغّل `python tools/workflow.py validate` للتحقق من الحزمة محليًا. Python 3.10+.
-5. انسخ `.env.example` إلى ملف أسرار محلي أو استخدم متغيرات بيئة آمنة؛ الأداة المرفقة لا تقرأ .env تلقائيًا.
-6. عيّن هوية موديل البناء وهوية موديل المناقشة المختلف. `python tools/workflow.py preflight` يتحقق من الإعدادات، ولا يختبر اتصال المزود.
-7. يبدأ الـAgent بـBOOT-001 فقط، ثم يحدد ربط أدواتك الفعلية بالأدوار. لا اتصال مدفوع ولا تنزيل dependency لمجرد فك الحزمة.
+**سيل (SAYL)** مدير تحميل (Download Manager) مكتوب بلغة Rust، بواجهة سطح مكتب Tauri 2 + Svelte + TypeScript، **Windows أولًا**، مصمم للاستئناف الآمن، التنزيل المتوازي المُحقق، والخصوصية المطلقة.
 
-## مهم: معنى «كونفيج جاهز» هنا
-`agents.config.json` ملف إعدادات خاص بهذه الحزمة، يقرؤه الـAgent وأداة workflow المرفقة. ليس صيغة native مضمونة لـCursor أو Claude Code أو Codex أو CrewAI. لا تختلق دعمًا تلقائيًا لأي منصة.
+> **حالة المشروع:** مواصفات وتطوير مبكر (ما قبل M1). النواة والمكتبات الأساسية موجودة وتخضع للاختبار؛ واجهة سطح المكتب وتكامل المتصفح والميزات المتقدمة قيد التطوير. راجع [خريطة الطريق](#خريطة-الطريق-roadmap) أدناه.
 
-الحزمة تعمل كـfile-based workflow: يقرأ كل دور packet المهمة ويودع تقرير JSON مطابقًا للعقد. الأداة المحلية تتحقق من الإعدادات والتقارير وبوابات القبول. لا تستدعي LLMs ولا تنفذ تطبيقات أو Strix بنفسها. Agent التنفيذ يستخدم أدواته الفعلية، أو ينشئ adapter مع اختبارات عند BOOT-003. هذا فصل مقصود حتى لا ندعي تشغيل فريق بمزود لم يحدده المستخدم.
+---
 
-الوضع الافتراضي `file_handoff`: يمكن تشغيل الجلسات يدويًا بموديل A وموديل B وتسليم packets بينهما. الوضع الآلي لا يُعلن جاهزًا إلا بعد اختبارات adapter الفعلية. تبديل اسم الدور أو session لا يثبت اختلاف الموديل.
+## ما هو سيل؟ (What is SAYL?)
 
-## الملفات
-- docs/MASTER-PLAN.md: الخطة الموحّدة للمنتج والموقع والإضافات واللغات والخصوصية.
-- agents.config.json: الأدوار والصلاحيات والموديلات والميزانية وبوابات الجودة.
-- docs/DEBATER-SYSTEM.md: بروتوكول الاعتراض والرد والفصل في الخلاف.
-- prompts/roles/: تعليمات كل دور.
-- docs/REPORT-CONTRACT.md وtemplates/: عقود وقوالب الأدلة والتقارير.
-- tools/workflow.py: validate/preflight/packet/check-report/gate، دون اتصالات خارجية.
-- docs/tasks/BOOT-001.md: أول مهمة فقط.
-- STATUS.json: حالة أولية؛ لا نتائج اختبارات مزعومة.
-- SAYL-FULL-EXECUTION-PROMPT.md: برومبت تشغيل كل المراحل.
-- CONTINUE-AFTER-PHASE-1.md: برومبت الاستمرار بعد BOOT-001.
-- STAGE-GATE.md: قاعدة التوقف بعد كل مرحلة وطلب موافقة.
+| الجانب | الوصف |
+|----------|---------|
+| **الهدف** | مدير تحميل مستقل، مفتوح المصدر، يحترم الخصوصية، لـ Windows (ثم Linux/Android). |
+| **المحرك** | Rust — `sayl-core` (نماذج/حالات/أحداث)، `sayl-http` (نقل HTTP، تحقق النطاقات)، `sayl-storage` (مخزن مهام آمن من التعطل)، `sayl-test-http` (خادم اختبارات حتمي لـ 27 وضع فشل). |
+| **الواجهة** | Tauri 2 + Svelte 5 + TypeScript — عربية أولاً (RTL)، i18n، ثيمات، Timeline حقيقي من المحرك. |
+| **الخصوصية** | لا تحليلات، لا تتبع، لا خطوط خارجية، لا رفع تقارير تعطل تلقائي. البيانات لا تغادر جهازك. |
+| **السلامة** | استئناف مُحقق بالنطاقات (Range validation)، تحقق ETag قوي، أسماء ملفات آمنة، كتابة بـ fsync، استعادة بعد تعطل. |
 
-## أوامر محلية
-```bash
-python tools/workflow.py validate
-python tools/workflow.py preflight
-python tools/workflow.py packet BOOT-001 builder
-python tools/workflow.py check-report reports/BOOT-001/builder.json
-python tools/workflow.py gate BOOT-001
+---
+
+## الحالة الحالية (Current Status)
+
+| الحزمة (Crate) | الوصف | اختبارات (Tests) | الحالة |
+|---------------|---------|------------------|--------|
+| `sayl-core` | نماذج المجال، آلة الحالات (11 حالة)، نظام الأخطاء، ناقل الأحداث، مفاتيح عدم التكرار | **33** | ✅ تمر |
+| `sayl-test-http` | خادم اختبارات HTTP حتمي، 27 وضع فشل، توليد بيانات حتمي | **25** | ✅ تمر |
+| `sayl-http` | عميل HTTP، تحقق النطاقات، تتبع إعادة توجيه آمن، استخراج أسماء ملفات آمنة | **65** | ✅ تمر |
+| `sayl-storage` | مخزن مهام WAL + لقطات ذرية، قفل دليل، استعادة بعد تعطل | **18** | ✅ تمر |
+| `sayl-app` | خدمات التطبيق، أوامر/أحداث Tauri | — | 🚧 قيد التطوير |
+| `sayl-cli` | واجهة سطر أوامر | — | 📋 مخطط |
+| `sayl-media` | مُحول yt-dlp/FFmpeg | — | 📋 مخطط |
+| `sayl-torrent` | محول librqbit | — | 📋 مخطط |
+| `sayl-plugin-host` | وقت تشغيل WASM، وسيط الصلاحيات | — | 📋 مخطط |
+| `apps/desktop` | Tauri + Svelte UI | — | 🚧 قيد التطوير |
+| `apps/website` | موقع تنزيل ثابت (هذا المستودع) | — | ✅ مكتمل |
+| `extensions/browser` | ملحقات Chromium/Firefox (Native Messaging) | — | 📋 مخطط |
+
+> **ملاحظة:** الأرقام أعلاه تعكس اختبارات الوحدة/التكامل الفعلية في المستودع. لا توجد اختبارات زائفة.
+
+---
+
+## البناء والتشغيل (Build & Run)
+
+### المتطلبات
+
+- **Rust:** `stable-x86_64-pc-windows-gnu` (GNU toolchain مع `rust-lld`)
+- **Windows:** Windows 10 1903+ x64
+- **للاختبارات فقط:** لا حاجة لـ Windows SDK ولا `link.exe` MSVC
+- **للبناء الإنتاجي (Tauri/MSVC):** مطلوب Windows SDK (تثبيت مرفوع الامتيازات)
+
+### أوامر موثقة (Verified Commands)
+
+وفقًا لـ `docs/TOOLCHAIN.md`، البيئة الحالية تعمل مع GNU + `rust-lld`:
+
+```powershell
+# إعداد المسار والعلميات
+$env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+$env:RUSTFLAGS = "-C linker=rust-lld"
+cd "C:\Users\Dragonfly\Downloads\Download Manager"
+
+# فحص الأنواع
+cargo +stable-x86_64-pc-windows-gnu check -p sayl-core
+cargo +stable-x86_64-pc-windows-gnu check -p sayl-http
+cargo +stable-x86_64-pc-windows-gnu check -p sayl-test-http
+cargo +stable-x86_64-pc-windows-gnu check -p sayl-storage
+
+# تشغيل الاختبارات
+cargo +stable-x86_64-pc-windows-gnu test -p sayl-core
+cargo +stable-x86_64-pc-windows-gnu test -p sayl-http
+cargo +stable-x86_64-pc-windows-gnu test -p sayl-test-http
+cargo +stable-x86_64-pc-windows-gnu test -p sayl-storage
+
+# مساحة العمل كاملة
+cargo +stable-x86_64-pc-windows-gnu test --workspace
 ```
 
-`gate` يفشل ما لم توجد كل التقارير المطلوبة لنفس commit وهوية شجرة الملفات ونفس acceptance revision. نجاح الأداة دليل اتساق ملفات، وليس برهانًا على خلو التطبيق من الثغرات أو أن محتوى تقرير كاذب أصبح حقيقة. تحتاج مراجعة مستقلة وCI وأدلة تشغيل.
+> **تحذير:** البناء الإنتاجي لـ Tauri يتطلب toolchain MSVC مع Windows SDK. البناء GNU يعمل للاختبارات فقط.
 
-## نطاق التفويض
-إنشاء/تعديل محلي وcommits محلية فقط عندما تسمح بيئة المستخدم. لا push، لا نشر، لا شراء نطاق، لا متجر، لا تثبيت Skills أو فحص خارجي أو إرسال كود خاص لمزود جديد دون الموافقة المناسبة. أسرار التوقيع وAPI خارج Git.
+---
+
+## هيكل المستودع (Repository Layout)
+
+```
+.
+├── apps/
+│   ├── desktop/          # Tauri + Svelte Desktop UI (قيد التطوير)
+│   └── website/          # موقع تنزيل ثابت (HTML/CSS/JS)
+├── crates/
+│   ├── core/             # sayl-core — نماذج، حالات، أحداث، أخطاء
+│   ├── http/             # sayl-http — عميل HTTP، تحقق نطاقات، أسماء ملفات
+│   ├── test-http/        # sayl-test-http — خادم اختبارات حتمي (27 وضع)
+│   ├── storage/          # sayl-storage — WAL + لقطات ذرية، قفل دليل
+│   ├── app/              # sayl-app — خدمات تطبيق، أوامر Tauri
+│   ├── cli/              # sayl-cli — واجهة سطر أوامر
+│   ├── media/            # sayl-media — yt-dlp/FFmpeg
+│   ├── torrent/          # sayl-torrent — librqbit
+│   └── plugin-host/      # sayl-plugin-host — WASM runtime
+├── extensions/
+│   └── browser/          # ملحقات المتصفح (Native Messaging)
+├── catalog/
+│   ├── plugins/          # بيانات إضافية مراجعة
+│   └── themes/           # بيانات ثيمات
+├── locales/              # موارد ترجمة نسخة
+├── docs/
+│   ├── MASTER-PLAN.md    # الخطة الموحدة للمنتج
+│   ├── TOOLCHAIN.md      # إعداد سلسلة الأدوات
+│   └── tasks/            # بطاقات مهام مفصلة
+├── .github/
+│   ├── workflows/ci.yml  # GitHub Actions CI
+│   ├── ISSUE_TEMPLATE/   # نماذج Issues
+│   └── PULL_REQUEST_TEMPLATE.md
+├── CONTRIBUTING.md       # دليل المساهمة
+├── SECURITY.md           # سياسة الأمان
+├── CODE_OF_CONDUCT.md    # مدونة السلوك
+├── .editorconfig         # تنسيق محرر موحد
+├── .gitattributes        # خصائص Git
+└── README.md             # هذا الملف
+```
+
+---
+
+## خريطة الطريق (Roadmap)
+
+### ✅ مكتمل /Implemented (ما قبل M1)
+
+- **sayl-core**: آلة حالات 11 حالة، انتقالات محمية، أخطاء مصنفة، ناقل أحداث محدود السعة مع ترقيم تسلسلي، مفاتيح Idempotency مع TTL، معرفات مهام UUID v7.
+- **sayl-test-http**: خادم fixture محلي، 27 وضع فشل (206 صحيح، لا Accept-Ranges، تجاهل Range، Content-Range فاسد، اقتطاع body، TCP reset، ETag متغير، ETag ضعيف، لا validator، 416، HEAD مرفوض، حجم مجهول، ملف فارغ، ترميز غير متوقع، 429 Retry-After، إعادة توجيه بأسرار، لا مساحة، إذن مرفوض، أسماء ملفات خبيثة، إيقاف أثناء probe، عامل بطيء، lease قديم، استعادة عند finalize، proxy/TLS، حدود أصل، اقتطاع ملف، pooling).
+- **sayl-http**: تحقق النطاقات النشط (HEAD → GET range=0-0)، تصنيف الدعم (Supported/Ignored/Unsupported/Unknown)، تتبع إعادة توجيه آمن (حد 5 هوب، تجريد Authorization/Cookie عبر أصول مختلفة، قائمة بيضاء http/https، كشف حلقات)، استخراج أسماء ملفات آمنة (RFC 5987، منع اجتياز مسارات، أسماء أجهزة Windows محجوزة، تحكم، Unicode NFC، حد 255 حرف)، تدفق للملف مع تحقق الطول و fsync.
+- **sayl-storage**: WAL بـ JSON-Lines، لقطات ذرية (tmp → fsync → rename)، تسامح مع ذيول مقطوعة، استعادة عبر snapshot + replay، قفل دليل حصري (Windows `share_mode(0)` + سجل في العملية).
+- **apps/website**: موقع ثابت RTL-first، تبديل لغة، فحص توفر ملفات بـ HEAD، FAQ accordion، لا تبعيات خارجية.
+
+### 🚧 قيد التطوير / Under Development
+
+- **sayl-app / apps/desktop**: Tauri 2 + Svelte 5 UI — Timeline حقيقي (نطاقات/leases/checkpoints/splits/retries من المحرك)، بطاقات مهام، طابور، منطقة سحب، اختصارات عامة، ثيمات JSON schema، i18n كامل.
+- **جدولة/طابور**: حد سرعة، جدولة زمنية، أولويات، إعادة تشغيل مهام فاشلة.
+- **تكامل المتصفح**: Native Messaging bridge، ملحقات Chromium/Firefox، صفحة "تكامل المتصفح" داخل التطبيق.
+- **دعم الفيديو**: yt-dlp/FFmpeg pinned، metadata، تقدم هيكلي، دمج/تحويل، قوائم تشغيل.
+- **دعم التورنت**: librqbit — magnet/.torrent، DHT/PEX، اختيار ملفات، بث/Seek.
+- **نظام الإضافات**: WASM runtime، hooks (extract، headers مقيدة، post-process، ui-tile declarative)، وسيط صلاحيات (DNS rebinding defense، allowlist شبكة، حدود ذاكرة/وقود/إخراج).
+- **كتالوج الإضافات/الثيمات**: داخل التطبيق والموقع — اسم/مطور/إصدار/مصدر/رخصة/توافق/صلاحيات/مراجعة/تثبيت/إزالة.
+- **Android**: Kotlin + UniFFI، HTTP Preview، SAF export، WorkManager/UIDT، إشعارات.
+- **التوزيع**: MSI/NSIS موقعة، تحديثات Tauri موقعة، SBOM، فحص تراخيص التبعيات.
+
+### 📋 مخطط / Planned (M5–M8 وما بعده)
+
+- Safari extension (مرحلة macOS منفصلة).
+- WASM plugins catalog مع remote refresh opt-in.
+- مراجعة أمنية قبل الإصدار (Strix).
+- مثبتات clean-machine، ترقية/إلغاء تثبيت نظيفة.
+- Android media/torrent/plugins بعد spikes.
+
+---
+
+## المساهمة (Contributing)
+
+راجع **[CONTRIBUTING.md](CONTRIBUTING.md)** لـ:
+
+- إعداد بيئة GNU + `rust-lld`
+- أوامر الاختبار والفحص
+- نمط رسائل الكوميت (English imperative)
+- قاعدة عدم الأوامر التدميرية لـ Git
+- تشغيل اختبارات HTTP fixture الحتمية دون شبكة
+- قائمة فحص Pull Request
+
+---
+
+## الأمان (Security)
+
+راجع **[SECURITY.md](SECURITY.md)** لـ:
+
+- الإصدارات المدعومة
+- كيفية الإبلاغ عن ثغرة أمنية (خاصًا)
+- داخل النطاق / خارج النطاق
+- وعد عدم وجود تتبع/تحليلات
+- المراجعة الأمنية قبل الإصدار
+
+---
+
+## مدونة السلوك (Code of Conduct)
+
+راجع **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** — نسخة مختصرة على نمط Contributor Covenant.
+
+---
+
+## الرخصة (License)
+
+**License: to be decided by the project owner**
+
+لم تُحسم الرخصة بعد. القرار يعود لمالك المشروع.
+
+---
+
+## روابط مفيدة
+
+- **الموقع:** `apps/website/` — افتح محليًا بـ `python -m http.server`
+- **Issues:** [GitHub Issues](https://github.com/SAYL/SAYL/issues)
+- **الأمان:** [SECURITY.md](SECURITY.md)
+- **خطة المنتج:** [docs/MASTER-PLAN.md](docs/MASTER-PLAN.md)
+- **سلسلة الأدوات:** [docs/TOOLCHAIN.md](docs/TOOLCHAIN.md)
+
+---
+
+## English Summary
+
+**SAYL** is an independent, open-source, privacy-respecting download manager for Windows, written in Rust with a Tauri 2 + Svelte desktop UI. Arabic-first, RTL, i18n-ready.
+
+### Current Status (Pre-M1)
+
+| Crate | Description | Tests |
+|-------|-------------|-------|
+| `sayl-core` | Domain models, 11-state machine, error taxonomy, bounded event bus, idempotency keys | 33 |
+| `sayl-test-http` | Deterministic HTTP fixture server, 27 failure modes | 25 |
+| `sayl-http` | HTTP client, range validation, safe redirects, safe filenames | 65 |
+| `sayl-storage` | Crash-safe task store (WAL + atomic snapshots), directory locking | 18 |
+
+Desktop UI, browser integration, video/torrent, plugins, Android — **under development**.
+
+### Build (Test Environment)
+
+```powershell
+$env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+$env:RUSTFLAGS = "-C linker=rust-lld"
+cargo +stable-x86_64-pc-windows-gnu test --workspace
+```
+
+Production builds require MSVC toolchain + Windows SDK (elevated install).
+
+### Links
+
+- **Website:** `apps/website/` — `python -m http.server` to preview
+- **Issues:** GitHub Issues
+- **Security:** `SECURITY.md`
+- **Roadmap:** `docs/MASTER-PLAN.md`
+- **Toolchain:** `docs/TOOLCHAIN.md`
+
+**License:** to be decided by the project owner.

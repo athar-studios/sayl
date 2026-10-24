@@ -1,0 +1,58 @@
+# Git attributes for SAYL
+
+# Text files - auto normalize line endings
+* text=auto
+
+# Rust and TOML - always LF
+*.rs text eol=lf
+*.toml text eol=lf
+
+# Cargo lock - always LF
+Cargo.lock text eol=lf
+
+# Web assets - always LF
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.svg text eol=lf
+
+# Documentation - always LF
+*.md text eol=lf
+
+# Configuration - always LF
+*.yml text eol=lf
+*.yaml text eol=lf
+*.ini text eol=lf
+.editorconfig text eol=lf
+
+# Scripts - Windows line endings
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files - no diff, no line ending conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+
+# Archives - binary
+*.zip binary
+*.tar.gz binary
+*.tar.zst binary
+*.msi binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.rlib binary
+
+# Diff settings
+*.rs diff=rust
+*.toml diff=toml
+*.md diff=markdown
