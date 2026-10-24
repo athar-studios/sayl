@@ -512,9 +512,8 @@ async fn test_worker_failing_mid_chunk_retried_by_another_worker_and_completes()
                         let attempt = range1_attempts.fetch_add(1, Ordering::SeqCst);
                         if attempt == 0 {
                             // First attempt on range 1 fails mid-chunk with ConnectionReset!
-                            let headers = format!(
-                                "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 1000-1999/2000\r\nContent-Length: 1000\r\n\r\n"
-                            );
+                            let headers =
+                                "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 1000-1999/2000\r\nContent-Length: 1000\r\n\r\n";
                             let _ = socket.write_all(headers.as_bytes()).await;
                             let _ = socket.write_all(&expected_data[1000..1200]).await; // write only 200 bytes
                             let _ = socket.shutdown().await; // simulate drop / RST
