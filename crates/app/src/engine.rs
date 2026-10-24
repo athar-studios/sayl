@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use chrono::Utc;
 use sayl_core::error::CoreError;
@@ -17,6 +18,7 @@ use tokio_util::sync::CancellationToken;
 use url::Url;
 
 use crate::config::EngineConfig;
+use crate::queue::{Scheduler, TaskStatus as QueueTaskStatus};
 use crate::sequential::DownloadOutcome;
 
 struct ActiveTaskControl {
@@ -47,6 +49,11 @@ struct EngineInner {
     event_receiver: Mutex<Option<EventReceiver>>,
     active_tasks: Arc<Mutex<HashMap<TaskId, ActiveTaskControl>>>,
     task_semaphore: Arc<Semaphore>,
+    scheduler: Mutex<Scheduler>,
+    /// Maps engine TaskIds to scheduler u64 task IDs.
+    scheduler_id_map: Mutex<HashMap<TaskId, u64>>,
+    /// Counter for generating unique scheduler task IDs.
+    next_scheduler_id: Mutex<u64>,
 }
 
 /// Download engine orchestrating multi-task, sequential and parallel downloads.
@@ -100,6 +107,9 @@ impl Engine {
 
         let max_tasks = config.max_concurrent_tasks.max(1);
         let semaphore = Arc::new(Semaphore::new(max_tasks));
+        let scheduler = Mutex::new(Scheduler::new(config.queue_limits));
+        let scheduler_id_map = Mutex::new(HashMap::new());
+        let next_scheduler_id = Mutex::new(1u64);
 
         let inner = EngineInner {
             download_dir: dl_dir,
@@ -110,6 +120,9 @@ impl Engine {
             event_receiver: Mutex::new(Some(receiver)),
             active_tasks: Arc::new(Mutex::new(HashMap::new())),
             task_semaphore: semaphore,
+            scheduler,
+            scheduler_id_map,
+            next_scheduler_id,
         };
 
         Ok(Self {
@@ -177,15 +190,18 @@ impl Engine {
     /// Runs the full lifecycle of a download task honoring `sayl_core::transition`:
     /// `Queued → Probing → Downloading → Verifying → Finalizing → Completed`,
     /// with `Pausing/Paused`, `Cancelling/Cancelled`, and `Failed` on error.
+    ///
+    /// This method now integrates with the scheduler: the task is enqueued and only
+    /// starts downloading when the scheduler promotes it (global slot + origin permit available).
     pub async fn start(&self, task_id: TaskId) -> Result<(), CoreError> {
         // 1. Load task record
-        let mut record = self
+        let record = self
             .inner
             .store
             .get_task(task_id)?
             .ok_or_else(|| CoreError::storage("not_found", format!("task {task_id} not found")))?;
 
-        // If already terminal, reject or return
+        // If already terminal, reject
         if record.state.is_terminal() {
             return Err(CoreError::validation(
                 "state",
@@ -193,20 +209,78 @@ impl Engine {
             ));
         }
 
+        // Get or allocate scheduler ID for this task
+        let sched_id = self.get_or_alloc_scheduler_id(task_id);
+
+        // Enqueue in scheduler
+        let origin = Self::extract_origin(&record.url)?;
+        let promoted = {
+            let mut scheduler = self.inner.scheduler.lock().map_err(|_| {
+                CoreError::scheduler("scheduler mutex poisoned")
+            })?;
+            scheduler.enqueue(sched_id).map_err(Self::queue_error_to_core)?;
+            scheduler.set_origin(sched_id, &origin).map_err(Self::queue_error_to_core)?;
+            let started = scheduler.poll(Instant::now());
+            started.contains(&sched_id)
+        };
+
+        if !promoted {
+            // Not promoted: task stays queued, persist and return
+            // The task is already in Queued state from add(), no state transition needed
+            // Emit no Started event; the queued event from add() is sufficient
+            return Ok(());
+        }
+
+        // Task was promoted: proceed with download
+        self.run_download(task_id, record, sched_id).await
+    }
+
+    /// Converts a scheduler QueueError to CoreError.
+    fn queue_error_to_core(err: crate::queue::QueueError) -> CoreError {
+        CoreError::scheduler(err.to_string())
+    }
+
+    /// Gets the scheduler ID for a task, allocating a new one if needed.
+    fn get_or_alloc_scheduler_id(&self, task_id: TaskId) -> u64 {
+        {
+            let map = self.inner.scheduler_id_map.lock().unwrap_or_else(|e| e.into_inner());
+            if let Some(&id) = map.get(&task_id) {
+                return id;
+            }
+        }
+        // Allocate new ID
+        let mut next_id = self.inner.next_scheduler_id.lock().unwrap_or_else(|e| e.into_inner());
+        let new_id = *next_id;
+        *next_id += 1;
+        drop(next_id);
+        let mut map = self.inner.scheduler_id_map.lock().unwrap_or_else(|e| e.into_inner());
+        map.insert(task_id, new_id);
+        new_id
+    }
+
+    /// Removes the scheduler ID mapping for a task.
+    fn remove_scheduler_id(&self, task_id: TaskId) {
+        let mut map = self.inner.scheduler_id_map.lock().unwrap_or_else(|e| e.into_inner());
+        map.remove(&task_id);
+    }
+
+    /// Gets the scheduler ID for a task, returning None if not found.
+    fn get_scheduler_id(&self, task_id: TaskId) -> Option<u64> {
+        let map = self.inner.scheduler_id_map.lock().unwrap_or_else(|e| e.into_inner());
+        map.get(&task_id).copied()
+    }
+
+    /// Internal method that executes the actual download after scheduler promotion.
+    async fn run_download(
+        &self,
+        task_id: TaskId,
+        mut record: TaskRecord,
+        sched_id: u64,
+    ) -> Result<(), CoreError> {
         // Verify state can transition to Probing
         sayl_core::transition(record.state, DownloadState::Probing)?;
 
-        // 2. Enforce concurrency limit: acquire semaphore permit
-        let permit = self
-            .inner
-            .task_semaphore
-            .clone()
-            .try_acquire_owned()
-            .map_err(|_| {
-                CoreError::scheduler("concurrency limit reached: max concurrent tasks running")
-            })?;
-
-        // 3. Register active task control
+        // Register active task control (no semaphore needed - scheduler manages concurrency)
         let cancel_token = CancellationToken::new();
         let pause_token = CancellationToken::new();
         {
@@ -230,47 +304,29 @@ impl Engine {
         let _guard = TaskGuard {
             task_id,
             active_tasks: Arc::clone(&self.inner.active_tasks),
-            _permit: permit,
+            _permit: self.inner.task_semaphore.clone().try_acquire_owned().map_err(|_| {
+                CoreError::scheduler("internal error: semaphore unavailable after scheduler promotion")
+            })?,
         };
 
-        // 4. Transition to Probing
+        // Transition to Probing
         self.transition_and_persist(&mut record, DownloadState::Probing)
             .await?;
 
         if cancel_token.is_cancelled() {
-            self.transition_and_persist(&mut record, DownloadState::Cancelling)
-                .await?;
-            self.transition_and_persist(&mut record, DownloadState::Cancelled)
-                .await?;
-            let _ = self
-                .inner
-                .event_sender
-                .emit(
-                    task_id,
-                    EventKind::Cancelled,
-                    EventPayload::Cancelled {
-                        reason: "cancelled during probing".into(),
-                    },
-                )
-                .await;
+            self.handle_cancel_during_probing(task_id, &mut record).await;
+            let promoted = self.finish_and_get_promoted(sched_id, QueueTaskStatus::Cancelled);
+            self.spawn_promoted_tasks(promoted);
+            self.remove_scheduler_id(task_id);
             return Ok(());
         }
         if pause_token.is_cancelled() {
-            let checkpoint = Checkpoint::new(
-                task_id,
-                record.written,
-                record.total_size,
-                vec![(0, record.written)],
-            );
-            let _ = self.inner.store.save_checkpoint(&checkpoint);
-            self.transition_and_persist(&mut record, DownloadState::Pausing)
-                .await?;
-            self.transition_and_persist(&mut record, DownloadState::Paused)
-                .await?;
+            self.handle_pause_during_probing(task_id, &mut record).await;
+            self.scheduler_pause_and_promote(sched_id).await;
             return Ok(());
         }
 
-        // 5. Probe remote origin
+        // Probe remote origin
         let target_url = Url::parse(record.final_url.as_deref().unwrap_or(&record.url))
             .map_err(|e| CoreError::validation("url", e.to_string()))?;
 
@@ -300,6 +356,9 @@ impl Engine {
                         },
                     )
                     .await;
+                let promoted = self.finish_and_get_promoted(sched_id, QueueTaskStatus::Failed);
+                self.spawn_promoted_tasks(promoted);
+                self.remove_scheduler_id(task_id);
                 return Err(err.into());
             }
         };
@@ -313,7 +372,7 @@ impl Engine {
         record.last_modified = probe_res.last_modified.clone().or(record.last_modified.clone());
         self.inner.store.upsert_task(&record)?;
 
-        // 6. Resume check
+        // Resume check
         let safe_filename = sayl_http::filename::sanitize_filename(&record.filename);
         if record.filename != safe_filename {
             record.filename = safe_filename.clone();
@@ -396,13 +455,16 @@ impl Engine {
                         .await;
                     record.error = Some(reason.to_string());
                     let _ = self.inner.store.upsert_task(&record);
+                    let promoted = self.finish_and_get_promoted(sched_id, QueueTaskStatus::Failed);
+                    self.spawn_promoted_tasks(promoted);
+                    self.remove_scheduler_id(task_id);
                     return Err(CoreError::validation("resume", reason));
                 }
             }
         }
 
-        // 7. Download execution
-        if !already_complete {
+        // Download execution
+        let outcome_status = if !already_complete {
             self.transition_and_persist(&mut record, DownloadState::Downloading)
                 .await?;
 
@@ -448,6 +510,7 @@ impl Engine {
                 Ok(DownloadOutcome::Completed { written }) => {
                     record.written = written;
                     self.inner.store.upsert_task(&record)?;
+                    QueueTaskStatus::Finished
                 }
                 Ok(DownloadOutcome::Paused { written }) => {
                     record.written = written;
@@ -462,6 +525,7 @@ impl Engine {
                         .await?;
                     self.transition_and_persist(&mut record, DownloadState::Paused)
                         .await?;
+                    self.scheduler_pause_and_promote(sched_id).await;
                     return Ok(());
                 }
                 Ok(DownloadOutcome::Cancelled { written }) => {
@@ -481,7 +545,7 @@ impl Engine {
                             },
                         )
                         .await;
-                    return Ok(());
+                    QueueTaskStatus::Cancelled
                 }
                 Err(err) => {
                     let _ = self
@@ -501,16 +565,51 @@ impl Engine {
                             },
                         )
                         .await;
+                    let promoted = self.finish_and_get_promoted(sched_id, QueueTaskStatus::Failed);
+                    self.spawn_promoted_tasks(promoted);
+                    self.remove_scheduler_id(task_id);
                     return Err(err);
                 }
             }
+        } else {
+            QueueTaskStatus::Finished
+        };
+
+        // If already_complete or download completed, continue to verification/finalization
+        if matches!(outcome_status, QueueTaskStatus::Finished) && !already_complete {
+            // Verification and finalization for successful downloads
+            let final_status = self
+                .complete_download(task_id, &mut record, &part_path)
+                .await
+                .unwrap_or(QueueTaskStatus::Failed);
+            let promoted = self.finish_and_get_promoted(sched_id, final_status);
+            self.spawn_promoted_tasks(promoted);
+            if final_status.is_terminal() {
+                self.remove_scheduler_id(task_id);
+            }
+        } else {
+            let promoted = self.finish_and_get_promoted(sched_id, outcome_status);
+            self.spawn_promoted_tasks(promoted);
+            if outcome_status.is_terminal() {
+                self.remove_scheduler_id(task_id);
+            }
         }
 
-        // 8. Verifying
-        self.transition_and_persist(&mut record, DownloadState::Verifying)
+        Ok(())
+    }
+
+    /// Completes a download after successful transfer: verify, finalize, emit Completed event.
+    async fn complete_download(
+        &self,
+        task_id: TaskId,
+        record: &mut TaskRecord,
+        part_path: &Path,
+    ) -> Result<QueueTaskStatus, CoreError> {
+        // Verifying
+        self.transition_and_persist(record, DownloadState::Verifying)
             .await?;
 
-        let actual_len = tokio::fs::metadata(&part_path)
+        let actual_len = tokio::fs::metadata(part_path)
             .await
             .map_err(|e| CoreError::io_with_context(e, "get part file metadata"))?
             .len();
@@ -518,34 +617,31 @@ impl Engine {
         if let Some(expected) = record.total_size {
             if actual_len != expected {
                 let _ = self
-                    .transition_and_persist(&mut record, DownloadState::Failed)
+                    .transition_and_persist(record, DownloadState::Failed)
                     .await;
                 record.error = Some("file size mismatch".to_string());
-                let _ = self.inner.store.upsert_task(&record);
-                return Err(CoreError::validation(
-                    "content_length",
-                    format!("verified size {actual_len} does not match expected {expected}"),
-                ));
+                let _ = self.inner.store.upsert_task(record);
+                return Ok(QueueTaskStatus::Failed);
             }
         }
 
-        // 9. Finalizing
-        self.transition_and_persist(&mut record, DownloadState::Finalizing)
+        // Finalizing
+        self.transition_and_persist(record, DownloadState::Finalizing)
             .await?;
 
         let final_path = self.resolve_destination_path(&record.filename)?;
         if final_path.exists() {
             let _ = tokio::fs::remove_file(&final_path).await;
         }
-        tokio::fs::rename(&part_path, &final_path)
+        tokio::fs::rename(part_path, &final_path)
             .await
             .map_err(|e| CoreError::io_with_context(e, "rename part file to final file"))?;
 
-        // 10. Completed
-        self.transition_and_persist(&mut record, DownloadState::Completed)
+        // Completed
+        self.transition_and_persist(record, DownloadState::Completed)
             .await?;
         record.written = actual_len;
-        self.inner.store.upsert_task(&record)?;
+        self.inner.store.upsert_task(record)?;
 
         let duration_ms = (Utc::now() - record.created_at)
             .num_milliseconds()
@@ -564,7 +660,123 @@ impl Engine {
             )
             .await;
 
-        Ok(())
+        Ok(QueueTaskStatus::Finished)
+    }
+
+    /// Handles cancellation during probing phase.
+    async fn handle_cancel_during_probing(&self, task_id: TaskId, record: &mut TaskRecord) {
+        let _ = self
+            .transition_and_persist(record, DownloadState::Cancelling)
+            .await;
+        let _ = self
+            .transition_and_persist(record, DownloadState::Cancelled)
+            .await;
+        let _ = self
+            .inner
+            .event_sender
+            .emit(
+                task_id,
+                EventKind::Cancelled,
+                EventPayload::Cancelled {
+                    reason: "cancelled during probing".into(),
+                },
+            )
+            .await;
+    }
+
+    /// Handles pause during probing phase.
+    async fn handle_pause_during_probing(&self, task_id: TaskId, record: &mut TaskRecord) {
+        let checkpoint = Checkpoint::new(task_id, record.written, record.total_size, vec![(0, record.written)]);
+        let _ = self.inner.store.save_checkpoint(&checkpoint);
+        let _ = self
+            .transition_and_persist(record, DownloadState::Pausing)
+            .await;
+        let _ = self
+            .transition_and_persist(record, DownloadState::Paused)
+            .await;
+    }
+
+    /// Calls scheduler.finish with outcome, polls for promoted tasks, and returns their scheduler IDs.
+    fn finish_and_get_promoted(&self, sched_id: u64, outcome: QueueTaskStatus) -> Vec<u64> {
+        let mut scheduler = match self.inner.scheduler.lock() {
+            Ok(s) => s,
+            Err(e) => e.into_inner(),
+        };
+        let _ = scheduler.finish(sched_id, outcome);
+        scheduler.poll(Instant::now())
+    }
+
+    /// Cancels task in scheduler, polls for promoted tasks, and returns their scheduler IDs.
+    fn cancel_and_get_promoted(&self, sched_id: u64) -> Vec<u64> {
+        let mut scheduler = match self.inner.scheduler.lock() {
+            Ok(s) => s,
+            Err(e) => e.into_inner(),
+        };
+        let _ = scheduler.cancel(sched_id);
+        scheduler.poll(Instant::now())
+    }
+
+    /// Spawns download for promoted scheduler IDs.
+    fn spawn_promoted_tasks(&self, promoted_sched_ids: Vec<u64>) {
+        for promoted_sched_id in promoted_sched_ids {
+            let engine = self.clone();
+            tokio::spawn(async move {
+                if let Some(promoted_task_id) = engine.get_task_id_from_scheduler_id(promoted_sched_id) {
+                    let _ = engine.run_promoted_download(promoted_task_id, promoted_sched_id).await;
+                } else {
+                    // No mapping: task was cancelled/removed. Release the scheduler slot.
+                    let _ = engine.finish_and_get_promoted(promoted_sched_id, QueueTaskStatus::Cancelled);
+                    // Note: finish_and_get_promoted will poll and spawn any newly promoted tasks
+                }
+            });
+        }
+    }
+
+    /// Runs download for a task that was promoted by the scheduler (skips scheduler enqueue).
+    async fn run_promoted_download(&self, task_id: TaskId, sched_id: u64) -> Result<(), CoreError> {
+        let record = self
+            .inner
+            .store
+            .get_task(task_id)?
+            .ok_or_else(|| CoreError::storage("not_found", format!("task {task_id} not found")))?;
+
+        // If task is already terminal (cancelled while queued), don't start download.
+        // Release the scheduler slot and promote waiters.
+        if record.state.is_terminal() || record.state == DownloadState::Cancelling {
+            let promoted = self.finish_and_get_promoted(sched_id, QueueTaskStatus::Cancelled);
+            self.spawn_promoted_tasks(promoted);
+            return Ok(());
+        }
+
+        self.run_download(task_id, record, sched_id).await
+    }
+
+    /// Releases scheduler slot for paused task and promotes waiting tasks.
+    async fn scheduler_pause_and_promote(&self, sched_id: u64) {
+        let promoted = self.cancel_and_get_promoted(sched_id);
+        self.spawn_promoted_tasks(promoted);
+        // Remove scheduler ID mapping for paused task so it can be re-enqueued on resume
+        if let Some(task_id) = self.get_task_id_from_scheduler_id(sched_id) {
+            self.remove_scheduler_id(task_id);
+        }
+    }
+
+    /// Gets the TaskId for a scheduler ID, if mapped.
+    fn get_task_id_from_scheduler_id(&self, sched_id: u64) -> Option<TaskId> {
+        let map = self.inner.scheduler_id_map.lock().unwrap_or_else(|e| e.into_inner());
+        // Reverse lookup: find TaskId by scheduler ID (value)
+        map.iter().find_map(|(&task_id, &v)| if v == sched_id { Some(task_id) } else { None })
+    }
+
+    /// Extracts the origin (scheme://host) from a URL string.
+    fn extract_origin(url: &str) -> Result<String, CoreError> {
+        let parsed = Url::parse(url).map_err(|e| CoreError::validation("url", e.to_string()))?;
+        let scheme = parsed.scheme();
+        let host = parsed
+            .host_str()
+            .ok_or_else(|| CoreError::validation("url", "missing host"))?;
+        let port = parsed.port().map(|p| format!(":{p}")).unwrap_or_default();
+        Ok(format!("{scheme}://{host}{port}"))
     }
 
     /// Pauses an active or queued download task.
@@ -599,6 +811,10 @@ impl Engine {
             .unwrap_or(false);
 
         if !is_active && record.state == DownloadState::Queued {
+            // Task is queued but not running: remove from scheduler and mark as Paused
+            if let Some(sched_id) = self.get_scheduler_id(task_id) {
+                self.scheduler_pause_queued(sched_id);
+            }
             if self
                 .transition_and_persist(&mut record, DownloadState::Probing)
                 .await
@@ -616,8 +832,15 @@ impl Engine {
         Ok(())
     }
 
+    /// Removes a queued task from scheduler and promotes waiting tasks.
+    fn scheduler_pause_queued(&self, sched_id: u64) {
+        let promoted = self.cancel_and_get_promoted(sched_id);
+        self.spawn_promoted_tasks(promoted);
+    }
+
     /// Cancels a download task. Idempotent: repeated calls succeed without error.
     pub async fn cancel(&self, task_id: TaskId) -> Result<(), CoreError> {
+        // Signal cancellation to active download if running
         if let Ok(active) = self.inner.active_tasks.lock() {
             if let Some(ctrl) = active.get(&task_id) {
                 ctrl.cancel_token.cancel();
@@ -637,9 +860,12 @@ impl Engine {
         };
 
         if record.state == DownloadState::Cancelled {
+            // Still need to clean up scheduler
+            self.scheduler_cancel_and_promote(task_id).await;
             return Ok(());
         }
         if record.state.is_terminal() {
+            self.scheduler_cancel_and_promote(task_id).await;
             return Ok(());
         }
 
@@ -651,6 +877,7 @@ impl Engine {
             .unwrap_or(false);
 
         if !is_active {
+            // Task is queued but not running: cancel directly in scheduler and persist
             if sayl_core::transition(record.state, DownloadState::Cancelling).is_ok() {
                 self.transition_and_persist(&mut record, DownloadState::Cancelling)
                     .await?;
@@ -668,9 +895,34 @@ impl Engine {
                     )
                     .await;
             }
+            // Cancel in scheduler FIRST, then remove mapping.
+            // This ensures the queued task is actually removed from the scheduler.
+            if let Some(sched_id) = self.get_scheduler_id(task_id) {
+                let promoted = self.cancel_and_get_promoted(sched_id);
+                self.spawn_promoted_tasks(promoted);
+                self.remove_scheduler_id(task_id);
+            }
         }
+        // If active, the running download will handle the cancellation and call on_task_complete
+
+        // Update scheduler and promote waiting tasks (for active tasks)
+        self.scheduler_cancel_and_promote(task_id).await;
 
         Ok(())
+    }
+
+    /// Internal: cancel task in scheduler and promote waiting tasks.
+    async fn scheduler_cancel_and_promote(&self, task_id: TaskId) {
+        let sched_id = match self.get_scheduler_id(task_id) {
+            Some(id) => id,
+            None => return, // No scheduler entry, nothing to do
+        };
+
+        let promoted = self.cancel_and_get_promoted(sched_id);
+        self.spawn_promoted_tasks(promoted);
+
+        // Clean up scheduler ID mapping
+        self.remove_scheduler_id(task_id);
     }
 
     /// Reloads tasks from the store and recovers non-terminal tasks to Paused/Queued or Failed.
@@ -709,8 +961,19 @@ impl Engine {
             }
 
             match task.state {
-                DownloadState::Queued | DownloadState::Paused => {
-                    // Dormant valid states
+                DownloadState::Queued => {
+                    // Re-enqueue in scheduler
+                    let sched_id = self.get_or_alloc_scheduler_id(task.id);
+                    let origin = Self::extract_origin(&task.url)?;
+                    let mut scheduler = self.inner.scheduler.lock().map_err(|_| {
+                        CoreError::scheduler("scheduler mutex poisoned")
+                    })?;
+                    scheduler.enqueue(sched_id).map_err(Self::queue_error_to_core)?;
+                    scheduler.set_origin(sched_id, &origin).map_err(Self::queue_error_to_core)?;
+                    // Note: we don't poll here; recovered tasks wait for their turn
+                }
+                DownloadState::Paused => {
+                    // Dormant valid state, not enqueued in scheduler
                 }
                 DownloadState::Probing | DownloadState::Downloading => {
                     if self
@@ -760,6 +1023,15 @@ impl Engine {
             }
         }
 
+        // After recovering all tasks, poll scheduler to promote any queued tasks
+        let promoted = {
+            let mut scheduler = self.inner.scheduler.lock().map_err(|_| {
+                CoreError::scheduler("scheduler mutex poisoned")
+            })?;
+            scheduler.poll(Instant::now())
+        };
+        self.spawn_promoted_tasks(promoted);
+
         Ok(updated)
     }
 
@@ -807,6 +1079,12 @@ impl Engine {
     /// Returns the download directory path.
     pub fn download_dir(&self) -> &Path {
         &self.inner.download_dir
+    }
+
+    /// Returns a snapshot of the scheduler occupancy.
+    pub async fn queue_stats(&self) -> crate::queue::QueueStats {
+        let scheduler = self.inner.scheduler.lock().unwrap_or_else(|e| e.into_inner());
+        scheduler.stats()
     }
 
     /// Helper that validates and persists state transitions.
