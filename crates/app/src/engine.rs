@@ -652,7 +652,7 @@ impl Engine {
                     cancel_token.clone(),
                     pause_token.clone(),
                     &self.inner.event_sender,
-                    &*self.inner.store,
+                    &self.inner.store,
                 )
                 .await;
 

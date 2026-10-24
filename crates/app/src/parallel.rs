@@ -36,6 +36,7 @@ impl Default for ParallelOptions {
 }
 
 /// Executes a bounded parallel multi-connection download to a `.part` file.
+#[allow(clippy::too_many_arguments)]
 pub async fn run_parallel_download(
     client: &reqwest::Client,
     url: &Url,
@@ -69,6 +70,7 @@ pub async fn run_parallel_download(
 }
 
 /// Executes a parallel download and returns both the [`DownloadOutcome`] and the resulting [`LeaseReport`].
+#[allow(clippy::too_many_arguments)]
 pub async fn run_parallel_download_with_report(
     client: &reqwest::Client,
     url: &Url,
@@ -103,6 +105,7 @@ pub async fn run_parallel_download_with_report(
 }
 
 /// Executes a parallel download with fully configurable [`ParallelOptions`].
+#[allow(clippy::too_many_arguments)]
 pub async fn run_parallel_download_with_options(
     client: &reqwest::Client,
     url: &Url,
@@ -211,7 +214,7 @@ pub async fn run_parallel_download_with_options(
     // Clone store for monitor task and final checkpoint, then shadow original to prevent capture
     let store_for_monitor = store.clone();
     let store_for_final = store.clone();
-    let store = (); // Shadow original store to prevent capture in worker closures
+    let _store = (); // Shadow original store to prevent capture in worker closures
 
     // Spawn monitor task first (captures store_for_monitor)
     let total_dl_clone = Arc::clone(&total_downloaded);
@@ -277,7 +280,8 @@ pub async fn run_parallel_download_with_options(
         let first_error = Arc::clone(&first_error);
         let cancel_token = cancel_token.clone();
         let pause_token = pause_token.clone();
-        let lease_ttl = lease_ttl;
+        // `lease_ttl` is Copy and captured by the worker task below through the
+        // outer scope, so no explicit clone/rebind is needed here.
 
         let handle = tokio::spawn(async move {
             let mut consecutive_failures = 0;
@@ -323,7 +327,7 @@ pub async fn run_parallel_download_with_options(
                     Ok(r) => r,
                     Err(e) => {
                         let mut tbl = table.lock().await;
-                        tbl.release(&lease);
+                        tbl.release(lease);
                         let err = CoreError::http(None, e.to_string(), None);
                         let mut err_guard = first_error.lock().await;
                         if err_guard.is_none() {
@@ -337,7 +341,7 @@ pub async fn run_parallel_download_with_options(
                     Ok(r) => r,
                     Err(err) => {
                         let mut tbl = table.lock().await;
-                        tbl.release(&lease);
+                        tbl.release(lease);
 
                         if cancel_token.is_cancelled() || pause_token.is_cancelled() {
                             break;
@@ -367,7 +371,7 @@ pub async fn run_parallel_download_with_options(
                     && status != reqwest::StatusCode::OK
                 {
                     let mut tbl = table.lock().await;
-                    tbl.release(&lease);
+                    tbl.release(lease);
                     let err = CoreError::http(
                         Some(status.as_u16()),
                         format!("worker {worker_id} received unexpected status: {status}"),
@@ -389,19 +393,19 @@ pub async fn run_parallel_download_with_options(
                 loop {
                     if cancel_token.is_cancelled() || pause_token.is_cancelled() {
                         let mut tbl = table.lock().await;
-                        tbl.release(&lease);
+                        tbl.release(lease);
                         break;
                     }
 
                     tokio::select! {
                         _ = cancel_token.cancelled() => {
                             let mut tbl = table.lock().await;
-                            tbl.release(&lease);
+                            tbl.release(lease);
                             break;
                         }
                         _ = pause_token.cancelled() => {
                             let mut tbl = table.lock().await;
-                            tbl.release(&lease);
+                            tbl.release(lease);
                             break;
                         }
                         item = stream.next() => {
@@ -410,7 +414,7 @@ pub async fn run_parallel_download_with_options(
                                     if !chunk_bytes.is_empty() {
                                         if worker_offset + (chunk_bytes.len() as u64) > expected_end {
                                             let mut tbl = table.lock().await;
-                                            tbl.release(&lease);
+                                            tbl.release(lease);
                                             let err = CoreError::validation(
                                                 "range_lease",
                                                 format!(
@@ -432,7 +436,7 @@ pub async fn run_parallel_download_with_options(
                                             worker_offset,
                                         ) {
                                             let mut tbl = table.lock().await;
-                                            tbl.release(&lease);
+                                            tbl.release(lease);
                                             let err = CoreError::io_with_context(
                                                 e,
                                                 format!("worker {worker_id} write_at"),
@@ -467,7 +471,7 @@ pub async fn run_parallel_download_with_options(
 
                 if let Some(err) = stream_err {
                     let mut tbl = table.lock().await;
-                    tbl.release(&lease);
+                    tbl.release(lease);
                     let mut err_guard = first_error.lock().await;
                     if err_guard.is_none() {
                         *err_guard = Some(err);
@@ -483,14 +487,14 @@ pub async fn run_parallel_download_with_options(
                 // Check cancellation
                 if cancel_token.is_cancelled() || pause_token.is_cancelled() {
                     let mut tbl = table.lock().await;
-                    tbl.release(&lease);
+                    tbl.release(lease);
                     break;
                 }
 
                 // Verify full range was written
                 if worker_offset != expected_end {
                     let mut tbl = table.lock().await;
-                    tbl.release(&lease);
+                    tbl.release(lease);
                     let err = CoreError::validation(
                         "range",
                         format!(
@@ -512,7 +516,7 @@ pub async fn run_parallel_download_with_options(
                 // 4. Complete
                 {
                     let mut tbl = table.lock().await;
-                    let completed = tbl.complete(&lease);
+                    let completed = tbl.complete(lease);
                     if completed {
                         consecutive_failures = 0;
                     }
@@ -530,7 +534,7 @@ pub async fn run_parallel_download_with_options(
         let _ = handle.await;
     }
 
-    let _ = monitor_handle.abort();
+    monitor_handle.abort();
 
     // Check cancellation
     if cancel_token.is_cancelled() {

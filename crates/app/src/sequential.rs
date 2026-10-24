@@ -21,6 +21,7 @@ pub enum DownloadOutcome {
 }
 
 /// Executes a sequential streaming download to a `.part` file.
+#[allow(clippy::too_many_arguments)]
 pub async fn run_sequential_download(
     client: &reqwest::Client,
     url: &Url,
