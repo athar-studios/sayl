@@ -2,6 +2,17 @@
 
 const HOST_NAME = "com.sayl.downloader";
 const CONTEXT_MENU_ID = "sayl-download-link";
+const FALLBACK_GUARD_HEADER = "x-sayl-fallback";
+
+// Localized strings with a literal fallback so the worker still behaves when
+// chrome.i18n is unavailable (unit/stub contexts).
+function msg(key) {
+  try {
+    return chrome.i18n.getMessage(key) || key;
+  } catch {
+    return key;
+  }
+}
 
 // Helper to display Chrome notifications with safe lastError consumption
 function notify(title, message) {
@@ -16,16 +27,21 @@ function notify(title, message) {
   });
 }
 
+// Swallow lastError for calls whose failure is an expected state.
+function consumeLastError() {
+  return chrome.runtime.lastError;
+}
+
 // Ping host at startup to verify native messaging connectivity
 function pingHost() {
   chrome.runtime.sendNativeMessage(HOST_NAME, { type: "Ping", version: 1 }, (response) => {
-    const err = chrome.runtime.lastError;
+    const err = consumeLastError();
     if (err) {
-      console.warn("SAYL host ping failed (host may not be registered yet):", err.message);
+      // Expected when SAYL is not installed or not running.
       return;
     }
     if (response && response.type === "Pong") {
-      console.log(`SAYL host reachable: v${response.version} (${response.app_version})`);
+      console.log(`SAYL host reachable: v${response.version}`);
     }
   });
 }
@@ -34,10 +50,10 @@ function pingHost() {
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: CONTEXT_MENU_ID,
-    title: "تنزيل باستخدام سيل",
+    title: msg("context_menu_download"),
     contexts: ["link"]
   }, () => {
-    const _ = chrome.runtime.lastError;
+    consumeLastError();
   });
   pingHost();
 });
@@ -54,29 +70,31 @@ chrome.contextMenus.onClicked.addListener((info) => {
   if (info.menuItemId !== CONTEXT_MENU_ID || !info.linkUrl) {
     return;
   }
+  if (!/^https?:\/\//i.test(info.linkUrl)) {
+    notify(msg("notify_error_title"), "Only http(s) links can be sent to SAYL.");
+    return;
+  }
 
-  const payload = {
+  chrome.runtime.sendNativeMessage(HOST_NAME, {
     type: "Download",
     url: info.linkUrl,
     referrer: info.pageUrl || null
-  };
-
-  chrome.runtime.sendNativeMessage(HOST_NAME, payload, (response) => {
-    const err = chrome.runtime.lastError;
+  }, (response) => {
+    const err = consumeLastError();
     if (err) {
-      notify("خطأ في الاتصال / Connection Error", err.message || "Could not communicate with SAYL host");
+      // SAYL is not installed or not running: leave the page untouched so the
+      // user can use the browser's own download instead.
+      notify(msg("notify_fallback_title"), msg("notify_fallback_body"));
       return;
     }
-
     if (!response) {
-      notify("خطأ / Error", "لم يتم تلقي رد من مضيف سيل / No response received from SAYL host");
+      notify(msg("notify_error_title"), "No response received from SAYL.");
       return;
     }
-
     if (response.type === "Error") {
-      notify("فشل التنزيل / Download Failed", `${response.code}: ${response.message}`);
+      notify(msg("notify_error_title"), `${response.code}: ${response.message}`);
     } else if (response.type === "Accepted") {
-      notify("تم قبول التنزيل / Download Accepted", `المهمة / Task: ${response.task_id}`);
+      notify(msg("notify_accepted_title"), `Task: ${response.task_id}`);
     }
   });
 });
