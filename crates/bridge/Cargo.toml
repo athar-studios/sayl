@@ -10,3 +10,11 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 url = "2"
 sayl-http = { path = "../http" }
+sayl-core = { path = "../core" }
+sayl-app = { path = "../app" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+[dev-dependencies]
+sayl-test-http = { path = "../test-http" }
+tempfile = "3"
+

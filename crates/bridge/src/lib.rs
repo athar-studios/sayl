@@ -9,11 +9,13 @@
 //! restricted to `http`/`https` with private networks blocked by default, and
 //! suggested filenames are sanitised and confined to the download directory.
 
+pub mod dispatch;
 pub mod host;
 pub mod message;
 pub mod protocol;
 pub mod validate;
 
+pub use dispatch::EngineDispatcher;
 pub use host::{serve, CommandLine, Dispatcher, EchoDispatcher};
 pub use message::{Request, Response, PROTOCOL_VERSION};
 pub use protocol::{decode_frame, encode_message, BridgeError, MAX_MESSAGE_BYTES};

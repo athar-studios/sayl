@@ -1,0 +1,9 @@
+{
+  "name": "com.sayl.downloader",
+  "description": "SAYL native messaging host",
+  "path": "C:\\REPLACE\\WITH\\sayl-bridge.exe",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://REPLACE_WITH_EXTENSION_ID/"
+  ]
+}
