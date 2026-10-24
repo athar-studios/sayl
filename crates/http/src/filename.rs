@@ -338,7 +338,7 @@ mod tests {
     #[test]
     fn test_reserved_characters_replaced() {
         assert_eq!(
-            sanitize_filename(r#"file:name*with?bad<chars>|"#.into()),
+            sanitize_filename(r#"file:name*with?bad<chars>|"#),
             "file_name_with_bad_chars__"
         );
     }

@@ -382,13 +382,15 @@ mod tests {
     fn test_build_client_with_proxy_credentials_redacted_in_error() {
         // Use an invalid URL that will fail at reqwest proxy construction
         // but after our validation passes
-        let mut config = ClientConfig::default();
-        config.proxy = Some(ProxyConfig {
-            url: "http://user:secret@[invalid-ipv6]".to_string(),
-            mode: ProxyMode::Http,
-            username: None,
-            password: None,
-        });
+        let config = ClientConfig {
+            proxy: Some(ProxyConfig {
+                url: "http://user:secret@[invalid-ipv6]".to_string(),
+                mode: ProxyMode::Http,
+                username: None,
+                password: None,
+            }),
+            ..Default::default()
+        };
         let result = build_client(&config);
         // The error should not contain the password
         if let Err(e) = result {

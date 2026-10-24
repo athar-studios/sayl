@@ -142,6 +142,18 @@ pub fn status_of(err: &HttpError) -> Option<u16> {
 }
 
 #[cfg(test)]
+impl RetryPolicy {
+    /// Uncapped exponential delay, used by tests to bound jittered values.
+    pub(crate) fn backoff_cap(&self, attempt: u32) -> Duration {
+        let exp = self
+            .base_delay
+            .as_millis()
+            .saturating_mul(1u128 << attempt.min(32));
+        Duration::from_millis(exp.min(self.max_delay.as_millis()) as u64)
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -268,17 +280,5 @@ mod tests {
         };
         assert!(should_retry(&err));
         assert_eq!(status_of(&err), None);
-    }
-}
-
-#[cfg(test)]
-impl RetryPolicy {
-    /// Uncapped exponential delay, used by tests to bound jittered values.
-    pub(crate) fn backoff_cap(&self, attempt: u32) -> Duration {
-        let exp = self
-            .base_delay
-            .as_millis()
-            .saturating_mul(1u128 << attempt.min(32));
-        Duration::from_millis(exp.min(self.max_delay.as_millis() as u128) as u64)
     }
 }
