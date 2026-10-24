@@ -1,6 +1,6 @@
 //! Engine configuration options.
 
-use sayl_http::stream::DEFAULT_CHUNK_SIZE;
+use crate::lease::DEFAULT_CHUNK_SIZE;
 
 /// Configuration options for the download engine.
 #[derive(Debug, Clone)]
@@ -9,7 +9,7 @@ pub struct EngineConfig {
     pub max_connections: usize,
     /// Maximum concurrent download tasks actively running at any time.
     pub max_concurrent_tasks: usize,
-    /// Streaming chunk buffer size in bytes.
+    /// Range chunk size in bytes (defaults to 4 MiB).
     pub chunk_size: usize,
 }
 

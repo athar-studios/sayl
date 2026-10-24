@@ -420,6 +420,7 @@ impl Engine {
                     task_id,
                     record.total_size.unwrap(),
                     self.inner.config.max_connections,
+                    self.inner.config.chunk_size,
                     cancel_token.clone(),
                     pause_token.clone(),
                     &self.inner.event_sender,

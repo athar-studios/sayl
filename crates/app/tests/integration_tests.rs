@@ -302,6 +302,7 @@ async fn test_parallel_download_with_disjoint_ranges() {
 
     let config = EngineConfig {
         max_connections: 4,
+        chunk_size: 16384,
         ..Default::default()
     };
     let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
