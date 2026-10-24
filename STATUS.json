@@ -2,9 +2,9 @@
   "schema_version": 1,
   "project": "sayl-downloader",
   "milestone": "M1",
-  "current_task": "UI-001",
+  "current_task": "M1 complete — desktop app, website, docs and release pipeline delivered",
   "state": "in_progress",
-  "last_verified_commit": "9b508de",
+  "last_verified_commit": "7cfd571",
   "toolchain": {
     "test_command": "cargo +stable-x86_64-pc-windows-gnu test -p <crate>",
     "required_env": {
@@ -48,9 +48,29 @@
       "result": "website JS parses; no external asset references, Arabic is valid UTF-8"
     },
     {
+      "command": "cd apps/desktop; npm test; npm run build",
+      "exit_code": 0,
+      "result": "21 vitest tests pass (i18n, formatting, state mapping); vite build emits dist/index.html + 4 hashed assets"
+    },
+    {
+      "command": "cargo +stable-x86_64-pc-windows-gnu check -p sayl-desktop",
+      "exit_code": 0,
+      "result": "type-checks clean; the Tauri test executable cannot run here (STATUS_ENTRYPOINT_NOT_FOUND on WebView2Loader), so the 3 Rust unit tests are unexecuted locally"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/release.ps1 -DryRun",
+      "exit_code": 0,
+      "result": "all six release steps simulated; without -DryRun it aborts at the missing Windows SDK with exit 1"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/check_release.ps1",
+      "exit_code": 1,
+      "result": "correctly reports the four missing release artefacts and exits non-zero without throwing"
+    },
+    {
       "command": "git log -1 --oneline",
       "exit_code": 0,
-      "result": "9b508de feat(app): download engine with lifecycle, resume, pause/cancel, recovery, and bounded parallel ranges (APP-001)"
+      "result": "7cfd571 docs + release pipeline (DOCS-001, REL-001)"
     }
   ],
   "blockers": [
@@ -59,6 +79,6 @@
     "Model identity attestation for status=passed reports is env-var based (SAYL_PRIMARY_*), not cryptographic, per docs/REPORT-CONTRACT.md:9.",
     "LICENSE choice is still the project owner's decision; README records `License: to be decided by the project owner` and no LICENSE file exists yet."
   ],
-  "next_task": "UI-001 (Tauri 2 + Svelte desktop app driving the sayl-app engine) — in progress; then UI-002 polish/i18n, DOCS-001, REL-001..004 packaging, and SEC-STRIX-001 security review last",
+  "next_task": "Phase M1 is closed. Next: SCHED-001 (lease-based bounded range splitting beyond the engine's current N-way split), PERF-001 (benchmark vs aria2), REC-001/002 (crash recovery drills), then MEDIA/TORRENT/PLUGIN/CATALOG/PRIV/AND phases, then SEC-STRIX-001 security review LAST as the owner asked. Packaging (REL-002..004) needs one elevated Windows SDK install from the owner.",
   "notes": "Round 10 progress. Committed f245629 (STORE-001) and 98cdf36 (HTTP-002 resume+retry) and 9b508de (APP-001) and c932e6c (SITE-001). Verified test totals by running each crate: core 33, test-http 25, http 65, storage 18, app 9 = 150. Two consecutive delegated attempts on the resume/retry work failed with max-tokens without writing a single file (their reports were truncated internal monologues), so the lead implemented crates/http/src/resume.rs and crates/http/src/retry.rs directly — disclosed as the narrow self-implementation exception. That work encodes: weak ETags never authorise If-Range, weak ETag with a matching Last-Modified does, size/validator change forces a restart from zero, and retry honours Retry-After in both delta-seconds and HTTP-date form while never retrying cancelled or fatal errors. STORE-001 deliberately avoids SQLite because no C compiler exists: append-only JSONL journal + atomic snapshot + fsync + single-writer lock. SITE-001 produced the Arabic RTL static site, README/CONTRIBUTING/SECURITY/CODE_OF_CONDUCT and .github files; the lead corrected ci.yml to use the MSVC toolchain so CI exercises the production link path instead of the local GNU workaround. docs/agent/HANDOFF.md was rewritten from scratch because the previous TEST-001 section had UTF-8 mojibake."
 }

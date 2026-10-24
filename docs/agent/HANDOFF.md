@@ -128,6 +128,10 @@ python tools/workflow.py check-report reports/<task>/<role>.json
 
 | commit | الوصف |
 |---|---|
+| `7cfd571` | docs: user guide, architecture, security model, build, FAQ, roadmap, changelog + NSIS/WiX packaging and release scripts |
+| `81984e3` | feat(desktop): Tauri 2 + Svelte Arabic-first desktop app (UI-001) |
+| `9b508de` | feat(app): download engine (APP-001) |
+| `c932e6c` | feat(site): Arabic RTL website + GitHub files (SITE-001) |
 | `f245629` | feat(storage): crash-safe task store (STORE-001) |
 | `98cdf36` | feat(http): validator-safe resume + retry policy; doctest scope off |
 | `0570b61` | feat(http): HTTP-001 probe/range/redirect/filename/stream + native-tls |
@@ -135,3 +139,23 @@ python tools/workflow.py check-report reports/<task>/<role>.json
 | `28013d8` | feat(core): CORE-001 state machine, errors, events, idempotency, TaskId |
 | `2bb1410` | chore: BOOT-003 gate passed; M0 complete |
 | `38be0fe` | BOOT-003 baseline |
+
+---
+
+## 9. حالة الإغلاق لمرحلة M1 (الجلسة الحالية)
+
+**منجز ومُتحقَّق منه بأمر حقيقي:**
+- `crates/storage` — 18 اختباراً (journal + لقطة + fsync + قفل كاتب واحد + 10,000 upsert في 0.31s).
+- `crates/http` — 65 اختباراً؛ أُضيف `resume.rs` و `retry.rs` (ETag ضعيف لا يسمح بالاستئناف أبداً؛ `Retry-After` بصيغتيه؛ لا إعادة محاولة للملغى/القاتل).
+- `crates/app` — 9 اختبارات تكامل: تنزيل كامل، اقتطاع، إيقاف/استئناف، تغيّر ETag، إلغاء idempotent، fallback، تنزيل متوازٍ بأربعة نطاقات مُدقَّقة، استعادة، حد التزامن.
+- `apps/desktop` — 21 اختبار vitest + بناء Vite ناجح + `cargo check` نظيف؛ أسماء أوامر Tauri مطابقة لما تستدعيه الواجهة.
+- `apps/website` — موقع عربي RTL بلا أي أصول خارجية، وأزرار تحميل تتحقق من وجود المخرجات فعلاً.
+- الوثائق: 8 ملفات في `docs/` + خط أنابيب إصدار NSIS/WiX + سكربتات تحقق.
+
+**قيود معلنة (لا تُخفى):**
+- لا يمكن بناء EXE/MSI/NSIS هنا: Windows SDK غائب والجلسة غير مرتفعة.
+- `cargo test -p sayl-desktop` لا يعمل محلياً (`STATUS_ENTRYPOINT_NOT_FOUND` بسبب WebView2Loader) — الاختبارات الثلاثة تعمل على CI/MSVC.
+- لم يُشغَّل التطبيق فعلياً (لا webview)؛ الواجهة مُتحقَّق منها بالبناء والاختبارات الوحدوية والفحص الساكن فقط.
+- Smart App Control يحجب بعض الثنائيات الجديدة (حل: حذف الثنائي لإعادة الربط).
+- لم يُوثَّق ترخيص المشروع بعد: قرار المالك.
+- لم تبدأ بعد: SCHED/PERF/REC/MEDIA/TORRENT/PLUGIN/CATALOG/PRIV/AND و`SEC-STRIX-001` (الأخير في النهاية كما طُلب).
