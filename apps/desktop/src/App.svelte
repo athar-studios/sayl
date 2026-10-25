@@ -617,7 +617,7 @@
     {selectedCategory}
     {selectedStateFilter}
     {categoryCounts}
-    {statusCounts}
+    statusCounts={stateCounts}
     on:select={(e) => (selectedCategory = e.detail)}
     on:selectState={(e) => (selectedStateFilter = e.detail)}
     on:toggleCollapse={(e) => handleToggleSidebar(e.detail)}
