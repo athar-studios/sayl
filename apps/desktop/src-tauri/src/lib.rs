@@ -4,13 +4,17 @@
 //! and communicates with the Svelte frontend via Tauri commands and events.
 
 pub mod autostart;
+pub mod browsers;
 pub mod duplicates;
+pub mod native_host;
 pub mod perf;
 pub mod power;
 pub mod shutdown;
 pub mod tray;
 
+pub use browsers::{BrowserStatus, SUPPORTED_BROWSERS};
 pub use duplicates::{find_duplicate, normalize_url_for_compare};
+pub use native_host::{NativeHostPing, NativeHostStatus, RegisteredStatus};
 pub use power::{should_inhibit, SleepInhibitor};
 pub use shutdown::{
     shutdown_decision, ShutdownController, ShutdownDecision, ShutdownRunner, ShutdownStatus,
@@ -784,6 +788,46 @@ pub mod commands {
         perf::log_frontend_perf(&payload);
         Ok(())
     }
+
+    #[tauri::command]
+    pub fn native_host_status() -> NativeHostStatus {
+        native_host::cmd_native_host_status()
+    }
+
+    #[tauri::command]
+    pub async fn browser_status() -> Vec<browsers::BrowserStatus> {
+        native_host::cmd_browser_status().await
+    }
+
+    #[tauri::command]
+    pub fn prepare_extension() -> Result<String, String> {
+        native_host::cmd_prepare_extension()
+    }
+
+    #[tauri::command]
+    pub fn register_native_host(extension_id: Option<String>) -> Result<(), String> {
+        native_host::cmd_register_native_host(extension_id)
+    }
+
+    #[tauri::command]
+    pub fn unregister_native_host() -> Result<(), String> {
+        native_host::cmd_unregister_native_host()
+    }
+
+    #[tauri::command]
+    pub async fn test_native_host() -> Result<NativeHostPing, String> {
+        native_host::cmd_test_native_host().await
+    }
+
+    #[tauri::command]
+    pub fn open_extension_folder() -> Result<(), String> {
+        native_host::cmd_open_extension_folder()
+    }
+
+    #[tauri::command]
+    pub fn open_browser_extensions(browser_id: String) -> Result<(), String> {
+        native_host::cmd_open_browser_extensions(browser_id)
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -877,7 +921,15 @@ pub fn run() {
             commands::arm_shutdown,
             commands::cancel_shutdown,
             commands::get_shutdown_status,
-            commands::report_frontend_perf
+            commands::report_frontend_perf,
+            commands::native_host_status,
+            commands::browser_status,
+            commands::prepare_extension,
+            commands::register_native_host,
+            commands::unregister_native_host,
+            commands::test_native_host,
+            commands::open_extension_folder,
+            commands::open_browser_extensions
         ])
         .on_page_load(move |_webview, payload| {
             if payload.event() == tauri::webview::PageLoadEvent::Finished {
