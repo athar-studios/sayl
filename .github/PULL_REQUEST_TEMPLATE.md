@@ -1,89 +1,39 @@
-## Summary
+## الملخص / Summary
 
-Brief description of the changes in this PR.
+<!-- اكتب ملخصًا موجزًا للتغييرات التي يتضمنها طلب السحب -->
+<!-- Brief description of the changes in this PR -->
 
-## Type
+---
 
-- [ ] feat — New feature
-- [ ] fix — Bug fix
-- [ ] refactor — Code restructuring (no behavior change)
-- [ ] perf — Performance improvement
-- [ ] test — Adding/modifying tests
-- [ ] docs — Documentation only
-- [ ] chore — Maintenance, tooling, dependencies
-- [ ] build — Build system changes
-- [ ] ci — CI configuration changes
+## نوع التعديل / Type of Change
 
-## Related Issues
+- [ ] `feat` — ميزة جديدة / New feature
+- [ ] `fix` — إصلاح خطأ / Bug fix
+- [ ] `refactor` — إعادة هيكلة دون تغيير السلوك / Code refactoring
+- [ ] `perf` — تحسين في الأداء والسرعة / Performance improvement
+- [ ] `test` — إضافة أو تعديل اختبارات / Adding or modifying tests
+- [ ] `docs` — توثيق وتعديل نصوص / Documentation only
+- [ ] `chore` — صيانة وتحديث أدوات / Maintenance & tooling
 
-Closes #<issue-number>
-Relates to #<issue-number>
+---
 
-## Changes
+## التذاكر المرتبطة / Related Issues
 
-- Change 1
-- Change 2
-- ...
+Closes #
+Relates to #
 
-## Testing
+---
 
-- [ ] All existing tests pass (`cargo +stable-x86_64-pc-windows-gnu test --workspace`)
-- [ ] New unit tests added for new functionality
-- [ ] Integration tests pass against `sayl-test-http` fixture server
-- [ ] Manual verification completed (describe steps):
+## التغييرات المنجزة / Changes Made
 
-```
-# Steps to manually verify
-1. ...
-2. ...
-```
+- 
+- 
 
-## Checklist
+---
 
-### Code Quality
-- [ ] `cargo +stable-x86_64-pc-windows-gnu fmt --all -- --check` passes
-- [ ] `cargo +stable-x86_64-pc-windows-gnu clippy --workspace --all-targets -- -D warnings` passes
-- [ ] No `unsafe` blocks without `// SAFETY:` justification
-- [ ] No `unwrap()`/`expect()` in production paths
-- [ ] Public APIs documented with `///` comments
+## التحقق والاختبار / Verification & Testing
 
-### Architecture
-- [ ] Changes respect crate boundaries (core: no I/O, storage: only file I/O, http: only network I/O)
-- [ ] No new external dependencies without justification (prefer pure Rust, avoid C deps)
-- [ ] No network calls in tests — all HTTP tests use `sayl-test-http`
-
-### Security & Privacy
-- [ ] No secrets, tokens, or credentials in code or commit history
-- [ ] No telemetry, analytics, or tracking code added
-- [ ] Input validation at boundaries (filenames, URLs, headers, plugin manifests)
-- [ ] Cross-origin redirect handling strips Authorization/Cookie headers
-- [ ] Plugin/WASM capabilities follow least-privilege principle
-
-### Documentation
-- [ ] README.md updated if user-facing change
-- [ ] Crate-level README.md updated if crate API changed
-- [ ] Architecture documentation updated if architectural change
-- [ ] CHANGELOG.md updated (when it exists)
-
-### Git Hygiene
-- [ ] Commit messages follow English imperative style (`feat(scope): subject`)
-- [ ] No destructive git operations (`reset --hard`, `checkout --`, `push --force`)
-- [ ] Commits are logically grouped and atomic
-
-### Accessibility (UI changes)
-- [ ] WCAG AA contrast maintained
-- [ ] RTL/LTR support verified
-- [ ] Focus rings visible (`:focus-visible`)
-- [ ] `prefers-reduced-motion` respected
-- [ ] ARIA labels/roles correct
-- [ ] Keyboard navigation works
-
-## Screenshots / Recordings (UI changes)
-
-| Before | After |
-|--------|-------|
-| ![before](url) | ![after](url) |
-
-## Additional Notes
-
-Any additional context, concerns, or discussion points for reviewers.
+- [ ] نجاح كافة اختبارات مساحة العمل الحتمية (`cargo check --workspace` & `cargo test --workspace`)
+- [ ] تنسيق الشفرة بالمعيار المعتمد (`cargo fmt --all -- --check`)
+- [ ] لا تحتوي الشفرة على أي كود تتبع أو تحليلات (No Telemetry / No Tracking)
+- [ ] فحص التعديلات محليًا والتأكد من استقرارها

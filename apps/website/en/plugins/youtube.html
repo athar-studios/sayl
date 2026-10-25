@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube Download Plugin · Sayl</title>
+  <meta name="description" content="YouTube Download Plugin for Sayl (Planned in v0.2.0): Extract YouTube videos in pristine quality (4K, 1080p, 60fps), with direct audio stre...">
+  <meta name="theme-color" content="#070F2E">
+  <link rel="canonical" href="https://sayl.site/en/plugins/youtube">
+  <link rel="alternate" hreflang="ar" href="https://sayl.site/plugins/youtube">
+  <link rel="alternate" hreflang="en" href="https://sayl.site/en/plugins/youtube">
+  <link rel="alternate" hreflang="x-default" href="https://sayl.site/plugins/youtube">
+
+  <!-- Favicons & App Icons (?v=2) -->
+  <link rel="icon" href="/favicon.ico?v=2" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
+  <link rel="manifest" href="/site.webmanifest">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:site_name" content="سيل · SAYL">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sayl.site/en/plugins/youtube">
+  <meta property="og:title" content="YouTube Download Plugin · Sayl">
+  <meta property="og:description" content="YouTube Download Plugin for Sayl (Planned in v0.2.0): Extract YouTube videos in pristine quality (4K, 1080p, 60fps), with direct audio stre...">
+  <meta property="og:image" content="https://sayl.site/og-image-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="YouTube Download Plugin · Sayl">
+  <meta name="twitter:description" content="YouTube Download Plugin for Sayl (Planned in v0.2.0): Extract YouTube videos in pristine quality (4K, 1080p, 60fps), with direct audio stre...">
+  <meta name="twitter:image" content="https://sayl.site/og-image-en.png">
+
+  <!-- Preload Fonts & Stylesheet -->
+  <link rel="preload" href="/fonts/IBMPlexSansArabic-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/IBMPlexSansArabic-Bold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Athar Studio",
+    "url": "https://sayl.site",
+    "logo": "https://sayl.site/icon-512.png",
+    "sameAs": [
+      "https://github.com/athar-studios",
+      "https://ko-fi.com/athar_studio"
+    ]
+  }
+  </script>
+</head>
+<body class="page-inner">
+  <canvas id="flow" aria-hidden="true"></canvas>
+  <div class="lang-modal-overlay" id="lang-modal" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
+    <div class="lang-modal-card">
+      <img src="/favicon.svg?v=2" alt="Sayl logo" width="56" height="38" style="margin-bottom:12px">
+      <h2 id="lang-modal-title">Choose Language · اختر لغة الموقع</h2>
+      <p>You can toggle your preferred language anytime from the header button.</p>
+      <div class="lang-choices">
+        <button type="button" class="lang-choice-btn" data-choose-lang="ar">
+          <strong>العربية</strong>
+          <small>Arabic RTL Interface</small>
+        </button>
+        <button type="button" class="lang-choice-btn primary" data-choose-lang="en">
+          <strong>English</strong>
+          <small>Default English experience</small>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <header>
+      <a href="/en" class="brand" aria-label="Sayl - Home">
+        <img class="brand-logo" src="/icon.svg" alt="Sayl" width="57" height="40">
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="/en/docs">Docs</a>
+        <a href="/en#features" class="hide-mobile">Features</a>
+        <a href="/en/faq">FAQ</a>
+        <a href="/en/compare">Compare</a>
+        <a href="/en/plugins" class="active">Plugins</a>
+        <a href="/en/support">Support</a>
+      </nav>
+      <div class="header-actions">
+        <a href="/plugins/youtube" class="lang-btn" aria-label="التبديل إلى العربية">العربية</a>
+      </div>
+    </header>
+    <main class="page-shell">
+      <article class="page-card">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+          <span style="font-size:0.85rem;background:rgba(242,196,107,0.15);color:var(--sand);padding:4px 12px;border-radius:999px;font-weight:600">Coming in v0.2.0</span>
+          <a href="/en/plugins" style="color:var(--teal);text-decoration:none;font-size:0.9rem">← All Plugins</a>
+        </div>
+        <h1>YouTube Download Plugin</h1>
+        <p class="lead" style="color:#b9c8e6;font-size:1.15rem;margin-bottom:28px">Extract YouTube videos in pristine quality (4K, 1080p, 60fps), with direct audio stream extraction (MP3/M4A) and subtitle selection.</p>
+
+        <div class="note">
+          <strong>Feature Status:</strong> This plugin is part of our approved roadmap for the upcoming v0.2.0 release and is not present in v0.1.0. We are actively integrating open-source yt-dlp backends to deliver clean, fast, ad-free downloads.
+        </div>
+
+        <h2>Planned Capabilities:</h2>
+        <ul>
+          <li><strong>Quality & Bitrate Selection:</strong> Select your preferred resolution from 360p up to 4K and 60fps where available.</li>
+          <li><strong>Direct Audio Extraction:</strong> Isolate audio-only tracks (MP3 or M4A) to save storage and data bandwidth.</li>
+          <li><strong>Batch & Playlist Downloads:</strong> Paste playlist URLs to queue complete series with structured metadata.</li>
+          <li><strong>Segmented & Resumable Streams:</strong> Reliable byte-accurate checkpoints preventing failed long-format transfers.</li>
+        </ul>
+
+        <h2>Participate in Development</h2>
+        <p>If you'd like to contribute code or test early prototypes of this plugin, follow our GitHub repository.</p>
+
+        <div class="cta" style="margin-top:36px">
+          <a class="btn pri" href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">Follow Plugin Updates on GitHub</a>
+          <a class="btn sec" href="/en/plugins">Back to Plugins Overview</a>
+        </div>
+      </article>
+    </main>
+    <footer>
+      <div class="footer-wrap">
+        <div class="footer-brand">
+          <img class="footer-logo" src="/icon.svg" alt="Sayl" width="54" height="38">
+          <span><strong>Sayl · سيل</strong></span>
+        </div>
+        <div class="footer-links">
+          <a href="/en/docs">Docs</a>
+          <a href="/en/faq">FAQ</a>
+          <a href="/en/compare">Comparison</a>
+          <a href="/en/idm-alternative">IDM Alternative</a>
+          <a href="/en/free-download-manager-windows">Windows FDM</a>
+          <a href="/en/plugins">Plugins</a>
+          <a href="/en/themes">Themes</a>
+          <a href="/en/about">About Studio</a>
+          <a href="/en/support">Support</a>
+          <a href="/en/privacy">Privacy</a>
+          <a href="/en/terms">Terms</a>
+          <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </div>
+      </div>
+      <div style="margin-top:20px;text-align:center;color:#6b80ad;font-size:0.85rem">
+        Athar Studio · Licensed under Apache-2.0 Open Source License · Zero tracking & zero telemetry
+      </div>
+    </footer>
+  </div>
+
+  <script src="/flow.js" defer></script>
+  <script src="/site.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>الأسئلة الشائعة حول برنامج سيل · SAYL FAQ</title>
+  <meta name="description" content="إجابات شاملة عن سيل: هل هو مجاني؟ هل هو آمن؟ حل تنبيه SmartScreen، تفعيل إضافة المتصفح، الاستئناف، وخطة الإضافات.">
+  <meta name="theme-color" content="#070F2E">
+  <link rel="canonical" href="https://sayl.site/faq">
+  <link rel="alternate" hreflang="ar" href="https://sayl.site/faq">
+  <link rel="alternate" hreflang="en" href="https://sayl.site/en/faq">
+  <link rel="alternate" hreflang="x-default" href="https://sayl.site/faq">
+
+  <!-- Favicons & App Icons (?v=2) -->
+  <link rel="icon" href="/favicon.ico?v=2" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
+  <link rel="manifest" href="/site.webmanifest">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:site_name" content="سيل · SAYL">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sayl.site/faq">
+  <meta property="og:title" content="الأسئلة الشائعة حول برنامج سيل · SAYL FAQ">
+  <meta property="og:description" content="إجابات شاملة عن سيل: هل هو مجاني؟ هل هو آمن؟ حل تنبيه SmartScreen، تفعيل إضافة المتصفح، الاستئناف، وخطة الإضافات.">
+  <meta property="og:image" content="https://sayl.site/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="الأسئلة الشائعة حول برنامج سيل · SAYL FAQ">
+  <meta name="twitter:description" content="إجابات شاملة عن سيل: هل هو مجاني؟ هل هو آمن؟ حل تنبيه SmartScreen، تفعيل إضافة المتصفح، الاستئناف، وخطة الإضافات.">
+  <meta name="twitter:image" content="https://sayl.site/og-image.png">
+
+  <!-- Preload Fonts & Stylesheet -->
+  <link rel="preload" href="/fonts/IBMPlexSansArabic-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/IBMPlexSansArabic-Bold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Athar Studio",
+    "url": "https://sayl.site",
+    "logo": "https://sayl.site/icon-512.png",
+    "sameAs": [
+      "https://github.com/athar-studios",
+      "https://ko-fi.com/athar_studio"
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "هل برنامج سيل مجاني فعلاً وبلا إعلانات؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "نعم، سيل برنامج مجاني تماماً بنسبة 100% ومفتوح المصدر بموجب رخصة Apache-2.0. لا يحتوي على أي إعلانات، ولا نوافذ منبثقة، ولا برمجيات ملحقة (Bundled Software)، ولا يتطلب أي اشتراك أو تفعيل."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "هل البرنامج آمن للاستخدام؟ وما قصة تنبيه Microsoft Defender SmartScreen؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "نعم، سيل آمن وكوده المصدري متاح بالكامل للمراجعة على GitHub. نظراً لأن المشروع جديد ولا نملك حالياً شهادة توقيع رقمية مدفوعة (EV Code Signing) بسبب تكلفتها العالية على المشاريع المستقلة، يظهر ويندوز رسالة تحذيرية زرقاء. يمكنك المتابعة بأمان عبر الضغط على «مزيد من المعلومات» (More info) ثم «تشغيل على أي حال» (Run anyway)."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "ما هي متطلبات النظام لتشغيل سيل؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "يعمل سيل على أنظمة Windows 10 و Windows 11 (بمعمارية 64-bit). محرك التنزيل مبني بلغة Rust فائقة الخفة، مما يجعله يستهلك قدراً ضئيلاً جداً من الذاكرة (RAM) والمعالج حتى أثناء تنزيل ملفات ضخمة."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "كيف يسرّع سيل التنزيل مقارنة بالمتصفح العادي؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "تنزّل المتصفحات الملفات عبر اتصال واحد. يقوم سيل بتقسيم الملف الواحد إلى مسارات متعددة (تصل إلى 16 اتصالاً متزامناً)، فيطلب كل جزء عبر اتصال منفصل في آن واحد ثم يجمعها بدقة على القرص، مستغلاً أقصى سرعة يتيحها اتصال الإنترنت لديك."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "كيف أقوم بتفعيل إضافة المتصفح؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "الأمر بسيط: افتح سيل > الإعدادات > إضافة المتصفح > تفعيل، ثم اضغط على «إضافة إلى المتصفح» في صفحة المتجر الرسمي لمتصفحك (Chrome، Edge، أو Brave). سيلتقط سيل الروابط تلقائياً."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "أين يحفظ سيل الملفات والبيانات؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "تُحفظ التنزيلات المكتملة افتراضياً في مجلد `Downloads\\SAYL` الخاص بحسابك. وتُحفظ سجلات المهام وبيانات البرنامج محلياً داخل مجلد `.data`، دون أي مزامنة سحابية أو إرسال لبياناتك خارج جهازك."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "ماذا يحدث إذا انقطع الاتصال أو أغلقت جهازي أثناء التنزيل؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "يحفظ سيل تقدم كل جزء في ملف مؤقت (.part). عند عودة الإنترنت أو إعادة تشغيل البرنامج، يكمل سيل التنزيل ذرياً من آخر بايت مسجل دون الحاجة لإعادة تنزيل ما اكتمل."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "هل يدعم سيل تنزيل الفيديوهات من يوتيوب ومنصات التواصل؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "في إصدار 0.1.0 الحالي، يدعم سيل روابط التنزيل المباشرة (Direct HTTP/HTTPS). تنزيل الفيديو واستخراج الدقات والمسارات الصوتية مخطط للإصدار 0.2.0 عبر تكامل أصيل مع yt-dlp و FFmpeg."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "ما هي ميزة الإضافات (Plugins) والسمات (Themes)؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "نعمل على نظام إضافات وسمات مرن ومفتوح في الإصدار 0.2.0، يتيح إضافة دعم مواقع جديدة وتخصيص المظهر بألوانك المفضلة، دون الحاجة لتحديث البرنامج بأكمله."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "كيف يعمل خيار إطفاء الجهاز بعد انتهاء التنزيلات؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "يمكنك تفعيله من الإعدادات. عند اكتمال آخر تنزيل بنجاح، يُظهر سيل شاشة تنبيه واضحة مع عداد أمان مدته 30 ثانية يتيح لك إلغاء الإطفاء بنقرة زر إذا كنت لا تزال تعمل على الحاسوب."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "كيف أقوم بإزالة تثبيت سيل بالكامل؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "لا يترك سيل أي أثر مخفي في سجل النظام (Registry). لإزالته، احذف مجلد البرنامج ومجلد التنزيلات والإعدادات (.data)، وسينمحي البرنامج تماماً من جهازك."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "كيف يمكنني المساهمة في تطوير سيل أو دعم المشروع؟",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "نرحب بالمساهمات البرمجية والترجمات على مستودع GitHub! كما يمكنك دعم استمرار المشروع عبر التبرع بأي مبلغ اختياري على Ko-fi (https://ko-fi.com/athar_studio)."
+      }
+    }
+  ]
+}
+  </script>
+</head>
+<body class="page-inner">
+  <canvas id="flow" aria-hidden="true"></canvas>
+  <div class="lang-modal-overlay" id="lang-modal" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
+    <div class="lang-modal-card">
+      <img src="/favicon.svg?v=2" alt="شعار سيل" width="56" height="38" style="margin-bottom:12px">
+      <h2 id="lang-modal-title">اختر لغة الموقع · Choose Language</h2>
+      <p>يمكنك تغيير اللغة في أي وقت من زر التبديل بأعلى الصفحة.</p>
+      <div class="lang-choices">
+        <button type="button" class="lang-choice-btn primary" data-choose-lang="ar">
+          <strong>العربية</strong>
+          <small>اللغة الأساسية والواجهة الافتراضية</small>
+        </button>
+        <button type="button" class="lang-choice-btn" data-choose-lang="en">
+          <strong>English</strong>
+          <small>English LTR Interface</small>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <header>
+      <a href="/" class="brand" aria-label="سيل - الصفحة الرئيسية">
+        <img class="brand-logo" src="/icon.svg" alt="سيل" width="57" height="40">
+      </a>
+      <nav aria-label="التنقل الرئيسي">
+        <a href="/docs">التوثيق</a>
+        <a href="/#features" class="hide-mobile">المميزات</a>
+        <a href="/faq" class="active">الأسئلة الشائعة</a>
+        <a href="/compare">مقارنة</a>
+        <a href="/plugins">الإضافات</a>
+        <a href="/support">ادعمنا</a>
+      </nav>
+      <div class="header-actions">
+        <a href="/en/faq" class="lang-btn" aria-label="Switch to English">English</a>
+      </div>
+    </header>
+    <main class="page-shell">
+      <article class="page-card">
+        <h1>الأسئلة الشائعة حول برنامج سيل</h1>
+        <p class="lead" style="color:#b9c8e6;font-size:1.15rem;margin-bottom:28px">إجابات واضحة ومباشرة عن كل ما يخص استخدام سيل، وتثبيته، وأمانه، ومميزاته الحالية والمستقبلية.</p>
+        <div class="faq-list">
+          <details>
+            <summary>هل برنامج سيل مجاني فعلاً وبلا إعلانات؟</summary>
+            <p>نعم، سيل برنامج مجاني تماماً بنسبة 100% ومفتوح المصدر بموجب رخصة Apache-2.0. لا يحتوي على أي إعلانات، ولا نوافذ منبثقة، ولا برمجيات ملحقة (Bundled Software)، ولا يتطلب أي اشتراك أو تفعيل.</p>
+          </details>
+          <details>
+            <summary>هل البرنامج آمن للاستخدام؟ وما قصة تنبيه Microsoft Defender SmartScreen؟</summary>
+            <p>نعم، سيل آمن وكوده المصدري متاح بالكامل للمراجعة على GitHub. نظراً لأن المشروع جديد ولا نملك حالياً شهادة توقيع رقمية مدفوعة (EV Code Signing) بسبب تكلفتها العالية على المشاريع المستقلة، يظهر ويندوز رسالة تحذيرية زرقاء. يمكنك المتابعة بأمان عبر الضغط على «مزيد من المعلومات» (More info) ثم «تشغيل على أي حال» (Run anyway).</p>
+          </details>
+          <details>
+            <summary>ما هي متطلبات النظام لتشغيل سيل؟</summary>
+            <p>يعمل سيل على أنظمة Windows 10 و Windows 11 (بمعمارية 64-bit). محرك التنزيل مبني بلغة Rust فائقة الخفة، مما يجعله يستهلك قدراً ضئيلاً جداً من الذاكرة (RAM) والمعالج حتى أثناء تنزيل ملفات ضخمة.</p>
+          </details>
+          <details>
+            <summary>كيف يسرّع سيل التنزيل مقارنة بالمتصفح العادي؟</summary>
+            <p>تنزّل المتصفحات الملفات عبر اتصال واحد. يقوم سيل بتقسيم الملف الواحد إلى مسارات متعددة (تصل إلى 16 اتصالاً متزامناً)، فيطلب كل جزء عبر اتصال منفصل في آن واحد ثم يجمعها بدقة على القرص، مستغلاً أقصى سرعة يتيحها اتصال الإنترنت لديك.</p>
+          </details>
+          <details>
+            <summary>كيف أقوم بتفعيل إضافة المتصفح؟</summary>
+            <p>الأمر بسيط: افتح سيل > الإعدادات > إضافة المتصفح > تفعيل، ثم اضغط على «إضافة إلى المتصفح» في صفحة المتجر الرسمي لمتصفحك (Chrome، Edge، أو Brave). سيلتقط سيل الروابط تلقائياً.</p>
+          </details>
+          <details>
+            <summary>أين يحفظ سيل الملفات والبيانات؟</summary>
+            <p>تُحفظ التنزيلات المكتملة افتراضياً في مجلد `Downloads\SAYL` الخاص بحسابك. وتُحفظ سجلات المهام وبيانات البرنامج محلياً داخل مجلد `.data`، دون أي مزامنة سحابية أو إرسال لبياناتك خارج جهازك.</p>
+          </details>
+          <details>
+            <summary>ماذا يحدث إذا انقطع الاتصال أو أغلقت جهازي أثناء التنزيل؟</summary>
+            <p>يحفظ سيل تقدم كل جزء في ملف مؤقت (.part). عند عودة الإنترنت أو إعادة تشغيل البرنامج، يكمل سيل التنزيل ذرياً من آخر بايت مسجل دون الحاجة لإعادة تنزيل ما اكتمل.</p>
+          </details>
+          <details>
+            <summary>هل يدعم سيل تنزيل الفيديوهات من يوتيوب ومنصات التواصل؟</summary>
+            <p>في إصدار 0.1.0 الحالي، يدعم سيل روابط التنزيل المباشرة (Direct HTTP/HTTPS). تنزيل الفيديو واستخراج الدقات والمسارات الصوتية مخطط للإصدار 0.2.0 عبر تكامل أصيل مع yt-dlp و FFmpeg.</p>
+          </details>
+          <details>
+            <summary>ما هي ميزة الإضافات (Plugins) والسمات (Themes)؟</summary>
+            <p>نعمل على نظام إضافات وسمات مرن ومفتوح في الإصدار 0.2.0، يتيح إضافة دعم مواقع جديدة وتخصيص المظهر بألوانك المفضلة، دون الحاجة لتحديث البرنامج بأكمله.</p>
+          </details>
+          <details>
+            <summary>كيف يعمل خيار إطفاء الجهاز بعد انتهاء التنزيلات؟</summary>
+            <p>يمكنك تفعيله من الإعدادات. عند اكتمال آخر تنزيل بنجاح، يُظهر سيل شاشة تنبيه واضحة مع عداد أمان مدته 30 ثانية يتيح لك إلغاء الإطفاء بنقرة زر إذا كنت لا تزال تعمل على الحاسوب.</p>
+          </details>
+          <details>
+            <summary>كيف أقوم بإزالة تثبيت سيل بالكامل؟</summary>
+            <p>لا يترك سيل أي أثر مخفي في سجل النظام (Registry). لإزالته، احذف مجلد البرنامج ومجلد التنزيلات والإعدادات (.data)، وسينمحي البرنامج تماماً من جهازك.</p>
+          </details>
+          <details>
+            <summary>كيف يمكنني المساهمة في تطوير سيل أو دعم المشروع؟</summary>
+            <p>نرحب بالمساهمات البرمجية والترجمات على مستودع GitHub! كما يمكنك دعم استمرار المشروع عبر التبرع بأي مبلغ اختياري على Ko-fi (https://ko-fi.com/athar_studio).</p>
+          </details>
+        </div>
+        <div class="note note-teal" style="margin-top:36px">
+          <strong>لديك استفسار آخر؟</strong> تفضل بفتح تذكرة أو مناقشة على <a href="https://github.com/athar-studios/sayl/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a> أو تواصل مع الاستوديو مباشرة.
+        </div>
+      </article>
+    </main>
+    <footer>
+      <div class="footer-wrap">
+        <div class="footer-brand">
+          <img class="footer-logo" src="/icon.svg" alt="سيل" width="54" height="38">
+          <span><strong>سيل · SAYL</strong></span>
+        </div>
+        <div class="footer-links">
+          <a href="/docs">التوثيق</a>
+          <a href="/faq">الأسئلة الشائعة</a>
+          <a href="/compare">مقارنة البرامج</a>
+          <a href="/idm-alternative">بديل IDM</a>
+          <a href="/free-download-manager-windows">تحميل لويندوز</a>
+          <a href="/plugins">الإضافات</a>
+          <a href="/themes">السمات</a>
+          <a href="/about">عن الاستوديو</a>
+          <a href="/support">ادعمنا</a>
+          <a href="/privacy">الخصوصية</a>
+          <a href="/terms">الشروط</a>
+          <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </div>
+      </div>
+      <div style="margin-top:20px;text-align:center;color:#6b80ad;font-size:0.85rem">
+        استوديو أثر · مرخّص بموجب رخصة Apache-2.0 مفتوحة المصدر · بدون إعلانات ولا تتبّع
+      </div>
+    </footer>
+  </div>
+
+  <script src="/flow.js" defer></script>
+  <script src="/site.js" defer></script>
+</body>
+</html>

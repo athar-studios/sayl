@@ -1,0 +1,2 @@
+# No rewrite rules for clean URLs — Cloudflare Pages natively handles clean URLs for all HTML pages.
+# Keep this file empty unless moving specific legacy URLs with 301/302 redirects.

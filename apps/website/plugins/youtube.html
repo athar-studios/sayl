@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>إضافة تنزيل YouTube · سيل</title>
+  <meta name="description" content="إضافة تنزيل YouTube لبرنامج سيل (قادمة في v0.2.0): تنزيل مقاطع يوتيوب بأعلى دقة متاحة (4K و1080p و60fps)، مع إمكانية استخراج المسار الصو...">
+  <meta name="theme-color" content="#070F2E">
+  <link rel="canonical" href="https://sayl.site/plugins/youtube">
+  <link rel="alternate" hreflang="ar" href="https://sayl.site/plugins/youtube">
+  <link rel="alternate" hreflang="en" href="https://sayl.site/en/plugins/youtube">
+  <link rel="alternate" hreflang="x-default" href="https://sayl.site/plugins/youtube">
+
+  <!-- Favicons & App Icons (?v=2) -->
+  <link rel="icon" href="/favicon.ico?v=2" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
+  <link rel="manifest" href="/site.webmanifest">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:site_name" content="سيل · SAYL">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sayl.site/plugins/youtube">
+  <meta property="og:title" content="إضافة تنزيل YouTube · سيل">
+  <meta property="og:description" content="إضافة تنزيل YouTube لبرنامج سيل (قادمة في v0.2.0): تنزيل مقاطع يوتيوب بأعلى دقة متاحة (4K و1080p و60fps)، مع إمكانية استخراج المسار الصو...">
+  <meta property="og:image" content="https://sayl.site/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="إضافة تنزيل YouTube · سيل">
+  <meta name="twitter:description" content="إضافة تنزيل YouTube لبرنامج سيل (قادمة في v0.2.0): تنزيل مقاطع يوتيوب بأعلى دقة متاحة (4K و1080p و60fps)، مع إمكانية استخراج المسار الصو...">
+  <meta name="twitter:image" content="https://sayl.site/og-image.png">
+
+  <!-- Preload Fonts & Stylesheet -->
+  <link rel="preload" href="/fonts/IBMPlexSansArabic-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/IBMPlexSansArabic-Bold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Athar Studio",
+    "url": "https://sayl.site",
+    "logo": "https://sayl.site/icon-512.png",
+    "sameAs": [
+      "https://github.com/athar-studios",
+      "https://ko-fi.com/athar_studio"
+    ]
+  }
+  </script>
+</head>
+<body class="page-inner">
+  <canvas id="flow" aria-hidden="true"></canvas>
+  <div class="lang-modal-overlay" id="lang-modal" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
+    <div class="lang-modal-card">
+      <img src="/favicon.svg?v=2" alt="شعار سيل" width="56" height="38" style="margin-bottom:12px">
+      <h2 id="lang-modal-title">اختر لغة الموقع · Choose Language</h2>
+      <p>يمكنك تغيير اللغة في أي وقت من زر التبديل بأعلى الصفحة.</p>
+      <div class="lang-choices">
+        <button type="button" class="lang-choice-btn primary" data-choose-lang="ar">
+          <strong>العربية</strong>
+          <small>اللغة الأساسية والواجهة الافتراضية</small>
+        </button>
+        <button type="button" class="lang-choice-btn" data-choose-lang="en">
+          <strong>English</strong>
+          <small>English LTR Interface</small>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <header>
+      <a href="/" class="brand" aria-label="سيل - الصفحة الرئيسية">
+        <img class="brand-logo" src="/icon.svg" alt="سيل" width="57" height="40">
+      </a>
+      <nav aria-label="التنقل الرئيسي">
+        <a href="/docs">التوثيق</a>
+        <a href="/#features" class="hide-mobile">المميزات</a>
+        <a href="/faq">الأسئلة الشائعة</a>
+        <a href="/compare">مقارنة</a>
+        <a href="/plugins" class="active">الإضافات</a>
+        <a href="/support">ادعمنا</a>
+      </nav>
+      <div class="header-actions">
+        <a href="/en/plugins/youtube" class="lang-btn" aria-label="Switch to English">English</a>
+      </div>
+    </header>
+    <main class="page-shell">
+      <article class="page-card">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+          <span style="font-size:0.85rem;background:rgba(242,196,107,0.15);color:var(--sand);padding:4px 12px;border-radius:999px;font-weight:600">قادمة في الإصدار 0.2.0</span>
+          <a href="/plugins" style="color:var(--teal);text-decoration:none;font-size:0.9rem">← كل الإضافات</a>
+        </div>
+        <h1>إضافة تنزيل YouTube</h1>
+        <p class="lead" style="color:#b9c8e6;font-size:1.15rem;margin-bottom:28px">تنزيل مقاطع يوتيوب بأعلى دقة متاحة (4K و1080p و60fps)، مع إمكانية استخراج المسار الصوتي بصيغ MP3 أو M4A واختيار الترجمات.</p>
+
+        <div class="note">
+          <strong>حالة الميزة:</strong> هذه الإضافة ضمن الخطة المعتمدة للإصدار 0.2.0 القادم، وليست متوفرة في الإصدار الحالي 0.1.0. نحن نعمل على دمج محرك yt-dlp ومكتبات معالجة الوسائط مفتوحة المصدر لتقديم تجربة تنزيل مباشرة وسريعة وبلا إعلانات.
+        </div>
+
+        <h2>الميزات المخططة في هذه الإضافة:</h2>
+        <ul>
+          <li><strong>اختيار الدقة والجودة:</strong> إمكانية اختيار جودة الفيديو المناسبة لسرعة اتصالك (من 360p وحتى 4K و8K إذا توفرت).</li>
+          <li><strong>استخراج الصوت المستقل:</strong> خيار حفظ المسار الصوتي فقط بصيغ شائعة (MP3 أو M4A) لتوفير المساحة واستهلاك البيانات.</li>
+          <li><strong>تنزيل قوائم التشغيل (Playlists):</strong> إضافة روابط القوائم وتنزيل جميع عناصرها دفعة واحدة بتسلسل منظم.</li>
+          <li><strong>استئناف التنزيل الآمن:</strong> استكمال تحميل المقاطع الضخمة في حال انقطاع الشبكة دون إعادة البدء من الصفر.</li>
+        </ul>
+
+        <h2>كن جزءاً من التطوير</h2>
+        <p>إذا كنت مهتماً بالمساهمة في كتابة كود هذه الإضافة أو اختبارها عند إطلاق النسخ التجريبية الأولى، تابع مستودع المشروع على GitHub.</p>
+
+        <div class="cta" style="margin-top:36px">
+          <a class="btn pri" href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">تابع تحديثات الإضافة على GitHub</a>
+          <a class="btn sec" href="/plugins">العودة لصفحة الإضافات</a>
+        </div>
+      </article>
+    </main>
+    <footer>
+      <div class="footer-wrap">
+        <div class="footer-brand">
+          <img class="footer-logo" src="/icon.svg" alt="سيل" width="54" height="38">
+          <span><strong>سيل · SAYL</strong></span>
+        </div>
+        <div class="footer-links">
+          <a href="/docs">التوثيق</a>
+          <a href="/faq">الأسئلة الشائعة</a>
+          <a href="/compare">مقارنة البرامج</a>
+          <a href="/idm-alternative">بديل IDM</a>
+          <a href="/free-download-manager-windows">تحميل لويندوز</a>
+          <a href="/plugins">الإضافات</a>
+          <a href="/themes">السمات</a>
+          <a href="/about">عن الاستوديو</a>
+          <a href="/support">ادعمنا</a>
+          <a href="/privacy">الخصوصية</a>
+          <a href="/terms">الشروط</a>
+          <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </div>
+      </div>
+      <div style="margin-top:20px;text-align:center;color:#6b80ad;font-size:0.85rem">
+        استوديو أثر · مرخّص بموجب رخصة Apache-2.0 مفتوحة المصدر · بدون إعلانات ولا تتبّع
+      </div>
+    </footer>
+  </div>
+
+  <script src="/flow.js" defer></script>
+  <script src="/site.js" defer></script>
+</body>
+</html>

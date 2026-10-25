@@ -1,0 +1,23 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>دليل سيل</title><link rel="stylesheet" href="style.css"></head><body>
+<canvas id="flow" aria-hidden="true" style="opacity:.45"></canvas>
+<div class="wrap">
+<header><a href="index.html"><img class="mark" src="icon.svg" alt="سيل"></a><nav><a href="index.html" class="hide">الرئيسية</a><a href="https://github.com/ashrymahrm/sayl/releases/latest">التنزيل</a><a href="https://github.com/ashrymahrm/sayl">GitHub</a></nav><button class="lang">English</button></header>
+<div class="docs">
+<aside><input placeholder="ابحث في الدليل" aria-label="بحث"><a class="on" href="#install">التثبيت</a><a href="#first">أول تنزيل</a><a href="#pause">الإيقاف والاستئناف</a><a href="#ext">إضافة المتصفح</a><a href="#cli">سطر الأوامر</a><a href="#settings">الإعدادات</a><a href="#faq">الأسئلة الشائعة</a></aside>
+<article>
+<h1>دليل استخدام سيل</h1><p>كل ما تحتاجه لتشغيل سيل، من التثبيت إلى سطر الأوامر. يخص هذا الدليل الإصدار 0.1.0.</p>
+<h2 id="install">التثبيت</h2>
+<ol class="steps"><li>افتح صفحة <a href="https://github.com/ashrymahrm/sayl/releases/latest">آخر إصدار</a> ونزِّل <kbd>SAYL-Setup-x64-0.1.0.exe</kbd>.</li><li>شغّل الملف واتبع خطوات التثبيت، دون الحاجة إلى صلاحيات المسؤول.</li><li>افتح سيل من قائمة ابدأ.</li></ol>
+<div class="note">إذا ظهرت رسالة «Windows protected your PC» فاضغط «More info» ثم «Run anyway». تظهر هذه الرسالة مع البرامج الجديدة التي لم تحصل بعد على توقيع معروف.</div>
+<h2 id="first">أول تنزيل</h2>
+<ol class="steps"><li>انسخ رابط الملف.</li><li>اضغط «تنزيل جديد» أو <kbd>Ctrl + N</kbd>، وسيُلصق الرابط تلقائيًا.</li><li>اختر مكان الحفظ واضغط «ابدأ».</li></ol>
+<h2 id="pause">الإيقاف والاستئناف</h2><p>اضغط زر الإيقاف بجانب أي تنزيل، واستأنفه متى شئت. وإذا أُغلق البرنامج أو انقطع الاتصال، يبقى التنزيل محفوظًا ويكمل من آخر جزء وصل.</p>
+<h2 id="ext">إضافة المتصفح</h2><ol class="steps"><li>ثبّت إضافة سيل على Chrome أو Edge.</li><li>افتح سيل مرة واحدة ليرتبط بالمتصفح.</li><li>سينتقل بعدها كل تنزيل إلى سيل. وإذا كان سيل مغلقًا، نزّل المتصفح الملف كالمعتاد.</li></ol>
+<h2 id="cli">سطر الأوامر</h2><div class="term"><b>PS&gt;</b> sayl get &lt;url&gt; [-c 8] [-o D:\Downloads]<br><b>PS&gt;</b> sayl list<br><b>PS&gt;</b> sayl pause &lt;id&gt; · sayl resume &lt;id&gt;<br><b>PS&gt;</b> sayl --version</div>
+<h2 id="settings">الإعدادات</h2><ul><li>عدد الاتصالات لكل تنزيل (من ١ إلى ١٦).</li><li>مجلد الحفظ الافتراضي.</li><li>اللغة، والوضع الفاتح أو الداكن.</li></ul>
+<h2 id="faq">الأسئلة الشائعة</h2>
+<details open><summary>هل ينزّل سيل مقاطع يوتيوب؟</summary><p>ليس بعد. يصل تنزيل الفيديو في الإصدار 0.2.0.</p></details>
+<details><summary>هل يجمع سيل أي بيانات عني؟</summary><p>لا. لا حساب ولا تتبّع، والكود كلها مفتوحة لمن أراد مراجعتها.</p></details>
+<details><summary>توقّف التنزيل عند نسبة معيّنة، فماذا أفعل؟</summary><p>اضغط «استئناف». وإذا كان الخادم لا يدعم الاستئناف، فسينبّهك سيل ويبدأ من جديد.</p></details>
+</article></div></div>
+<script src="flow.js"></script></body></html>

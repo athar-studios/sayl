@@ -1,152 +1,136 @@
 <div align="center">
 
-[العربية](README.md) | **English**
+[العربية](README.md) | [English](README.en.md)
+
+<br>
+
+<img src="assets/brand/icon.svg" alt="SAYL Logo" width="120" height="84">
+
+# SAYL (سيل)
+
+[![CI](https://github.com/athar-studios/sayl/actions/workflows/ci.yml/badge.svg)](https://github.com/athar-studios/sayl/actions)
+[![Latest Release](https://img.shields.io/github/v/release/athar-studios/sayl?color=00B6BD&label=Release)](https://github.com/athar-studios/sayl/releases/latest)
+[![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-orange.svg)](https://ko-fi.com/athar_studio)
+
+**SAYL is a fast, lightweight Windows-first download manager built in Rust with a modern desktop UI, completely open source, and respecting your privacy with zero ads and zero telemetry.**
+
+<br>
+
+<img src="docs/ui-mockups/03-main-light-en.png" alt="SAYL Main Desktop Interface" width="880">
 
 </div>
 
-<img src="assets/brand/logo-full.svg" alt="SAYL" width="220">
+---
 
-# SAYL Download Manager
+## Features
 
-[![CI](https://github.com/athar-studios/sayl/actions/workflows/ci.yml/badge.svg)](https://github.com/athar-studios/sayl/actions)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-
-<!-- [Screenshot placeholder: Application UI screenshot will be added here once official screenshots are published to docs/screenshots/v0.1.0/] -->
-
-**SAYL** is an independent, high-performance download manager for Windows designed for speed, reliable resuming, and complete user privacy. It delivers fast multi-part downloads, resilient state persistence across crashes, and a modern clean interface with zero telemetry and zero ads.
+- **Multi-Connection Acceleration:** Splits files across concurrent connections to maximize bandwidth utilization.
+- **Reliable Resumption:** Connection drops or unexpected reboots resume byte-for-byte using strong ETag verification without restarting from zero.
+- **Bilingual Arabic & English:** Crafted with native Arabic RTL support and full English LTR experience, featuring clean typography and light/dark modes.
+- **Drag & Drop:** Drop URLs directly from your browser into the window to start downloading immediately.
+- **Automatic Categorization & Search:** Automatically sorts downloads into Video, Audio, Documents, Programs, and Compressed, paired with instantaneous real-time search.
+- **Dedicated Progress Window:** Monitor per-chunk transfer rates, live connection status, speed, and ETA in an isolated progress view.
+- **Auto-Shutdown & Sleep Inhibition:** Prevents Windows from entering sleep mode while downloads are in flight, with an optional 30-second countdown PC auto-shutdown.
+- **Comprehensive CLI Tool:** A standalone `sayl.exe` binary offering complete queue control, crash recovery, and automation for PowerShell scripts.
+- **Absolute Privacy:** No accounts, no ads, no tracking analytics (No Telemetry), and no intermediate proxy servers between your computer and your downloads.
 
 ---
 
-### What is SAYL?
-SAYL manages and accelerates file downloads over standard HTTP and HTTPS protocols. It splits files into parallel byte ranges to maximize connection bandwidth, continuously validates received chunks, and ensures that interrupted transfers resume accurately without data corruption.
+## Download & Installation
 
-Key highlights:
-- **Verified Resuming:** Strict byte-range validation and strong ETag checking prevent corrupted resumes when servers or files change (provided the remote server supports range requests and the file has not been modified).
-- **Crash Resilience:** Durable transaction-safe journaling ensures unfinished tasks recover automatically after sudden reboots or power loss.
-- **Absolute Privacy:** No tracking, no analytics SDKs, no ads, and no external telemetry calls. Your download history and URLs stay local on your machine.
+Visit the **[GitHub Releases Page](https://github.com/athar-studios/sayl/releases/latest)** to download the latest build:
+
+- **Windows Installer (64-bit):** `SAYL-Setup-x64-0.1.0.exe` (installs cleanly in user space without requiring administrator elevation).
+
+> **Windows SmartScreen Notice:**  
+> Because SAYL is an independent open-source project without a costly commercial EV code-signing certificate, Windows may show a blue warning saying 'Windows protected your PC / Unknown Publisher'.  
+> To launch: click **'More info'** and then choose **'Run anyway'**. Sayl's source code is 100% open and auditable on GitHub.
 
 ---
 
-### Download & Installation
-Download the latest official release for Windows directly from GitHub:  
-👉 **[Download SAYL — Latest Release](https://github.com/athar-studios/sayl/releases/latest)**
+## Quickstart
 
-#### Available Packages
-- **Standard NSIS Installer (Recommended):** `SAYL-Setup-x64-0.1.0.exe`  
-  Download and run the setup executable to install SAYL on your PC.
-- **Windows Installer Package (MSI):** `SAYL-Setup-x64-0.1.0.msi`  
-  Alternative MSI package suitable for silent installation or enterprise deployment.
+### Desktop Application (GUI)
+1. Open SAYL from your Start Menu.
+2. Click **'Add Download'** or press <kbd>Ctrl + N</kbd>.
+3. Paste your URL and hit **'Start Download'**.
 
-#### Verifying Package Integrity
-Each release publishes an accompanying `SHA256SUMS.txt` file. You can verify your installer using PowerShell:
+### Command-Line Interface (CLI)
+Sayl is available directly from your terminal:
+
 ```powershell
-Get-FileHash .\SAYL-Setup-x64-0.1.0.exe -Algorithm SHA256
+# Add a download with 8 parallel connections
+sayl add https://example.com/file.zip --connections 8
+
+# List active and queued downloads
+sayl list
+
+# Pause or resume a task
+sayl pause <id>
+sayl start <id>
+
+# Recover tasks interrupted by power loss
+sayl recover
 ```
-Compare the output hash against the one published in `SHA256SUMS.txt`.
 
 ---
 
-### Starting Your First Download
+## Browser Extension
 
-#### Adding a Download
-1. Click **"Add Download"** in the toolbar or press `Ctrl+N`.
-2. Paste the target file URL into the dialog.
-3. Click **"Start Download"** to initiate the transfer.
+A Manifest V3 extension for Chromium-based browsers (Google Chrome, Microsoft Edge, Brave) is available in `extensions/browser/chromium`.
 
-#### Handling Duplicate URLs
-When adding a URL that already exists in the downloads list, SAYL prompts with a dialog offering three clear actions:
-- **Open existing:** Switch directly to the existing download task and view its details.
-- **Download again:** Start a new, independent download task for the same URL.
-- **Cancel:** Close the dialog and dismiss the addition.
-
-#### Drag and Drop
-Drag any download link directly from your browser or desktop application and drop it into the SAYL window to begin downloading immediately.
-
-#### Categories & Collapsible Sidebar
-SAYL features a collapsible sidebar that organizes your downloads by file category with live task counts:
-- **Available Categories:** All, Video, Audio, Documents, Programs, Compressed, and Other.
-- **Automatic Classification:** Files are categorized based on their file extension first, falling back to the HTTP MIME content type (`Content-Type`) when extensions are absent or ambiguous.
-
-#### Search & State Filtering
-- **Quick Search:** Real-time search box filtering downloads by matching file name or URL.
-- **State Filter:** Quick filter chips to view tasks by status: All, Active (Running), Paused, Completed, and Failed.
-
-#### View Modes: Cards & Compact Table
-SAYL offers two view layouts to match your preference:
-- **Card View (Default):** Rich visual cards displaying progress, size, and download speed.
-- **Compact Table View:** Streamlined tabular layout displaying Name, Size, Progress, Speed, Remaining Time, State, and quick Action buttons.
-- Your preferred view mode is saved automatically in Settings and restored across sessions.
-
-#### Floating Download Window
-A small floating panel inside the app, one per active download, overlays the task list so progress can be watched without leaving the current view:
-- **Metrics Displayed:** File name, size, gradient progress bar, real-time speed, estimated remaining time, and active segment count (`Parts`).
-- **Direct Controls:** Pause, resume, and cancel buttons.
-- **Completion Actions:** Offers **"Open file"** and **"Show in folder"** buttons once the transfer completes.
-- **Configuration:** Governed by two preferences in Settings: "Show download window when download starts" (on by default) and "Close window automatically when finished" (off by default).
-
-#### Sleep Prevention During Downloads
-To ensure large downloads finish uninterrupted, SAYL requests Windows to remain awake (`SetThreadExecutionState`) while downloads are actively running, and releases this lock automatically once all downloads stop or finish. This behavior is governed by the **"Prevent sleep during downloads"** setting and is enabled by default.
-
-#### Shutdown Computer on Completion
-An optional feature to shut down the machine automatically once all downloads complete, accessible from the floating download window and the toolbar's main menu (⋮):
-- **Transient Preference:** Never saved to disk; automatically reset upon application restart to prevent unintended future shutdowns.
-- **Safety Countdown:** Initiates a visible 60-second countdown prompt with an explicit **"Cancel"** action before initiating system shutdown.
-- **Refusal Safeguards:** Strictly refuses to shut down if any task has failed, is paused, is still running, or if there are no download tasks in the list.
-
-#### Save Folder Selection
-- By default, files are saved to your system's `Downloads` folder.
-- The destination directory for all downloads is configured in Settings using the native folder picker.
-
-#### Pause and Resume
-- **Pause:** Click the `Pause` button on any active download at any time. The engine gracefully stops workers and commits written bytes to disk.
-- **Resume:** Click `Resume` to continue transferring from where you left off, provided the remote server supports range requests (`Accept-Ranges`) and the remote file validator has not changed.
+- Right-click any link and select **'Download with Sayl'**.
+- Or enable automatic download interception.
+- See setup instructions in the [Browser Integration Guide](https://sayl.site/docs#ext).
 
 ---
 
-### Browser Extension & Context Menu
-SAYL integrates with Chromium-based browsers (Google Chrome, Microsoft Edge, Brave) via its companion extension:
-- **Context Menu Integration:** Right-click any link on the web and select **"التحميل باستخدام سيل" / "Download with Sayl"** to send the URL directly to the SAYL desktop application.
-- **Toolbar Popup:** Checks and displays whether the native messaging host (`com.sayl.downloader`) is connected, reporting the running app version.
-- **Fallback Behavior:** If the SAYL application is closed or not installed, the popup indicates that the host is not connected and the browser leaves the link untouched, allowing the user to download through the browser as normal.
+## Complete Documentation
+
+Comprehensive command references, settings breakdown, server error behaviors, and architectural details are published on our official documentation site:
+
+🌐 **[SAYL Official Documentation & User Guide](https://sayl.site/docs)**
 
 ---
 
-### Settings
-Open Settings via the **gear button in the toolbar**:
-- **Default Download Directory:** Configure where all downloaded files are saved using the native directory picker.
-- **Concurrency & Connections:** Adjust maximum concurrent connections per download (default is 4).
-- **Default View Mode:** Toggle between Card view and compact Table view, saved automatically.
-- **Prevent Sleep During Downloads:** Keep Windows awake while downloads are active (enabled by default).
-- **Show Download Window on Start:** Automatically display the floating window when a download begins (enabled by default).
-- **Close Window on Finish:** Automatically close the floating download window when complete (disabled by default).
-- **Appearance & Language:** Toggle between Arabic (with full RTL support) and English, and select Dark or Light theme modes.
+## Building from Source
+
+To compile Sayl locally on Windows:
+
+```powershell
+# Requirements: Rust (GNU toolchain) and Node.js 18+
+rustup toolchain install stable-x86_64-pc-windows-gnu
+$env:RUSTFLAGS = "-C linker=rust-lld"
+
+# Check and run workspace tests
+cargo check --workspace
+cargo test --workspace
+
+# Build the desktop application
+cd apps/desktop
+npm install
+npm run tauri build
+```
+
+See **[docs/BUILD.md](docs/BUILD.md)** for detailed build instructions.
 
 ---
 
-### Frequently Asked Questions (FAQ)
+## Contributing
 
-#### Q: Does SAYL collect any data about my downloads or usage?
-**A:** No. SAYL is built with a zero-telemetry policy. There are no tracking scripts, no third-party analytics, and no remote telemetry servers. All download records and URLs remain strictly on your local device.
-
-#### Q: Why does a download occasionally restart from 0% instead of resuming?
-**A:** This safeguards against file corruption if:
-1. The remote web server does not support HTTP Range requests (`Accept-Ranges`).
-2. The file on the remote server changed while paused (validator or `ETag` mismatch).
-
-#### Q: Are downloaded parts lost if my computer crashes or loses power?
-**A:** No. SAYL maintains a write-ahead journal and regularly flushes state to disk. When reopened, any incomplete downloads are restored and ready for resumption.
+We welcome community contributions. Please read **[CONTRIBUTING.md](CONTRIBUTING.md)** and **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** before opening a Pull Request.
 
 ---
 
-### System Requirements
-- **Operating System:** Windows 10 (version 1903 or later) or Windows 11, 64-bit (x64).
-- **Runtime:** Microsoft Edge WebView2 Runtime (pre-installed on modern Windows systems).
-- **Storage:** Adequate free disk space and write permissions on the designated download directory.
+## Support Sayl
+
+Sayl is and will always remain free and open source. If you find it helpful and wish to support our work and infrastructure, you can donate any amount via Ko-fi:
+
+☕ **[Support us on Ko-fi](https://ko-fi.com/athar_studio)**
 
 ---
 
-### License & Website
-- **License:** Licensed under the **Apache License, Version 2.0**. See [`LICENSE`](LICENSE) for details.
-- **Official Website:** [https://sayl.site](https://sayl.site)
-- **Repository & Issues:** [https://github.com/athar-studios/sayl](https://github.com/athar-studios/sayl)
+## License
 
+Sayl is released under the **[Apache-2.0 License](LICENSE)**.
