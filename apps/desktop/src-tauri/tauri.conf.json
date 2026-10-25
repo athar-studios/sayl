@@ -35,11 +35,6 @@
       "icons/icon.ico",
       "icons/icon.png"
     ],
-    "resources": {
-      "resources/host/sayl-bridge.exe": "host/sayl-bridge.exe",
-      "resources/host/com.sayl.downloader.json": "host/com.sayl.downloader.json",
-      "resources/extensions/browser/chromium/": "extensions/browser/chromium/"
-    },
     "windows": {
       "nsis": {
         "installerIcon": "icons/icon.ico",

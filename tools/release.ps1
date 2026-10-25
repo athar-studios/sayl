@@ -176,6 +176,13 @@ if ($DryRun) {
         Copy-Item -LiteralPath (Join-Path $RepoRoot "assets\brand\icon.ico") -Destination (Join-Path $HostStageDir "icon.ico") -Force
         Copy-Item -Path (Join-Path $RepoRoot "extensions\browser\chromium\*") -Destination $ExtStageDir -Recurse -Force
 
+        # Stage release configuration overlay for Tauri CLI
+        $DesktopInstallerDir = Join-Path $DesktopDir "installer"
+        if (-not (Test-Path -LiteralPath $DesktopInstallerDir)) {
+            New-Item -ItemType Directory -Path $DesktopInstallerDir -Force | Out-Null
+        }
+        Copy-Item -LiteralPath (Join-Path $RepoRoot "installer\tauri.bundle-resources.json") -Destination (Join-Path $DesktopInstallerDir "tauri.bundle-resources.json") -Force
+
         Write-Host "[نجاح / PASS] تم تجهيز موارد الحزمة بنجاح داخل $StageDir" -ForegroundColor Green
     } finally {
         Pop-Location
@@ -186,7 +193,7 @@ if ($DryRun) {
 # 4. Build Tauri Release Binary & Packages
 # ------------------------------------------------------------------------------
 Write-Host "`n[الخطوة 4 / Step 4] بناء حزمة Tauri الإنتاجية / Building Tauri Production Release..." -ForegroundColor Yellow
-$TauriBuildCmd = "npm run tauri -- build"
+$TauriBuildCmd = "npm run tauri -- build --config installer/tauri.bundle-resources.json"
 
 if ($DryRun) {
     Write-Host "[DRY-RUN] Working directory: $DesktopDir" -ForegroundColor Cyan

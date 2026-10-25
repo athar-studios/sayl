@@ -245,6 +245,32 @@ if (-not (Test-Path -LiteralPath $TauriConfPath)) {
         Write-Host "  [FAIL] bundle.windows.wix section missing in tauri.conf.json" -ForegroundColor Red
         $Failures++
     }
+
+    # Config sanity check: base tauri.conf.json must not declare bundle.resources
+    if ($conf.bundle.PSObject.Properties['resources']) {
+        Write-Host "  [FAIL] base tauri.conf.json should not declare bundle.resources (use installer/tauri.bundle-resources.json)" -ForegroundColor Red
+        $Failures++
+    } else {
+        Write-Host "  [PASS] base tauri.conf.json has no bundle.resources (clean for fresh checkouts)" -ForegroundColor Green
+    }
+
+    # Validate release overlay installer/tauri.bundle-resources.json when present
+    $OverlayPath = Join-Path $RepoRoot "installer/tauri.bundle-resources.json"
+    if (Test-Path -LiteralPath $OverlayPath) {
+        try {
+            $overlayRaw = Get-Content -LiteralPath $OverlayPath -Raw -Encoding UTF8
+            $overlayConf = $overlayRaw | ConvertFrom-Json
+            if ($overlayConf.bundle.resources) {
+                Write-Host "  [PASS] Release overlay installer/tauri.bundle-resources.json valid with bundle.resources" -ForegroundColor Green
+            } else {
+                Write-Host "  [FAIL] installer/tauri.bundle-resources.json missing bundle.resources block" -ForegroundColor Red
+                $Failures++
+            }
+        } catch {
+            Write-Host "  [FAIL] installer/tauri.bundle-resources.json is invalid JSON: $_" -ForegroundColor Red
+            $Failures++
+        }
+    }
 }
 
 Write-Host "`n------------------------------------------------------------" -ForegroundColor Cyan

@@ -118,6 +118,10 @@ The release pipeline produces the following exact artefacts in `releases/`:
   - `HKCU\Software\Microsoft\Edge\NativeMessagingHosts\com.sayl.downloader`
   - القيمة الافتراضية لكليهما تشير إلى المسار المطلق للملف: `<InstallDir>\host\com.sayl.downloader.json`.
 
+### طبقة تكوين الموارد للإصدارات / Release Resources Overlay
+- **ملف التكوين الأساسي (`apps/desktop/src-tauri/tauri.conf.json`):** لا يحتوي على حقل `bundle.resources`، مما يتيح تشغيل أوامر التطوير والبناء القياسية (`npm run tauri -- dev` أو `npm run tauri -- build`) على أي استنساخ جديد للفرع دون الفشل بسبب مجلد الموارد الموجه للإنتاج حصراً.
+- **تراكب الإنتاج (`installer/tauri.bundle-resources.json`):** يحدد تخطيط موارد الحزمة النهائي (`host/sayl-bridge.exe` و `host/com.sayl.downloader.json` و `extensions/browser/chromium/**`). يقوم سكربت الإصدار `tools/release.ps1` ببناء `sayl-bridge`، وتجهيز مجلد الموارد تحت `apps/desktop/src-tauri/resources/`، ثم تمرير التراكب عبر `--config installer/tauri.bundle-resources.json`.
+
 ### نهج التسجيل وحدوده (NSIS مقابل WiX) / Registration Approach & Limitations
 1. **مثبت NSIS (`installer/nsis/hooks.nsh` و `installer/nsis/sayl.nsi`):**
    - عند التثبيت: ينسخ الملفات، ويُنفذ `sayl-bridge.exe --register-host --extension-id ipfenakpblanjjiboejfobkjhegnciif` لكتابة المسار المطلق الدقيق وتحديث سجل النظام. كما يضمن السكربت تحديث ملف `com.sayl.downloader.json` بمسار `$INSTDIR\host\sayl-bridge.exe` المطلق وتسجيل مفاتيح HKCU في حال غياب المشغّل.
@@ -126,4 +130,5 @@ The release pipeline produces the following exact artefacts in `releases/`:
 
 2. **مثبت WiX MSI (`installer/wix/native-host.wxs` و `installer/wix/sayl.wxs`):**
    - يسجل المفاتيح `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.sayl.downloader` و Edge مشيرةً إلى `[INSTALLDIR]host\com.sayl.downloader.json` عبر مكونات WiX القياسية للمستخدم الحالي (`Scope="perUser"`).
-   - **الحدود المعلنة (Documented Limitation):** مثبتات MSI تعمل بدون صلاحيات مسؤول وتتجنب تشغيل Custom Actions معقدة قد تعطل التثبيت الصامت. يُسجل المفتاح مسار المانيفست في السجل تلقائياً. في حال تم نقل مجلد التثبيت يدوياً، يتم تحديث المسار داخل ملف المانيفست تلقائياً عند أول تشغيل لجسر سيل عبر تطبيق سطح المكتب.
+   - يتضمن إجراءات مخصصة (CustomActions) تعمل بصلاحيات المستخدم (`Execute="deferred" Impersonate="yes" Return="ignore"`) لتشغيل `sayl-bridge.exe --register-host` بعد نسخ الملفات و `--unregister-host` قبل حذفها.
+   - **الحدود المعلنة وحالة القالب (Honest Limitation & Template Fallback):** ملف المانيفست المشحون مع الحزمة في `extensions/browser/host/com.sayl.downloader.json` يحتوي على مسار تمثيلي مؤقت (`C:\REPLACE_WITH_INSTALL_DIR\host\sayl-bridge.exe`). في حال تعذر تشغيل الـ Custom Action أو تم تقييدها بواسطة سياسات الأمان أو التثبيت الصامت، يظل المانيفست قالباً يتطلب من تطبيق SAYL (أو جسر سيل) إعادة كتابته بالمسار المطلق الفعلي عند أول إقلاع للبرنامج.

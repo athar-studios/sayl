@@ -1,7 +1,10 @@
 ﻿[CmdletBinding()]
 param (
-    [Parameter(Mandatory = $true, ValueFromRemainingArguments = $true, Position = 0)]
+    [Parameter(Position = 0, ValueFromPipeline = $true)]
     [string[]]$Path,
+
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$AdditionalPaths,
 
     [Parameter(Mandatory = $false)]
     [string]$PngOutDir
@@ -16,6 +19,27 @@ Write-Host "============================================================" -Foreg
 Write-Host " SAYL - Installer Binary Icon Brand Verifier" -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 
+# Gather and normalize all passed target paths (handles comma separation and remaining args)
+$RawTargets = @()
+if ($Path) { $RawTargets += $Path }
+if ($AdditionalPaths) { $RawTargets += $AdditionalPaths }
+
+$Targets = [System.Collections.Generic.List[string]]::new()
+foreach ($entry in $RawTargets) {
+    if (-not $entry) { continue }
+    foreach ($part in ($entry -split ',')) {
+        $clean = $part.Trim().Trim('"', "'")
+        if ($clean -and -not $Targets.Contains($clean)) {
+            $Targets.Add($clean)
+        }
+    }
+}
+
+if ($Targets.Count -eq 0) {
+    Write-Host "[ERROR] No target file paths were supplied to check." -ForegroundColor Red
+    exit 1
+}
+
 $OverallFailures = 0
 
 # Thresholds:
@@ -24,7 +48,7 @@ $OverallFailures = 0
 $MinBrandPercentage = 45.0
 $MaxRedPercentage = 1.5
 
-foreach ($filePath in $Path) {
+foreach ($filePath in $Targets) {
     Write-Host "`nChecking: $filePath" -ForegroundColor Yellow
 
     if (-not (Test-Path -LiteralPath $filePath)) {

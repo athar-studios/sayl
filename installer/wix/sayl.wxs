@@ -138,5 +138,25 @@
       <ComponentRef Id="ApplicationShortcut" />
       <ComponentRef Id="NativeMessagingHost" />
     </Feature>
+
+    <!-- Per-user CustomActions for native messaging host registration -->
+    <CustomAction Id="RegisterNativeHost"
+                  Directory="INSTALLFOLDER"
+                  ExeCommand="&quot;[HostFolder]sayl-bridge.exe&quot; --register-host --extension-id ipfenakpblanjjiboejfobkjhegnciif"
+                  Execute="deferred"
+                  Impersonate="yes"
+                  Return="ignore" />
+
+    <CustomAction Id="UnregisterNativeHost"
+                  Directory="INSTALLFOLDER"
+                  ExeCommand="&quot;[HostFolder]sayl-bridge.exe&quot; --unregister-host"
+                  Execute="deferred"
+                  Impersonate="yes"
+                  Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="RegisterNativeHost" After="InstallFiles">NOT (REMOVE = "ALL")</Custom>
+      <Custom Action="UnregisterNativeHost" Before="RemoveFiles">REMOVE = "ALL"</Custom>
+    </InstallExecuteSequence>
   </Package>
 </Wix>
