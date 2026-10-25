@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param()
 
 $ErrorActionPreference = 'Stop'
@@ -145,6 +145,126 @@ foreach ($bmp in $BmpTargets) {
     if (-not (Test-BmpFile -FilePath $bmp.Path -ExpectedW $bmp.Width -ExpectedH $bmp.Height)) {
         $Failures++
     }
+}
+
+# ------------------------------------------------------------------------------
+# 2b. Installer Artwork Layout Invariants
+#
+# Light structural checks for INST-001 (navy calligraphy confined to the
+# left panel, flat light text areas, no latin wordmark, marks confined to
+# their zones). The full gates, WCAG contrast checks and the layout-accurate
+# dialog renders live in tools/check-installer-artwork.ps1.
+# ------------------------------------------------------------------------------
+Write-Host "`n[2b] Validating Installer Artwork Layout Invariants..." -ForegroundColor Yellow
+
+Add-Type -AssemblyName System.Drawing
+
+# Fast 24bpp pixel buffer via LockBits (top-down rows, index = y*stride + x*3, BGR).
+function Get-ArtworkPixelData {
+    param([string]$Path)
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    $stream = [System.IO.MemoryStream]::new($bytes)
+    $loaded = [System.Drawing.Bitmap]::FromStream($stream)
+    $rect = [System.Drawing.Rectangle]::new(0, 0, $loaded.Width, $loaded.Height)
+    $bd = $loaded.LockBits($rect, [System.Drawing.Imaging.ImageLockMode]::ReadOnly, [System.Drawing.Imaging.PixelFormat]::Format24bppRgb)
+    $px = [byte[]]::new([Math]::Abs($bd.Stride) * $bd.Height)
+    [System.Runtime.InteropServices.Marshal]::Copy($bd.Scan0, $px, 0, $px.Length)
+    $loaded.UnlockBits($bd)
+    $loaded.Dispose()
+    $stream.Dispose()
+    return @{ Width = $bd.Width; Height = $bd.Height; Stride = $bd.Stride; Pixels = $px }
+}
+
+function Test-ArtworkLayout {
+    param(
+        [string]$Name,
+        [scriptblock]$Probe
+    )
+    $data = Get-ArtworkPixelData -Path (Join-Path $RepoRoot "apps/desktop/src-tauri/icons/$Name")
+    $detail = & $Probe $data
+    if ($detail.Pass) {
+        Write-Host "  [PASS] $Name : $($detail.Text)" -ForegroundColor Green
+    } else {
+        Write-Host "  [FAIL] $Name : $($detail.Text)" -ForegroundColor Red
+        $script:Failures++
+    }
+}
+
+# wix-dialog.bmp: flat light text area (x >= 170) and navy left panel without
+# light leaks or a white latin wordmark.
+Test-ArtworkLayout -Name 'wix-dialog.bmp' -Probe {
+    param($d)
+    $deviants = 0
+    for ($y = 0; $y -lt 312; $y++) {
+        $row = $y * $d.Stride
+        for ($x = 170; $x -le 489; $x++) {
+            $i = $row + $x * 3
+            if ([Math]::Abs($d.Pixels[$i+2] - 251) -gt 8 -or [Math]::Abs($d.Pixels[$i+1] - 251) -gt 8 -or [Math]::Abs($d.Pixels[$i] - 253) -gt 8) { $deviants++ }
+        }
+    }
+    $navy = 0; $white = 0; $tot = 0
+    for ($y = 0; $y -lt 312; $y++) {
+        $row = $y * $d.Stride
+        for ($x = 0; $x -le 158; $x++) {
+            $i = $row + $x * 3
+            $r = [int]$d.Pixels[$i+2]; $g = [int]$d.Pixels[$i+1]; $b = [int]$d.Pixels[$i]
+            $tot++
+            if ([Math]::Abs($r-11) -le 20 -and [Math]::Abs($g-26) -le 20 -and [Math]::Abs($b-78) -le 20) { $navy++ }
+            if ($r -ge 200 -and $g -ge 200 -and $b -ge 200) { $white++ }
+        }
+    }
+    $pass = ($deviants -eq 0) -and ($navy / $tot -ge 0.60) -and ($white / $tot -le 0.002)
+    @{ Pass = $pass; Text = "text zone deviants=$deviants (0), left panel navy={0:P1} (>=60%), white={1:P3} (<=0.2%)" -f ($navy/$tot), ($white/$tot) }
+}
+
+# wix-banner.bmp: flat light everywhere except the brand mark zone (x >= 415).
+Test-ArtworkLayout -Name 'wix-banner.bmp' -Probe {
+    param($d)
+    $outOfZone = 0; $markPx = 0
+    for ($y = 0; $y -lt 58; $y++) {
+        $row = $y * $d.Stride
+        for ($x = 0; $x -le 492; $x++) {
+            $i = $row + $x * 3
+            if ([Math]::Abs($d.Pixels[$i+2] - 251) -gt 8 -or [Math]::Abs($d.Pixels[$i+1] - 251) -gt 8 -or [Math]::Abs($d.Pixels[$i] - 253) -gt 8) {
+                if ($x -ge 415) { $markPx++ } else { $outOfZone++ }
+            }
+        }
+    }
+    @{ Pass = ($outOfZone -eq 0 -and $markPx -gt 0); Text = "deviants outside mark zone=$outOfZone (0), mark px=$markPx (>0)" }
+}
+
+# nsis-header.bmp: flat white matching the MUI2 white header, mark only at x >= 95.
+Test-ArtworkLayout -Name 'nsis-header.bmp' -Probe {
+    param($d)
+    $outOfZone = 0; $markPx = 0
+    for ($y = 0; $y -lt 57; $y++) {
+        $row = $y * $d.Stride
+        for ($x = 0; $x -le 149; $x++) {
+            $i = $row + $x * 3
+            $r = [int]$d.Pixels[$i+2]; $g = [int]$d.Pixels[$i+1]; $b = [int]$d.Pixels[$i]
+            if (-not ([Math]::Abs($r-255) -le 8 -and [Math]::Abs($g-255) -le 8 -and [Math]::Abs($b-255) -le 8)) {
+                if ($x -ge 95) { $markPx++ } else { $outOfZone++ }
+            }
+        }
+    }
+    @{ Pass = ($outOfZone -eq 0 -and $markPx -gt 0); Text = "non-white outside mark zone=$outOfZone (0), mark px=$markPx (>0)" }
+}
+
+# nsis-sidebar.bmp: navy-dominant calligraphy panel, no white wordmark, teal present.
+Test-ArtworkLayout -Name 'nsis-sidebar.bmp' -Probe {
+    param($d)
+    $navy = 0; $white = 0; $teal = 0; $tot = 164 * 314
+    for ($y = 0; $y -lt 314; $y++) {
+        $row = $y * $d.Stride
+        for ($x = 0; $x -le 163; $x++) {
+            $i = $row + $x * 3
+            $r = [int]$d.Pixels[$i+2]; $g = [int]$d.Pixels[$i+1]; $b = [int]$d.Pixels[$i]
+            if ([Math]::Abs($r-11) -le 20 -and [Math]::Abs($g-26) -le 20 -and [Math]::Abs($b-78) -le 20) { $navy++ }
+            if ($r -ge 200 -and $g -ge 200 -and $b -ge 200) { $white++ }
+            if ($g -ge 100 -and $b -ge 100 -and $r -le 90) { $teal++ }
+        }
+    }
+    @{ Pass = (($navy/$tot) -ge 0.85 -and ($white/$tot) -le 0.001 -and ($teal/$tot) -ge 0.01); Text = "navy={0:P1} (>=85%), white={1:P3} (<=0.1%), teal={2:P1} (>=1%)" -f ($navy/$tot), ($white/$tot), ($teal/$tot) }
 }
 
 # ------------------------------------------------------------------------------
