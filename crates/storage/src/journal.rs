@@ -15,6 +15,7 @@ use crate::record::{Checkpoint, TaskRecord};
 use sayl_core::id::TaskId;
 
 /// Specific mutation operation recorded in the write-ahead journal.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "payload")]
 pub enum JournalOp {

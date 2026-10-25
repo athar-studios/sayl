@@ -46,7 +46,6 @@ pub async fn run_sequential_download(
         });
     }
 
-    // Build HTTP request
     let mut req_builder = client.get(url.clone());
     req_builder = req_builder.header(reqwest::header::ACCEPT_ENCODING, "identity");
 
@@ -62,20 +61,71 @@ pub async fn run_sequential_download(
         }
     }
 
-    let res = req_builder
-        .send()
-        .await
+    let built_req = req_builder
+        .build()
         .map_err(|e| CoreError::http(None, e.to_string(), None))?;
 
-    let status = res.status();
-    if status.is_client_error() || status.is_server_error() {
-        return Err(CoreError::http(
-            Some(status.as_u16()),
-            format!("server returned error status: {status}"),
-            None,
-        ));
-    }
+    // Retry loop for transient failures (429, 503, 408, 425, 5xx) with backoff
+    let retry_policy = sayl_http::retry::RetryPolicy::default();
+    let mut attempts = 0u32;
+    let res = loop {
+        attempts += 1;
+        let send_result = client
+            .execute(built_req.try_clone().expect("GET request is cloneable"))
+            .await;
+        match send_result {
+            Ok(r) => {
+                let status = r.status();
+                if status.is_client_error() || status.is_server_error() {
+                    let code = status.as_u16();
+                    if sayl_http::retry::is_retryable_status(code)
+                        && retry_policy.may_retry(attempts)
+                        && !cancel_token.is_cancelled()
+                    {
+                        let retry_after_secs = r
+                            .headers()
+                            .get(reqwest::header::RETRY_AFTER)
+                            .and_then(|v| v.to_str().ok())
+                            .and_then(|s| s.parse::<u64>().ok());
+                        let retry_after = retry_after_secs.map(std::time::Duration::from_secs);
+                        let delay =
+                            retry_policy.delay_for_attempt(attempts.saturating_sub(1), retry_after);
+                        tracing::warn!(
+                            "retryable status {code} (attempt {attempts}/{}), waiting {delay:?}",
+                            retry_policy.max_attempts
+                        );
+                        tokio::time::sleep(delay).await;
+                        continue;
+                    }
+                    let retry_after_secs = r
+                        .headers()
+                        .get(reqwest::header::RETRY_AFTER)
+                        .and_then(|v| v.to_str().ok())
+                        .and_then(|s| s.parse::<u64>().ok());
+                    return Err(CoreError::http(
+                        Some(code),
+                        format!("server returned error status: {status}"),
+                        retry_after_secs,
+                    ));
+                }
+                break r;
+            }
+            Err(e) => {
+                if retry_policy.may_retry(attempts) && !cancel_token.is_cancelled() {
+                    let delay = retry_policy.delay_for_attempt(attempts.saturating_sub(1), None);
+                    tracing::warn!(
+                        "transient request error (attempt {attempts}/{}), waiting {delay:?}: {e}",
+                        retry_policy.max_attempts
+                    );
+                    tokio::time::sleep(delay).await;
+                    continue;
+                }
+                return Err(CoreError::http(None, e.to_string(), None));
+            }
+        }
+    };
 
+    let status = res.status();
     let is_partial = status == reqwest::StatusCode::PARTIAL_CONTENT;
     let (mut file, mut current_written) = if resume_from > 0 && is_partial {
         use tokio::io::AsyncSeekExt;

@@ -246,7 +246,7 @@ impl TaskView {
             error: rec.error.clone(),
             mime: rec.content_type.clone(),
             parts,
-            error_kind: None,
+            error_kind: rec.error_kind.clone(),
             connections,
             created_at: Some(rec.created_at.to_rfc3339()),
             completed_at,

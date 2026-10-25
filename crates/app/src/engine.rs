@@ -372,7 +372,9 @@ impl Engine {
                 let _ = self
                     .transition_and_persist(&mut record, DownloadState::Failed)
                     .await;
-                record.error = Some(err.to_string());
+                let core_err = CoreError::from(err);
+                record.error = Some(core_err.to_string());
+                record.error_kind = Some(core_err.error_kind().to_string());
                 let _ = self.inner.store.upsert_task(&record);
                 let _ = self
                     .inner
@@ -381,15 +383,15 @@ impl Engine {
                         task_id,
                         EventKind::Error,
                         EventPayload::Error {
-                            error: err.to_string(),
-                            retryable: err.is_retryable(),
+                            error: core_err.to_string(),
+                            retryable: core_err.is_retryable(),
                         },
                     )
                     .await;
                 let promoted = self.finish_and_get_promoted(sched_id, QueueTaskStatus::Failed);
                 self.spawn_promoted_tasks(promoted);
                 self.remove_scheduler_id(task_id);
-                return Err(err.into());
+                return Err(core_err);
             }
         };
 
@@ -524,6 +526,7 @@ impl Engine {
                         .transition_and_persist(&mut record, DownloadState::Failed)
                         .await;
                     record.error = Some(reason.to_string());
+                    record.error_kind = Some("network".to_string());
                     let _ = self.inner.store.upsert_task(&record);
                     let promoted = self.finish_and_get_promoted(sched_id, QueueTaskStatus::Failed);
                     self.spawn_promoted_tasks(promoted);
@@ -620,28 +623,127 @@ impl Engine {
                         QueueTaskStatus::Cancelled
                     }
                     Err(err) => {
-                        let _ = self
-                            .transition_and_persist(&mut record, DownloadState::Failed)
-                            .await;
-                        record.error = Some(err.to_string());
-                        let _ = self.inner.store.upsert_task(&record);
-                        let _ = self
-                            .inner
-                            .event_sender
-                            .emit(
+                        // Fallback: if the server ignored Range requests (200 instead of 206),
+                        // retry with sequential single-stream download instead of failing.
+                        if err.error_kind() == "range_unsupported" {
+                            tracing::warn!(
+                                "parallel download unsupported (server ignores Range), falling back to sequential"
+                            );
+                            let seq_result = crate::sequential::run_sequential_download(
+                                &self.inner.client,
+                                &probe_res.final_url,
+                                &part_path,
                                 task_id,
-                                EventKind::Error,
-                                EventPayload::Error {
-                                    error: err.to_string(),
-                                    retryable: err.is_retryable(),
-                                },
+                                record.total_size,
+                                None,
+                                0,
+                                cancel_token.clone(),
+                                pause_token.clone(),
+                                &self.inner.event_sender,
+                                &self.inner.store,
                             )
                             .await;
-                        let promoted =
-                            self.finish_and_get_promoted(sched_id, QueueTaskStatus::Failed);
-                        self.spawn_promoted_tasks(promoted);
-                        self.remove_scheduler_id(task_id);
-                        return Err(err);
+                            match seq_result {
+                                Ok(DownloadOutcome::Completed { written }) => {
+                                    record.written = written;
+                                    self.inner.store.upsert_task(&record)?;
+                                    QueueTaskStatus::Finished
+                                }
+                                Ok(DownloadOutcome::Paused { written }) => {
+                                    record.written = written;
+                                    let checkpoint = Checkpoint::new(
+                                        task_id,
+                                        written,
+                                        record.total_size,
+                                        vec![(0, written)],
+                                    );
+                                    let _ = self.inner.store.save_checkpoint(&checkpoint);
+                                    self.transition_and_persist(
+                                        &mut record,
+                                        DownloadState::Pausing,
+                                    )
+                                    .await?;
+                                    self.transition_and_persist(&mut record, DownloadState::Paused)
+                                        .await?;
+                                    self.scheduler_pause_and_promote(sched_id).await;
+                                    return Ok(());
+                                }
+                                Ok(DownloadOutcome::Cancelled { written }) => {
+                                    record.written = written;
+                                    self.transition_and_persist(
+                                        &mut record,
+                                        DownloadState::Cancelling,
+                                    )
+                                    .await?;
+                                    self.transition_and_persist(
+                                        &mut record,
+                                        DownloadState::Cancelled,
+                                    )
+                                    .await?;
+                                    let _ = self
+                                        .inner
+                                        .event_sender
+                                        .emit(
+                                            task_id,
+                                            EventKind::Cancelled,
+                                            EventPayload::Cancelled {
+                                                reason: "cancelled by user".into(),
+                                            },
+                                        )
+                                        .await;
+                                    QueueTaskStatus::Cancelled
+                                }
+                                Err(seq_err) => {
+                                    let _ = self
+                                        .transition_and_persist(&mut record, DownloadState::Failed)
+                                        .await;
+                                    record.error = Some(seq_err.to_string());
+                                    record.error_kind = Some(seq_err.error_kind().to_string());
+                                    let _ = self.inner.store.upsert_task(&record);
+                                    let _ = self
+                                        .inner
+                                        .event_sender
+                                        .emit(
+                                            task_id,
+                                            EventKind::Error,
+                                            EventPayload::Error {
+                                                error: seq_err.to_string(),
+                                                retryable: seq_err.is_retryable(),
+                                            },
+                                        )
+                                        .await;
+                                    let promoted = self
+                                        .finish_and_get_promoted(sched_id, QueueTaskStatus::Failed);
+                                    self.spawn_promoted_tasks(promoted);
+                                    self.remove_scheduler_id(task_id);
+                                    return Err(seq_err);
+                                }
+                            }
+                        } else {
+                            let _ = self
+                                .transition_and_persist(&mut record, DownloadState::Failed)
+                                .await;
+                            record.error = Some(err.to_string());
+                            record.error_kind = Some(err.error_kind().to_string());
+                            let _ = self.inner.store.upsert_task(&record);
+                            let _ = self
+                                .inner
+                                .event_sender
+                                .emit(
+                                    task_id,
+                                    EventKind::Error,
+                                    EventPayload::Error {
+                                        error: err.to_string(),
+                                        retryable: err.is_retryable(),
+                                    },
+                                )
+                                .await;
+                            let promoted =
+                                self.finish_and_get_promoted(sched_id, QueueTaskStatus::Failed);
+                            self.spawn_promoted_tasks(promoted);
+                            self.remove_scheduler_id(task_id);
+                            return Err(err);
+                        }
                     }
                 };
             } else {
@@ -706,6 +808,7 @@ impl Engine {
                             .transition_and_persist(&mut record, DownloadState::Failed)
                             .await;
                         record.error = Some(err.to_string());
+                        record.error_kind = Some(err.error_kind().to_string());
                         let _ = self.inner.store.upsert_task(&record);
                         let _ = self
                             .inner
@@ -774,6 +877,7 @@ impl Engine {
                     .transition_and_persist(record, DownloadState::Failed)
                     .await;
                 record.error = Some("file size mismatch".to_string());
+                record.error_kind = Some("disk".to_string());
                 let _ = self.inner.store.upsert_task(record);
                 return Ok(QueueTaskStatus::Failed);
             }

@@ -207,6 +207,10 @@ pub async fn run_parallel_download_with_options(
 
     let total_downloaded = Arc::new(AtomicU64::new(0));
     let first_error = Arc::new(Mutex::new(None::<CoreError>));
+    // Shared throttle counter: increments on each 429/503 seen by any worker.
+    // At >= 2 consecutive throttles, workers release and stop so the engine can downgrade.
+    let throttle_count = Arc::new(std::sync::atomic::AtomicU32::new(0));
+    let range_unsupported = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let start_time = Instant::now();
 
     let mut handles = Vec::with_capacity(num_workers);
@@ -278,6 +282,8 @@ pub async fn run_parallel_download_with_options(
         let total_downloaded = Arc::clone(&total_downloaded);
         let table = Arc::clone(&table);
         let first_error = Arc::clone(&first_error);
+        let throttle_count = Arc::clone(&throttle_count);
+        let range_unsupported = Arc::clone(&range_unsupported);
         let cancel_token = cancel_token.clone();
         let pause_token = pause_token.clone();
         // `lease_ttl` is Copy and captured by the worker task below through the
@@ -315,10 +321,10 @@ pub async fn run_parallel_download_with_options(
                     }
                 };
 
-                // 2. Fetch Range
+                // 2. Fetch Range with retry on transient failures
                 let range_header_val =
                     sayl_http::range::format_byte_range(lease.start, Some(lease.end_inclusive));
-                let req = match client
+                let built_req = match client
                     .get(url.clone())
                     .header(reqwest::header::ACCEPT_ENCODING, "identity")
                     .header(reqwest::header::RANGE, range_header_val)
@@ -337,52 +343,132 @@ pub async fn run_parallel_download_with_options(
                     }
                 };
 
-                let res = match client.execute(req).await {
-                    Ok(r) => r,
-                    Err(err) => {
-                        let mut tbl = table.lock().await;
-                        tbl.release(lease);
-
-                        if cancel_token.is_cancelled() || pause_token.is_cancelled() {
-                            break;
+                let retry_policy = sayl_http::retry::RetryPolicy::default();
+                let mut req_attempts = 0u32;
+                let res_opt: Option<reqwest::Response> = loop {
+                    req_attempts += 1;
+                    let exec_req = match built_req.try_clone() {
+                        Some(r) => r,
+                        None => break None,
+                    };
+                    match client.execute(exec_req).await {
+                        Ok(r) => {
+                            let status = r.status();
+                            let code = status.as_u16();
+                            if code == 429 || code == 503 {
+                                let prev = throttle_count
+                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                if prev >= 1 {
+                                    // 2+ consecutive throttles: downgrade to single connection
+                                    let mut tbl = table.lock().await;
+                                    tbl.release(lease);
+                                    tracing::warn!(
+                                        "worker {worker_id}: {code} seen {} times, downgrading connections",
+                                        prev + 1
+                                    );
+                                    break None;
+                                }
+                            } else if status.is_success() {
+                                throttle_count.store(0, std::sync::atomic::Ordering::Relaxed);
+                            }
+                            if status != reqwest::StatusCode::PARTIAL_CONTENT
+                                && status != reqwest::StatusCode::OK
+                            {
+                                if sayl_http::retry::is_retryable_status(code)
+                                    && retry_policy.may_retry(req_attempts)
+                                    && !cancel_token.is_cancelled()
+                                {
+                                    let retry_after_secs = r
+                                        .headers()
+                                        .get(reqwest::header::RETRY_AFTER)
+                                        .and_then(|v| v.to_str().ok())
+                                        .and_then(|s| s.parse::<u64>().ok());
+                                    let delay = retry_policy.delay_for_attempt(
+                                        req_attempts.saturating_sub(1),
+                                        retry_after_secs.map(Duration::from_secs),
+                                    );
+                                    tracing::warn!(
+                                        "worker {worker_id}: retryable status {code} (attempt {req_attempts}), waiting {delay:?}"
+                                    );
+                                    tokio::time::sleep(delay).await;
+                                    continue;
+                                }
+                                let mut tbl = table.lock().await;
+                                tbl.release(lease);
+                                let retry_after_secs = r
+                                    .headers()
+                                    .get(reqwest::header::RETRY_AFTER)
+                                    .and_then(|v| v.to_str().ok())
+                                    .and_then(|s| s.parse::<u64>().ok());
+                                let err = CoreError::http(
+                                    Some(code),
+                                    format!(
+                                        "worker {worker_id} received unexpected status: {status}"
+                                    ),
+                                    retry_after_secs,
+                                );
+                                let mut err_guard = first_error.lock().await;
+                                if err_guard.is_none() {
+                                    *err_guard = Some(err);
+                                }
+                                return Ok(());
+                            }
+                            // 200 for a Range request means the server ignores Range
+                            if status == reqwest::StatusCode::OK {
+                                range_unsupported.store(true, std::sync::atomic::Ordering::Relaxed);
+                                let mut tbl = table.lock().await;
+                                tbl.release(lease);
+                                tracing::warn!(
+                                    "worker {worker_id}: server returned 200 for Range request, marking range_unsupported"
+                                );
+                                break None;
+                            }
+                            break Some(r);
                         }
-
-                        let core_err = CoreError::http(
-                            None,
-                            format!("worker {worker_id} request error: {err}"),
-                            None,
-                        );
-                        let mut err_guard = first_error.lock().await;
-                        if err_guard.is_none() {
-                            *err_guard = Some(core_err);
+                        Err(err) => {
+                            if retry_policy.may_retry(req_attempts)
+                                && !cancel_token.is_cancelled()
+                                && !pause_token.is_cancelled()
+                            {
+                                let delay = retry_policy
+                                    .delay_for_attempt(req_attempts.saturating_sub(1), None);
+                                tracing::warn!(
+                                    "worker {worker_id}: transient error (attempt {req_attempts}), waiting {delay:?}: {err}"
+                                );
+                                tokio::time::sleep(delay).await;
+                                continue;
+                            }
+                            if cancel_token.is_cancelled() || pause_token.is_cancelled() {
+                                let mut tbl = table.lock().await;
+                                tbl.release(lease);
+                                break None;
+                            }
+                            let mut tbl = table.lock().await;
+                            tbl.release(lease);
+                            let core_err = CoreError::http(
+                                None,
+                                format!("worker {worker_id} request error: {err}"),
+                                None,
+                            );
+                            let mut err_guard = first_error.lock().await;
+                            if err_guard.is_none() {
+                                *err_guard = Some(core_err);
+                            }
+                            consecutive_failures += 1;
+                            if consecutive_failures >= 3 {
+                                break None;
+                            }
+                            tokio::time::sleep(Duration::from_millis(30)).await;
+                            continue;
                         }
-
-                        consecutive_failures += 1;
-                        if consecutive_failures >= 3 {
-                            break;
-                        }
-                        tokio::time::sleep(Duration::from_millis(30)).await;
-                        continue;
                     }
                 };
 
-                let status = res.status();
-                if status != reqwest::StatusCode::PARTIAL_CONTENT
-                    && status != reqwest::StatusCode::OK
-                {
-                    let mut tbl = table.lock().await;
-                    tbl.release(lease);
-                    let err = CoreError::http(
-                        Some(status.as_u16()),
-                        format!("worker {worker_id} received unexpected status: {status}"),
-                        None,
-                    );
-                    let mut err_guard = first_error.lock().await;
-                    if err_guard.is_none() {
-                        *err_guard = Some(err);
-                    }
-                    return Ok(());
-                }
+                // If we broke out without a response (throttle downgrade or range unsupported), skip processing
+                let res = match res_opt {
+                    Some(r) => r,
+                    None => continue,
+                };
 
                 // 3. Stream bytes and write at exact offset
                 let mut stream = res.bytes_stream();
@@ -640,6 +726,16 @@ pub async fn run_parallel_download_with_options(
     // Did not complete all chunks
     let _ = shared_file.sync_all();
     drop(shared_file);
+
+    // If any worker detected that the server ignores Range requests (200 for Range),
+    // return a range_unsupported error so the engine can fall back to sequential.
+    if range_unsupported.load(std::sync::atomic::Ordering::Relaxed) {
+        return Err(CoreError::http(
+            Some(200),
+            "server returned 200 for a Range request; parallel transfer not supported".to_string(),
+            None,
+        ));
+    }
 
     let err_opt = { first_error.lock().await.take() };
     if let Some(err) = err_opt {

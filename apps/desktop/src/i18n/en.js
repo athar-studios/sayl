@@ -370,6 +370,18 @@ export default {
       title: "Download cancelled",
       hint: "The download was stopped and cancelled.",
     },
+    too_many_redirects: {
+      title: "Too many redirects",
+      hint: "The URL redirects too many times; there may be a redirect loop.",
+    },
+    timeout: {
+      title: "Connection timed out",
+      hint: "The server took too long to respond. Please retry later.",
+    },
+    invalid_url: {
+      title: "Invalid URL",
+      hint: "The provided URL is not valid or not supported.",
+    },
     unknown: {
       title: "Download failed",
       hint: "An unexpected error occurred while downloading this file.",
