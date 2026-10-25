@@ -78,40 +78,35 @@ Section "SAYL Core (مطلوب / Required)" SecCore
   ; Application binary
   File /nonfatal "${BUILD_DIR}\${MAIN_EXE}"
   
-  ; Native messaging host and unpacked Chromium extension
+  ; Native messaging host and unpacked Chromium and Firefox extensions
   SetOutPath "$INSTDIR\host"
   File /nonfatal "${BUILD_DIR}\sayl-bridge.exe"
-  File /nonfatal "..\..\extensions\browser\host\com.sayl.downloader.json"
   
   SetOutPath "$INSTDIR\extensions\browser\chromium"
   File /r /x ".*" "..\..\extensions\browser\chromium\*.*"
 
-  ; Register native messaging host
-  DetailPrint "Configuring SAYL native messaging host..."
+  SetOutPath "$INSTDIR\extensions\browser\firefox"
+  File /r /x ".*" "..\..\extensions\browser\firefox\*.*"
+
+  ; Stage browser extensions under %LOCALAPPDATA%\Sayl\extension
+  DetailPrint "Staging SAYL browser extensions to LocalAppData..."
+  RMDir /r "$LOCALAPPDATA\Sayl\extension\chromium"
+  RMDir /r "$LOCALAPPDATA\Sayl\extension\firefox"
+  CreateDirectory "$LOCALAPPDATA\Sayl\extension\chromium"
+  CreateDirectory "$LOCALAPPDATA\Sayl\extension\firefox"
+
+  ${If} ${FileExists} "$INSTDIR\extensions\browser\chromium"
+    nsExec::ExecToLog 'cmd.exe /c xcopy "$INSTDIR\extensions\browser\chromium" "$LOCALAPPDATA\Sayl\extension\chromium" /E /I /Y'
+  ${EndIf}
+  ${If} ${FileExists} "$INSTDIR\extensions\browser\firefox"
+    nsExec::ExecToLog 'cmd.exe /c xcopy "$INSTDIR\extensions\browser\firefox" "$LOCALAPPDATA\Sayl\extension\firefox" /E /I /Y'
+  ${EndIf}
+
+  ; Register native messaging host via sayl-bridge (single writer of manifests and HKCU keys)
+  DetailPrint "Registering SAYL native messaging host..."
   ${If} ${FileExists} "$INSTDIR\host\sayl-bridge.exe"
-    nsExec::ExecToLog '"$INSTDIR\host\sayl-bridge.exe" --register-host --extension-id ipfenakpblanjjiboejfobkjhegnciif'
+    nsExec::ExecToLog '"$INSTDIR\host\sayl-bridge.exe" --register-host'
   ${EndIf}
-
-  ${If} ${FileExists} "$INSTDIR\host"
-    ${WordReplace} "$INSTDIR\host\sayl-bridge.exe" "\" "\\" "+" $1
-    ClearErrors
-    FileOpen $0 "$INSTDIR\host\com.sayl.downloader.json" w
-    ${Unless} ${Errors}
-      FileWrite $0 "{\r$\n"
-      FileWrite $0 '  "name": "com.sayl.downloader",$\r$\n'
-      FileWrite $0 '  "description": "SAYL native messaging host",$\r$\n'
-      FileWrite $0 '  "path": "$1",$\r$\n'
-      FileWrite $0 '  "type": "stdio",$\r$\n'
-      FileWrite $0 '  "allowed_origins": [$\r$\n'
-      FileWrite $0 '    "chrome-extension://ipfenakpblanjjiboejfobkjhegnciif/"$\r$\n'
-      FileWrite $0 "  ]$\r$\n"
-      FileWrite $0 "}$\r$\n"
-      FileClose $0
-    ${EndUnless}
-  ${EndIf}
-
-  WriteRegStr HKCU "Software\Google\Chrome\NativeMessagingHosts\com.sayl.downloader" "" "$INSTDIR\host\com.sayl.downloader.json"
-  WriteRegStr HKCU "Software\Microsoft\Edge\NativeMessagingHosts\com.sayl.downloader" "" "$INSTDIR\host\com.sayl.downloader.json"
 
   ; Write uninstaller
   WriteUninstaller "$INSTDIR\Uninstall.exe"
@@ -181,9 +176,13 @@ Section "Uninstall"
   ${If} ${FileExists} "$INSTDIR\host\sayl-bridge.exe"
     nsExec::ExecToLog '"$INSTDIR\host\sayl-bridge.exe" --unregister-host'
   ${EndIf}
-  DeleteRegKey HKCU "Software\Google\Chrome\NativeMessagingHosts\com.sayl.downloader"
-  DeleteRegKey HKCU "Software\Microsoft\Edge\NativeMessagingHosts\com.sayl.downloader"
-  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "SAYL"
+
+  ; Clean up installer-staged extension and host directories under %LOCALAPPDATA%\Sayl
+  ; User downloads and settings are untouched.
+  ; Note: The desktop app owns HKCU\Software\Microsoft\Windows\CurrentVersion\Run\SAYL,
+  ; so the installer does not delete it on uninstall.
+  RMDir /r "$LOCALAPPDATA\Sayl\extension"
+  RMDir /r "$LOCALAPPDATA\Sayl\host"
 
   ; Remove only installed application files
   Delete "$INSTDIR\${MAIN_EXE}"

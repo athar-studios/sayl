@@ -1,48 +1,38 @@
 ; ==============================================================================
-; SAYL ("سيل") - NSIS Installer Hooks for Native Messaging Host Registration
+; SAYL ("سيل") - NSIS Installer Hooks for Native Messaging Host & Extensions
 ; Runs in per-user scope (HKCU), never requiring administrative privileges.
-; Pinned Extension ID: ipfenakpblanjjiboejfobkjhegnciif
+; Zero-config browser extension flow for Chromium and Firefox.
 ; ==============================================================================
 
 !include "LogicLib.nsh"
-!include "WordFunc.nsh"
 
 !macro NSIS_HOOK_PREINSTALL
   ; No pre-install action required
 !macroend
 
 !macro NSIS_HOOK_POSTINSTALL
-  DetailPrint "Configuring SAYL browser native messaging host..."
+  DetailPrint "Staging SAYL browser extensions to LocalAppData..."
 
-  ; 1. If sayl-bridge.exe exists and supports --register-host, invoke it
+  ; 1. Clean destination directories first to avoid stale files across upgrades
+  RMDir /r "$LOCALAPPDATA\Sayl\extension\chromium"
+  RMDir /r "$LOCALAPPDATA\Sayl\extension\firefox"
+  CreateDirectory "$LOCALAPPDATA\Sayl\extension\chromium"
+  CreateDirectory "$LOCALAPPDATA\Sayl\extension\firefox"
+
+  ; 2. Stage unpacked Chromium and Firefox extension files via xcopy
+  ${If} ${FileExists} "$INSTDIR\extensions\browser\chromium"
+    nsExec::ExecToLog 'cmd.exe /c xcopy "$INSTDIR\extensions\browser\chromium" "$LOCALAPPDATA\Sayl\extension\chromium" /E /I /Y'
+  ${EndIf}
+
+  ${If} ${FileExists} "$INSTDIR\extensions\browser\firefox"
+    nsExec::ExecToLog 'cmd.exe /c xcopy "$INSTDIR\extensions\browser\firefox" "$LOCALAPPDATA\Sayl\extension\firefox" /E /I /Y'
+  ${EndIf}
+
+  ; 3. Register native messaging host via sayl-bridge (single writer of manifests and HKCU keys)
+  DetailPrint "Registering SAYL native messaging host..."
   ${If} ${FileExists} "$INSTDIR\host\sayl-bridge.exe"
-    nsExec::ExecToLog '"$INSTDIR\host\sayl-bridge.exe" --register-host --extension-id ipfenakpblanjjiboejfobkjhegnciif'
+    nsExec::ExecToLog '"$INSTDIR\host\sayl-bridge.exe" --register-host'
   ${EndIf}
-
-  ; 2. Ensure the host manifest has the resolved absolute path and pinned extension ID
-  ${If} ${FileExists} "$INSTDIR\host"
-    ; Format $INSTDIR\host\sayl-bridge.exe with escaped backslashes for JSON
-    ${WordReplace} "$INSTDIR\host\sayl-bridge.exe" "\" "\\" "+" $1
-
-    ClearErrors
-    FileOpen $0 "$INSTDIR\host\com.sayl.downloader.json" w
-    ${Unless} ${Errors}
-      FileWrite $0 "{\r$\n"
-      FileWrite $0 '  "name": "com.sayl.downloader",$\r$\n'
-      FileWrite $0 '  "description": "SAYL native messaging host",$\r$\n'
-      FileWrite $0 '  "path": "$1",$\r$\n'
-      FileWrite $0 '  "type": "stdio",$\r$\n'
-      FileWrite $0 '  "allowed_origins": [$\r$\n'
-      FileWrite $0 '    "chrome-extension://ipfenakpblanjjiboejfobkjhegnciif/"$\r$\n'
-      FileWrite $0 "  ]$\r$\n"
-      FileWrite $0 "}$\r$\n"
-      FileClose $0
-    ${EndUnless}
-  ${EndIf}
-
-  ; 3. Ensure HKCU NativeMessagingHosts registry keys are set for Chrome and Edge
-  WriteRegStr HKCU "Software\Google\Chrome\NativeMessagingHosts\com.sayl.downloader" "" "$INSTDIR\host\com.sayl.downloader.json"
-  WriteRegStr HKCU "Software\Microsoft\Edge\NativeMessagingHosts\com.sayl.downloader" "" "$INSTDIR\host\com.sayl.downloader.json"
 !macroend
 
 !macro NSIS_HOOK_PREUNINSTALL
@@ -53,14 +43,14 @@
     nsExec::ExecToLog '"$INSTDIR\host\sayl-bridge.exe" --unregister-host'
   ${EndIf}
 
-  ; 2. Delete HKCU NativeMessagingHosts keys
-  DeleteRegKey HKCU "Software\Google\Chrome\NativeMessagingHosts\com.sayl.downloader"
-  DeleteRegKey HKCU "Software\Microsoft\Edge\NativeMessagingHosts\com.sayl.downloader"
+  ; 2. Clean up installer-staged extension and host directories under %LOCALAPPDATA%\Sayl
+  ; User downloads and settings are untouched.
+  ; Note: The desktop app owns HKCU\Software\Microsoft\Windows\CurrentVersion\Run\SAYL,
+  ; so the installer does not delete it on uninstall.
+  RMDir /r "$LOCALAPPDATA\Sayl\extension"
+  RMDir /r "$LOCALAPPDATA\Sayl\host"
 
-  ; 3. Clean up autostart if user enabled run at startup
-  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "SAYL"
-
-  ; 4. Clean up host manifest and installed extension directory
+  ; 3. Clean up host and extension directories inside install directory
   Delete "$INSTDIR\host\com.sayl.downloader.json"
   Delete "$INSTDIR\host\sayl-bridge.exe"
   Delete "$INSTDIR\host\icon.ico"
@@ -69,7 +59,7 @@
 !macroend
 
 !macro NSIS_HOOK_POSTUNINSTALL
-  ; Additional safety cleanup
-  DeleteRegKey HKCU "Software\Google\Chrome\NativeMessagingHosts\com.sayl.downloader"
-  DeleteRegKey HKCU "Software\Microsoft\Edge\NativeMessagingHosts\com.sayl.downloader"
+  ; Additional safety cleanup of installer-staged directories
+  RMDir /r "$LOCALAPPDATA\Sayl\extension"
+  RMDir /r "$LOCALAPPDATA\Sayl\host"
 !macroend

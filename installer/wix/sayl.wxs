@@ -61,6 +61,7 @@
           <Directory Id="ExtensionsFolder" Name="extensions">
             <Directory Id="BrowserFolder" Name="browser">
               <Directory Id="ChromiumFolder" Name="chromium" />
+              <Directory Id="FirefoxFolder" Name="firefox" />
             </Directory>
           </Directory>
         </Directory>
@@ -103,30 +104,18 @@
                      KeyPath="yes" />
     </Component>
 
-    <!-- Component 3: Native Messaging Host Files and Registry -->
+    <!-- Component 3: Native Messaging Host Binary -->
     <Component Id="NativeMessagingHost"
                Guid="A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D"
                Directory="HostFolder">
       <File Id="SaylBridgeExe"
             Source="$(var.SourceDir)\sayl-bridge.exe" />
-      <File Id="HostManifestJson"
-            Source="..\..\extensions\browser\host\com.sayl.downloader.json" />
-      <!-- Chrome HKCU Native Messaging Registration -->
       <RegistryValue Root="HKCU"
-                     Key="Software\Google\Chrome\NativeMessagingHosts\com.sayl.downloader"
-                     Type="string"
-                     Value="[HostFolder]com.sayl.downloader.json"
+                     Key="Software\SAYL"
+                     Name="HostInstalled"
+                     Type="integer"
+                     Value="1"
                      KeyPath="yes" />
-      <!-- Edge HKCU Native Messaging Registration -->
-      <RegistryValue Root="HKCU"
-                     Key="Software\Microsoft\Edge\NativeMessagingHosts\com.sayl.downloader"
-                     Type="string"
-                     Value="[HostFolder]com.sayl.downloader.json" />
-      <!-- Startup Run key cleanup on uninstall -->
-      <RegistryValue Root="HKCU"
-                     Key="Software\Microsoft\Windows\CurrentVersion\Run"
-                     Name="SAYL"
-                     Action="remove" />
       <RemoveFolder Id="CleanUpHostFolder"
                     Directory="HostFolder"
                     On="uninstall" />
@@ -139,14 +128,24 @@
       <ComponentRef Id="NativeMessagingHost" />
     </Feature>
 
-    <!-- Per-user CustomActions for native messaging host registration -->
-    <CustomAction Id="RegisterNativeHost"
+    <!-- Per-user CustomActions for native messaging host staging and registration -->
+    <!-- CustomAction: Stage unpacked browser extensions to %LOCALAPPDATA%\Sayl\extension -->
+    <CustomAction Id="StageBrowserExtensions"
                   Directory="INSTALLFOLDER"
-                  ExeCommand="&quot;[HostFolder]sayl-bridge.exe&quot; --register-host --extension-id ipfenakpblanjjiboejfobkjhegnciif"
+                  ExeCommand="&quot;cmd.exe&quot; /c if exist &quot;[INSTALLFOLDER]extensions\browser\chromium&quot; (rd /s /q &quot;%LOCALAPPDATA%\Sayl\extension\chromium&quot; 2&gt;nul &amp; xcopy &quot;[INSTALLFOLDER]extensions\browser\chromium&quot; &quot;%LOCALAPPDATA%\Sayl\extension\chromium&quot; /E /I /Y) &amp; if exist &quot;[INSTALLFOLDER]extensions\browser\firefox&quot; (rd /s /q &quot;%LOCALAPPDATA%\Sayl\extension\firefox&quot; 2&gt;nul &amp; xcopy &quot;[INSTALLFOLDER]extensions\browser\firefox&quot; &quot;%LOCALAPPDATA%\Sayl\extension\firefox&quot; /E /I /Y)"
                   Execute="deferred"
                   Impersonate="yes"
-                  Return="ignore" />
+                  Return="check" />
 
+    <!-- CustomAction: Register native messaging host manifests and HKCU keys via sayl-bridge -->
+    <CustomAction Id="RegisterNativeHost"
+                  Directory="INSTALLFOLDER"
+                  ExeCommand="&quot;[HostFolder]sayl-bridge.exe&quot; --register-host"
+                  Execute="deferred"
+                  Impersonate="yes"
+                  Return="check" />
+
+    <!-- CustomAction: Unregister native messaging host manifests and HKCU keys via sayl-bridge -->
     <CustomAction Id="UnregisterNativeHost"
                   Directory="INSTALLFOLDER"
                   ExeCommand="&quot;[HostFolder]sayl-bridge.exe&quot; --unregister-host"
@@ -154,9 +153,19 @@
                   Impersonate="yes"
                   Return="ignore" />
 
+    <!-- CustomAction: Clean up installer-staged extension and host directories under %LOCALAPPDATA%\Sayl -->
+    <CustomAction Id="CleanupStagedFiles"
+                  Directory="INSTALLFOLDER"
+                  ExeCommand="&quot;cmd.exe&quot; /c rd /s /q &quot;%LOCALAPPDATA%\Sayl\extension&quot; 2&gt;nul &amp; rd /s /q &quot;%LOCALAPPDATA%\Sayl\host&quot; 2&gt;nul"
+                  Execute="deferred"
+                  Impersonate="yes"
+                  Return="ignore" />
+
     <InstallExecuteSequence>
-      <Custom Action="RegisterNativeHost" After="InstallFiles">NOT (REMOVE = "ALL")</Custom>
+      <Custom Action="StageBrowserExtensions" After="InstallFiles">NOT (REMOVE = "ALL")</Custom>
+      <Custom Action="RegisterNativeHost" After="StageBrowserExtensions">NOT (REMOVE = "ALL")</Custom>
       <Custom Action="UnregisterNativeHost" Before="RemoveFiles">REMOVE = "ALL"</Custom>
+      <Custom Action="CleanupStagedFiles" After="UnregisterNativeHost">REMOVE = "ALL"</Custom>
     </InstallExecuteSequence>
   </Package>
 </Wix>
