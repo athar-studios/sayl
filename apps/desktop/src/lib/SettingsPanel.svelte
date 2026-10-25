@@ -1,7 +1,7 @@
 <script>
   import { t, setLanguage } from "./i18n.js";
   import { safeInvoke } from "./tauri.js";
-  import { DEFAULT_SETTINGS, normalizeSettings } from "./settings.js";
+  import { DEFAULT_SETTINGS, normalizeSettings, SETTINGS_SECTIONS } from "./settings.js";
   import {
     SUPPORTED_BROWSERS,
     BROWSER_ICONS,
@@ -35,16 +35,7 @@
   let guideBrowser = null;
   let stagedExtensionDir = "";
 
-  const sections = [
-    { id: "general", labelKey: "settings.navGeneral" },
-    { id: "downloads", labelKey: "settings.navDownloads" },
-    { id: "categories", labelKey: "settings.navCategories" },
-    { id: "notifications", labelKey: "settings.navNotifications" },
-    { id: "power", labelKey: "settings.navPower" },
-    { id: "appearance", labelKey: "settings.navAppearance" },
-    { id: "extension", labelKey: "settings.navExtension" },
-    { id: "about", labelKey: "settings.navAbout" },
-  ];
+  const sections = SETTINGS_SECTIONS;
 
   $: if (open) {
     localSettings = normalizeSettings(settings);
@@ -222,7 +213,9 @@
               id={"tour-nav-" + sec.id}
               class="nav-tab-btn"
               class:active={activeSection === sec.id}
-              on:click={() => {
+              on:click={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 activeSection = sec.id;
                 if (sec.id === "extension") loadExtensionStatus();
               }}
@@ -827,6 +820,9 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    pointer-events: auto;
+    position: relative;
+    z-index: 101;
   }
 
   .modal-header {
@@ -877,6 +873,9 @@
     padding: 0.5rem;
     gap: 0.25rem;
     overflow-y: auto;
+    pointer-events: auto;
+    position: relative;
+    z-index: 10;
   }
 
   .nav-tab-btn {
@@ -1335,6 +1334,22 @@
     gap: 0.75rem;
     padding: 0.85rem 1.5rem;
     border-top: 1px solid var(--color-border);
+    position: relative;
+    z-index: 10;
+    pointer-events: auto;
+  }
+
+  .btn-browse {
+    background: var(--color-bg-hover, rgba(255, 255, 255, 0.08));
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    white-space: nowrap;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+
+  .btn-browse:hover {
+    background: var(--color-bg-card-subtle, rgba(255, 255, 255, 0.14));
   }
 
   .btn {

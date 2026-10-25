@@ -35,6 +35,17 @@ export const SETTINGS_KEYS = [
   "close_notice_shown",
 ];
 
+export const SETTINGS_SECTIONS = [
+  { id: "general", labelKey: "settings.navGeneral" },
+  { id: "downloads", labelKey: "settings.navDownloads" },
+  { id: "categories", labelKey: "settings.navCategories" },
+  { id: "notifications", labelKey: "settings.navNotifications" },
+  { id: "power", labelKey: "settings.navPower" },
+  { id: "appearance", labelKey: "settings.navAppearance" },
+  { id: "extension", labelKey: "settings.navExtension" },
+  { id: "about", labelKey: "settings.navAbout" },
+];
+
 /**
  * Merges partial or backend settings with DEFAULT_SETTINGS, ensuring all keys are present
  * while preserving unknown/new backend fields.

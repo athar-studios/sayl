@@ -29,6 +29,7 @@
   import Splash from "./lib/Splash.svelte";
   import Tour from "./lib/Tour.svelte";
   import ExtensionGuideDialog from "./lib/ExtensionGuideDialog.svelte";
+  import SchedulerDialog from "./lib/SchedulerDialog.svelte";
   import logoFull from "./assets/logo-full.svg";
   import logoWhite from "./assets/logo-white.svg";
   import { isTourCompleted, clearTourCompleted } from "./lib/tour.js";
@@ -51,6 +52,7 @@
   let droppedUrl = "";
   let settingsOpen = false;
   let settingsInitialSection = "general";
+  let schedulerOpen = false;
   let showToolbar = true;
   let showStatusbar = true;
 
@@ -132,7 +134,7 @@
   // Active floating tasks currently open
   $: activeFloatingTasks = openDownloadWindows
     .map((id) => tasks.find((t) => t.id === id))
-    .filter(Boolean);
+    .filter((t) => t && t.state !== "Cancelled");
 
   // Watch for completion of all tasks when autoShutdown is enabled
   $: if (autoShutdown && !shutdownArmed && areAllDownloadsFinished(tasks)) {
@@ -206,11 +208,12 @@
   }
 
   function handleTasksUpdated(newTasks) {
-    if (settings.close_download_window_on_finish) {
-      for (const t of newTasks) {
-        if (t.state === "Completed" && openDownloadWindows.includes(t.id)) {
-          openDownloadWindows = openDownloadWindows.filter((id) => id !== t.id);
-        }
+    for (const t of newTasks) {
+      if (
+        (t.state === "Completed" && settings.close_download_window_on_finish) ||
+        t.state === "Cancelled"
+      ) {
+        openDownloadWindows = openDownloadWindows.filter((id) => id !== t.id);
       }
     }
   }
@@ -269,7 +272,7 @@
         tasks = [newTask, ...tasks.filter((t) => t.id !== newTask.id)];
         selectedId = newTask.id;
 
-        if (settings.show_download_window) {
+        if (settings.show_download_window && newTask.state !== "Cancelled") {
           if (!openDownloadWindows.includes(newTask.id)) {
             openDownloadWindows = [...openDownloadWindows, newTask.id];
           }
@@ -410,6 +413,7 @@
       tasks = tasks.map((t) =>
         t.id === id ? { ...t, state: "Cancelled", speed_bps: 0, eta_secs: null } : t
       );
+      openDownloadWindows = openDownloadWindows.filter((wId) => wId !== id);
     } catch {
       // Handled by safeInvoke toast
     } finally {
@@ -831,7 +835,7 @@
       on:toggleToolbar={() => (showToolbar = !showToolbar)}
       on:toggleStatusbar={() => (showStatusbar = !showStatusbar)}
       on:toggleLanguage={toggleLanguage}
-      on:openScheduler={() => showToast("info", $t("menu.toolsSchedule"))}
+      on:openScheduler={() => (schedulerOpen = true)}
       on:openSettings={() => {
         settingsInitialSection = "general";
         settingsOpen = true;
@@ -863,7 +867,7 @@
         on:pauseAll={handlePauseAll}
         on:delete={() => handleTriggerDelete()}
         on:deleteCompleted={handleDeleteCompleted}
-        on:schedule={() => showToast("info", $t("menu.toolsSchedule"))}
+        on:schedule={() => (schedulerOpen = true)}
         on:settings={() => {
           settingsInitialSection = "general";
           settingsOpen = true;
@@ -1034,6 +1038,12 @@
     on:close={() => (extensionGuideOpen = false)}
   />
 
+  <!-- Scheduler Dialog (Bug 2) -->
+  <SchedulerDialog
+    open={schedulerOpen}
+    on:close={() => (schedulerOpen = false)}
+  />
+
   <!-- Floating Download Windows Stack (Req 8) -->
   {#if activeFloatingTasks.length > 0}
     <div class="floating-windows-stack" role="region" aria-label={$t("downloadWindow.title")}>
@@ -1196,7 +1206,8 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow-y: hidden;
+    overflow-x: auto;
     min-width: 0;
   }
 

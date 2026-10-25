@@ -38,6 +38,15 @@ describe("Formatting helpers", () => {
       expect(formatBytes(5242880, "ar")).toBe("5.0 MB");
       expect(formatBytes(2147483648, "ar")).toBe("2.0 GB");
     });
+
+    it("written/total ordering preserves smaller written before larger total", () => {
+      const written = formatBytes(72 * 1024 * 1024, "ar");
+      const total = formatBytes(100 * 1024 * 1024, "ar");
+      expect(written).toBe("72.0 MB");
+      expect(total).toBe("100.0 MB");
+      const combined = `${written} / ${total}`;
+      expect(combined).toBe("72.0 MB / 100.0 MB");
+    });
   });
 
   describe("formatSpeed", () => {
@@ -97,6 +106,18 @@ describe("Formatting helpers", () => {
       expect(formatPercent(undefined, "ar")).toBe("");
       expect(formatPercent(NaN, "ar")).toBe("");
     });
+
+    it("never includes parentheses for any percentage values", () => {
+      const values = [0, 50, 72, 72.5, 99.9, 100];
+      for (const val of values) {
+        const resAr = formatPercent(val, "ar");
+        const resEn = formatPercent(val, "en");
+        expect(resAr).not.toContain("(");
+        expect(resAr).not.toContain(")");
+        expect(resEn).not.toContain("(");
+        expect(resEn).not.toContain(")");
+      }
+    });
   });
 
   describe("RTL safety and bidi isolate", () => {
@@ -137,6 +158,14 @@ describe("Formatting helpers", () => {
       expect(enDate).not.toBe("—");
       expect(arDate).toContain("2026");
       expect(enDate).toContain("2026");
+    });
+
+    it("formats with ar-EG locale producing correct latn numbers", () => {
+      const iso = "2026-10-25T14:48:00Z";
+      const arDate = formatDate(iso, "ar");
+      expect(arDate).not.toBe("—");
+      expect(arDate).toMatch(/2026/);
+      expect(arDate).not.toMatch(/[٠-٩]/);
     });
   });
 

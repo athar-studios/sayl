@@ -63,10 +63,12 @@
   .task-list-container {
     flex: 1;
     overflow-y: auto;
+    overflow-x: auto;
     display: flex;
     flex-direction: column;
     height: 100%;
     width: 100%;
+    min-width: 0;
   }
 
   .task-list-container.cards-mode {
@@ -87,6 +89,8 @@
     height: 100%;
     flex: 1;
     display: flex;
+    min-width: 0;
+    overflow-x: auto;
   }
 
   .empty-tab-notice {

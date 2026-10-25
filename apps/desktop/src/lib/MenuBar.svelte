@@ -271,6 +271,7 @@
   .menubar {
     height: 26px;
     background: #fdfdfd;
+    color: #1a1a1a;
     border-bottom: 1px solid #e0e0e0;
     display: flex;
     align-items: center;
@@ -298,13 +299,17 @@
     height: 22px;
     border-radius: 3px;
     cursor: default;
-    color: inherit;
+    color: #1a1a1a;
     font-size: 12px;
     font-family: inherit;
     display: flex;
     align-items: center;
     border: none;
     background: transparent;
+  }
+
+  :global([data-theme="dark"]) .menu-btn {
+    color: #f1f5f9;
   }
 
   .menu-btn:hover,

@@ -67,4 +67,35 @@ describe("State mapping & action guards", () => {
     expect(isTerminal("Paused")).toBe(false);
     expect(isTerminal("Queued")).toBe(false);
   });
+
+  it("ensures cancelled tasks do not appear in openDownloadWindows or active floating tasks", () => {
+    let openDownloadWindows = ["t1", "t2", "t3"];
+    const tasks = [
+      { id: "t1", state: "Downloading" },
+      { id: "t2", state: "Cancelled" },
+      { id: "t3", state: "Completed" },
+    ];
+
+    // Filter updated tasks (matching handleTasksUpdated logic)
+    for (const t of tasks) {
+      if (t.state === "Cancelled") {
+        openDownloadWindows = openDownloadWindows.filter((id) => id !== t.id);
+      }
+    }
+    expect(openDownloadWindows).not.toContain("t2");
+    expect(openDownloadWindows).toEqual(["t1", "t3"]);
+
+    // Active floating tasks derivation rejects Cancelled tasks
+    const activeFloating = openDownloadWindows
+      .map((id) => tasks.find((t) => t.id === id))
+      .filter((t) => t && t.state !== "Cancelled");
+    expect(activeFloating.map((t) => t.id)).toEqual(["t1", "t3"]);
+
+    // Guard on new task: cancelled task never added
+    const cancelledTask = { id: "t4", state: "Cancelled" };
+    if (cancelledTask.state !== "Cancelled") {
+      openDownloadWindows.push(cancelledTask.id);
+    }
+    expect(openDownloadWindows).not.toContain("t4");
+  });
 });

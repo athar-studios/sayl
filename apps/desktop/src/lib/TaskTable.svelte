@@ -421,13 +421,16 @@
                   style="width: {percent !== null ? percent + '%' : '30%'};"
                 ></div>
                 <div class="cell-progress-text">
-                  <bdi dir="ltr">
-                    {#if percent !== null}
-                      {percent}% ({totalFormatted || writtenFormatted})
-                    {:else}
-                      {writtenFormatted}
+                  {#if percent !== null}
+                    <span class="cell-percent-label"><bdi dir="ltr">{percent}%</bdi></span>
+                    {#if totalFormatted && writtenFormatted}
+                      <span class="cell-size-label"><bdi dir="ltr">{writtenFormatted} / {totalFormatted}</bdi></span>
+                    {:else if totalFormatted || writtenFormatted}
+                      <span class="cell-size-label"><bdi dir="ltr">{totalFormatted || writtenFormatted}</bdi></span>
                     {/if}
-                  </bdi>
+                  {:else}
+                    <span class="cell-size-label"><bdi dir="ltr">{writtenFormatted}</bdi></span>
+                  {/if}
                 </div>
               </div>
             {:else if isPaused}
@@ -435,7 +438,8 @@
                 <div class="cell-progress-bar paused-bar" role="progressbar" aria-valuenow={percent} aria-valuemin="0" aria-valuemax="100">
                   <div class="cell-progress-fill paused-fill" style="width: {percent}%;"></div>
                   <div class="cell-progress-text">
-                    {$t("state.Paused")} <bdi dir="ltr">({percent}%)</bdi>
+                    <span class="cell-state-label">{$t("state.Paused")}</span>
+                    <span class="cell-percent-label"><bdi dir="ltr">{percent}%</bdi></span>
                   </div>
                 </div>
               {:else}
@@ -625,7 +629,8 @@
   .table-container {
     width: 100%;
     height: 100%;
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: auto;
     background: #ffffff;
     border: none;
     user-select: none;
@@ -639,6 +644,7 @@
 
   .tasks-table {
     width: 100%;
+    min-width: 900px;
     border-collapse: collapse;
     font-size: 13px;
     font-family: var(--font-system, "Segoe UI Variable Text", "Segoe UI", Tahoma, Arial, sans-serif);
@@ -749,6 +755,7 @@
     text-overflow: ellipsis;
     vertical-align: middle;
     font-size: 12.5px;
+    unicode-bidi: isolate;
   }
 
   :global([data-theme="dark"]) .grid-row td {
@@ -817,6 +824,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 6px;
     font-size: 10.5px;
     font-weight: 700;
     color: #0b1a4e;

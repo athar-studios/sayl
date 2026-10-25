@@ -120,7 +120,7 @@
     </div>
 
     <div class="progress-labels">
-      <span class="size-text"><bdi dir="ltr">{writtenFormatted}</bdi> / <bdi dir="ltr">{totalFormatted}</bdi></span>
+      <span class="size-text"><bdi dir="ltr">{writtenFormatted} / {totalFormatted}</bdi></span>
       {#if percentFormatted}
         <span class="percent-text"><bdi dir="ltr">{percentFormatted}</bdi></span>
       {/if}
@@ -351,17 +351,19 @@
 
 <style>
   .download-window {
-    width: 350px;
-    background-color: var(--color-bg-card);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
+    width: 420px;
+    background: #f0f0f0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    border: 1px solid #c0c0c0;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
     padding: 0.95rem 1.15rem;
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
     pointer-events: auto;
     animation: window-in 220ms ease;
+    color: #1a1a1a;
   }
 
   .window-header {
@@ -401,26 +403,10 @@
     display: block;
   }
 
-  :global([data-theme="dark"]) .logo-dark {
-    display: block !important;
-  }
-  :global([data-theme="dark"]) .logo-light {
-    display: none !important;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :global(:root:not([data-theme="light"])) .logo-dark {
-      display: block;
-    }
-    :global(:root:not([data-theme="light"])) .logo-light {
-      display: none;
-    }
-  }
-
   .file-name {
     font-size: 0.85rem;
     font-weight: 700;
-    color: var(--color-text);
+    color: #1a1a1a;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -439,14 +425,17 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: var(--color-text-muted);
+    color: #4b5563;
     background: transparent;
-    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    border-radius: 2px;
+    cursor: pointer;
   }
 
   .close-btn:hover {
-    background-color: var(--color-bg-alt);
-    color: var(--color-text);
+    background-color: #e5e5e5;
+    border-color: #adadad;
+    color: #111827;
   }
 
   .progress-section {
@@ -456,21 +445,22 @@
   }
 
   .progress-bar-wrap {
-    height: 6px;
-    background-color: var(--color-bg-alt);
-    border-radius: var(--radius-full);
+    height: 16px;
+    background-color: #ffffff;
+    border: 1px solid #c0c0c0;
+    border-radius: 2px;
     overflow: hidden;
   }
 
   .progress-bar-fill {
     height: 100%;
-    background: var(--progress-gradient, var(--color-accent-gradient));
-    border-radius: var(--radius-full);
+    background: #00b6bd;
+    border-radius: 0;
     transition: width 200ms ease;
   }
 
   .progress-bar-fill.completed {
-    background: var(--state-completed, #16a34a) !important;
+    background: #16a34a !important;
   }
 
   .progress-labels {
@@ -478,20 +468,21 @@
     align-items: center;
     justify-content: space-between;
     font-size: 0.725rem;
-    color: var(--color-text-muted);
+    color: #4b5563;
   }
 
   .percent-text {
     font-weight: 700;
-    color: var(--color-accent);
+    color: #00878c;
   }
 
-  /* SVG Speed Chart */
+  /* Inline SVG Speed Chart */
   .chart-section {
     height: 40px;
     width: 100%;
-    background-color: var(--color-bg-alt);
-    border-radius: var(--radius-sm);
+    background-color: #e8e8e8;
+    border: 1px solid #d0d0d0;
+    border-radius: 2px;
     overflow: hidden;
   }
 
@@ -501,14 +492,15 @@
     display: block;
   }
 
-  /* Metrics Grid (5 columns for percentage, speed, eta, connections, parts) */
+  /* Metrics Grid (5 columns) */
   .metrics-grid {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     gap: 0.25rem;
     padding: 0.45rem 0.35rem;
-    background-color: var(--color-bg-alt);
-    border-radius: var(--radius-sm);
+    background: #e8e8e8;
+    border: 1px solid #d0d0d0;
+    border-radius: 2px;
   }
 
   .metric-col {
@@ -521,7 +513,7 @@
 
   .metric-label {
     font-size: 0.65rem;
-    color: var(--color-text-subtle);
+    color: #555555;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -531,15 +523,16 @@
   .metric-val {
     font-size: 0.725rem;
     font-weight: 700;
-    color: var(--color-text);
+    color: #111111;
     white-space: nowrap;
   }
 
   /* Friendly error block */
   .window-error-block {
     padding: 0.45rem 0.65rem;
-    background-color: var(--color-danger-light);
-    border-radius: var(--radius-sm);
+    background-color: #fee2e2;
+    border: 1px solid #fca5a5;
+    border-radius: 2px;
     font-size: 0.75rem;
   }
 
@@ -551,11 +544,11 @@
 
   .err-title {
     font-weight: 700;
-    color: var(--color-danger);
+    color: #dc2626;
   }
 
   .err-hint {
-    color: var(--color-text-muted);
+    color: #4b5563;
     line-height: 1.35;
   }
 
@@ -567,26 +560,23 @@
   .err-summary {
     font-size: 0.725rem;
     font-weight: 700;
-    color: var(--color-text-muted);
+    color: #6b7280;
     user-select: none;
   }
 
   .err-raw {
     margin-top: 0.25rem;
     padding: 0.35rem 0.5rem;
-    background-color: rgba(0, 0, 0, 0.08);
-    border-radius: 4px;
+    background-color: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 2px;
     font-family: monospace;
     font-size: 0.7rem;
     white-space: pre-wrap;
     word-break: break-all;
     max-height: 5rem;
     overflow-y: auto;
-    color: var(--color-text);
-  }
-
-  :global([data-theme="dark"]) .err-raw {
-    background-color: rgba(0, 0, 0, 0.35);
+    color: #111827;
   }
 
   .window-actions {
@@ -611,29 +601,34 @@
     padding: 0.35rem 0.5rem;
     font-size: 0.775rem;
     font-weight: 600;
-    border-radius: var(--radius-sm);
-    background-color: var(--color-bg-alt);
-    color: var(--color-text-muted);
-    transition: background-color var(--transition-normal), color var(--transition-normal);
+    border-radius: 2px;
+    background: #e1e1e1;
+    border: 1px solid #adadad;
+    color: #000;
+    cursor: pointer;
+    transition: background-color 120ms ease;
   }
 
   .control-btn:hover {
-    background-color: var(--color-bg-card-hover);
-    color: var(--color-text);
+    background: #e5e5e5;
+    color: #000;
   }
 
   .control-btn-accent {
-    color: var(--color-accent);
+    background: #00b6bd;
+    border-color: #009aa0;
+    color: #ffffff;
   }
 
   .control-btn-accent:hover {
-    background-color: var(--color-accent-light);
+    background: #029ca2;
+    color: #ffffff;
   }
 
-  .control-btn-danger:hover,
   .control-btn-cancel:hover {
-    background-color: var(--color-danger-light);
-    color: var(--color-danger);
+    background: #fecaca;
+    border-color: #f87171;
+    color: #dc2626;
   }
 
   .action-btn {
@@ -645,18 +640,28 @@
     padding: 0.4rem 0.6rem;
     font-size: 0.8rem;
     font-weight: 600;
-    border-radius: var(--radius-sm);
+    border-radius: 2px;
+    cursor: pointer;
   }
 
   .btn-primary {
-    background: var(--color-accent-gradient);
+    background: #00b6bd;
+    border: 1px solid #009aa0;
     color: #ffffff;
   }
 
+  .btn-primary:hover {
+    background: #029ca2;
+  }
+
   .btn-secondary {
-    background-color: var(--color-bg-alt);
-    border: 1px solid var(--color-border);
-    color: var(--color-text);
+    background: #e1e1e1;
+    border: 1px solid #adadad;
+    color: #000;
+  }
+
+  .btn-secondary:hover {
+    background: #e5e5e5;
   }
 
   .options-section {
@@ -664,7 +669,7 @@
     flex-direction: column;
     gap: 0.35rem;
     padding-top: 0.4rem;
-    border-top: 1px solid var(--color-border);
+    border-top: 1px solid #d0d0d0;
   }
 
   .option-toggle-label {
@@ -672,14 +677,14 @@
     align-items: center;
     gap: 0.45rem;
     font-size: 0.725rem;
-    color: var(--color-text-muted);
+    color: #374151;
     cursor: pointer;
     user-select: none;
   }
 
   .toggle-checkbox {
     cursor: pointer;
-    accent-color: var(--color-accent);
+    accent-color: #00b6bd;
   }
 
   @keyframes window-in {

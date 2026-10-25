@@ -216,7 +216,7 @@
   <div class="card-footer">
     <div class="metrics">
       <span class="size-metric">
-        <bdi dir="ltr">{writtenFormatted}</bdi> / <bdi dir="ltr">{totalFormatted}</bdi>
+        <bdi dir="ltr">{writtenFormatted} / {totalFormatted}</bdi>
         {#if percentFormatted}
           <span class="percent-badge"><bdi dir="ltr">{percentFormatted}</bdi></span>
         {/if}

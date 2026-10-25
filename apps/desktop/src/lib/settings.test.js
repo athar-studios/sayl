@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DEFAULT_SETTINGS, SETTINGS_KEYS, normalizeSettings } from "./settings.js";
+import { DEFAULT_SETTINGS, SETTINGS_KEYS, SETTINGS_SECTIONS, normalizeSettings } from "./settings.js";
 
 describe("Settings contract & defaults (settings.js)", () => {
   it("has exactly the 13 documented keys in SETTINGS_KEYS", () => {
@@ -94,5 +94,27 @@ describe("Settings contract & defaults (settings.js)", () => {
     expect(custom.custom_backend_field).toBe("sayl-extension-v1");
     expect(custom.extra_num).toBe(42);
     expect(custom.view_mode).toBe("table");
+  });
+
+  it("settings sections are all reachable and have distinct IDs", () => {
+    expect(SETTINGS_SECTIONS).toBeDefined();
+    expect(SETTINGS_SECTIONS.length).toBe(8);
+    const ids = SETTINGS_SECTIONS.map((s) => s.id);
+    const uniqueIds = new Set(ids);
+    expect(uniqueIds.size).toBe(ids.length);
+    expect(ids).toEqual([
+      "general",
+      "downloads",
+      "categories",
+      "notifications",
+      "power",
+      "appearance",
+      "extension",
+      "about",
+    ]);
+    for (const sec of SETTINGS_SECTIONS) {
+      expect(sec.labelKey).toBeTruthy();
+      expect(typeof sec.id).toBe("string");
+    }
   });
 });

@@ -129,21 +129,18 @@ export function formatLtr(str) {
  * Falls back to "—" if string is absent, empty, or invalid.
  */
 export function formatDate(isoString, lang = "ar") {
-  if (!isoString || typeof isoString !== "string") {
-    return "—";
-  }
+  if (!isoString || typeof isoString !== "string") return "—";
   const date = new Date(isoString);
-  if (isNaN(date.getTime())) {
-    return "—";
-  }
+  if (isNaN(date.getTime())) return "—";
   try {
-    const locale = lang === "ar" ? "ar" : "en";
+    const locale = lang === "ar" ? "ar-EG" : "en-US";
     return new Intl.DateTimeFormat(locale, {
       year: "numeric",
-      month: "numeric",
+      month: "numeric", 
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      numberingSystem: lang === "ar" ? "latn" : undefined,
     }).format(date);
   } catch {
     return "—";
