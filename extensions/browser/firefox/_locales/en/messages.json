@@ -1,0 +1,34 @@
+{
+  "extension_name": {
+    "message": "SAYL Download Manager — سيل",
+    "description": "Extension name as shown in the browser"
+  },
+  "extension_description": {
+    "message": "Send downloads to SAYL (سيل). When SAYL is not running the browser keeps downloading as usual.",
+    "description": "Extension description as shown in the browser"
+  },
+  "context_menu_download": {
+    "message": "Download with Sayl",
+    "description": "Right-click menu item on links (English UI)"
+  },
+  "action_title": {
+    "message": "SAYL Download Manager",
+    "description": "Tooltip of the toolbar button"
+  },
+  "notify_accepted_title": {
+    "message": "Download accepted",
+    "description": "Notification title when SAYL takes over a download"
+  },
+  "notify_fallback_title": {
+    "message": "SAYL is not running",
+    "description": "Notification title when the browser keeps the download"
+  },
+  "notify_fallback_body": {
+    "message": "The browser is downloading the file instead.",
+    "description": "Notification body when the browser keeps the download"
+  },
+  "notify_error_title": {
+    "message": "Could not reach SAYL",
+    "description": "Notification title for host errors"
+  }
+}
