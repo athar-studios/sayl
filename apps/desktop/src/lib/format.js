@@ -125,23 +125,82 @@ export function formatLtr(str) {
 }
 
 /**
- * Formats an ISO 8601 date string into localized date and time.
+ * Formats an ISO 8601 date string into human-friendly localized date/time:
+ * - If date is today: "اليوم hh:mm م" (ar) / "Today h:mm A" (en)
+ * - If date is yesterday: "أمس hh:mm م" (ar) / "Yesterday h:mm A" (en)
+ * - Otherwise: "D MMMM YYYY" (e.g. "25 أكتوبر 2026" / "Oct 25, 2026")
  * Falls back to "—" if string is absent, empty, or invalid.
  */
-export function formatDate(isoString, lang = "ar") {
-  if (!isoString || typeof isoString !== "string") return "—";
+export function formatDate(isoString, lang = "ar", now = new Date()) {
+  if (
+    !isoString ||
+    (typeof isoString !== "string" &&
+      typeof isoString !== "number" &&
+      !(isoString instanceof Date))
+  ) {
+    return "—";
+  }
   const date = new Date(isoString);
   if (isNaN(date.getTime())) return "—";
+
   try {
-    const locale = lang === "ar" ? "ar-EG" : "en-US";
-    return new Intl.DateTimeFormat(locale, {
-      year: "numeric",
-      month: "numeric", 
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      numberingSystem: lang === "ar" ? "latn" : undefined,
-    }).format(date);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const targetDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const diffTime = today.getTime() - targetDay.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+      if (lang === "ar") {
+        const time = new Intl.DateTimeFormat("ar-EG", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+          numberingSystem: "latn",
+        }).format(date);
+        return `اليوم ${time}`;
+      } else {
+        const time = new Intl.DateTimeFormat("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        }).format(date);
+        return `Today ${time}`;
+      }
+    }
+
+    if (diffDays === 1) {
+      if (lang === "ar") {
+        const time = new Intl.DateTimeFormat("ar-EG", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+          numberingSystem: "latn",
+        }).format(date);
+        return `أمس ${time}`;
+      } else {
+        const time = new Intl.DateTimeFormat("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        }).format(date);
+        return `Yesterday ${time}`;
+      }
+    }
+
+    if (lang === "ar") {
+      return new Intl.DateTimeFormat("ar-EG", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        numberingSystem: "latn",
+      }).format(date);
+    } else {
+      return new Intl.DateTimeFormat("en-US", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }).format(date);
+    }
   } catch {
     return "—";
   }

@@ -143,6 +143,8 @@ describe("Formatting helpers", () => {
   });
 
   describe("formatDate", () => {
+    const fixedNow = new Date(2026, 9, 26, 12, 0); // 2026-10-26 12:00 local
+
     it("falls back to — when date is missing or invalid", () => {
       expect(formatDate(null)).toBe("—");
       expect(formatDate(undefined)).toBe("—");
@@ -150,22 +152,49 @@ describe("Formatting helpers", () => {
       expect(formatDate("invalid-date-string")).toBe("—");
     });
 
-    it("formats ISO date strings in Arabic and English", () => {
-      const iso = "2026-03-29T12:00:00Z";
-      const arDate = formatDate(iso, "ar");
-      const enDate = formatDate(iso, "en");
-      expect(arDate).not.toBe("—");
-      expect(enDate).not.toBe("—");
-      expect(arDate).toContain("2026");
-      expect(enDate).toContain("2026");
+    it("formats today's date as اليوم hh:mm م in Arabic and Today h:mm A in English", () => {
+      const todayDate = new Date(2026, 9, 26, 14, 48); // today at 14:48
+      const arToday = formatDate(todayDate.toISOString(), "ar", fixedNow);
+      const enToday = formatDate(todayDate.toISOString(), "en", fixedNow);
+
+      expect(arToday).toMatch(/^اليوم \d{2}:\d{2} [صم]$/);
+      expect(arToday).toContain("اليوم");
+      expect(arToday).toContain("02:48 م");
+      expect(enToday).toMatch(/^Today \d{1,2}:\d{2} [AP]M$/);
+      expect(enToday).toContain("Today");
+      expect(enToday).toContain("2:48 PM");
+    });
+
+    it("formats yesterday's date as أمس hh:mm م in Arabic and Yesterday h:mm A in English", () => {
+      const yesterdayDate = new Date(2026, 9, 25, 9, 15); // yesterday at 09:15
+      const arYesterday = formatDate(yesterdayDate.toISOString(), "ar", fixedNow);
+      const enYesterday = formatDate(yesterdayDate.toISOString(), "en", fixedNow);
+
+      expect(arYesterday).toMatch(/^أمس \d{2}:\d{2} [صم]$/);
+      expect(arYesterday).toContain("أمس");
+      expect(arYesterday).toContain("09:15 ص");
+      expect(enYesterday).toMatch(/^Yesterday \d{1,2}:\d{2} [AP]M$/);
+      expect(enYesterday).toContain("Yesterday");
+      expect(enYesterday).toContain("9:15 AM");
+    });
+
+    it("formats older dates as D MMMM YYYY (e.g., 25 أكتوبر 2026 / Oct 25, 2026)", () => {
+      const olderDate = new Date(2026, 9, 20, 10, 0); // 20 Oct 2026
+      const arOlder = formatDate(olderDate.toISOString(), "ar", fixedNow);
+      const enOlder = formatDate(olderDate.toISOString(), "en", fixedNow);
+
+      expect(arOlder).toBe("20 أكتوبر 2026");
+      expect(enOlder).toBe("Oct 20, 2026");
     });
 
     it("formats with ar-EG locale producing correct latn numbers", () => {
-      const iso = "2026-10-25T14:48:00Z";
-      const arDate = formatDate(iso, "ar");
+      const olderDate = new Date(2026, 9, 25, 14, 48);
+      const nowNextMonth = new Date(2026, 10, 15, 12, 0);
+      const arDate = formatDate(olderDate.toISOString(), "ar", nowNextMonth);
       expect(arDate).not.toBe("—");
       expect(arDate).toMatch(/2026/);
       expect(arDate).not.toMatch(/[٠-٩]/);
+      expect(arDate).toBe("25 أكتوبر 2026");
     });
   });
 

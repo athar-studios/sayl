@@ -43,6 +43,13 @@
   class="task-card"
   class:selected
   on:click={(e) => dispatch("select", { id: task.id, ctrlKey: e.ctrlKey || e.metaKey, shiftKey: e.shiftKey })}
+  on:dblclick={() => {
+    if (task.state === "Completed") {
+      dispatch("openFile", task.id);
+    } else {
+      dispatch("properties", task.id);
+    }
+  }}
   on:keydown={(e) => { if (e.key === 'Enter') dispatch('select', { id: task.id, ctrlKey: e.ctrlKey || e.metaKey, shiftKey: e.shiftKey }); }}
   role="button"
   tabindex="0"

@@ -72,6 +72,7 @@
 
   // Floating download windows: array of task IDs
   let openDownloadWindows = [];
+  const openWindowsSet = new Set();
 
   // Machine shutdown state (component state ONLY, NEVER persisted)
   let autoShutdown = false;
@@ -83,6 +84,7 @@
   let unlistenTasksChanged = null;
   let unlistenTrayAction = null;
   let unlistenOpenSettings = null;
+  let unlistenWindowClosed = null;
   let unlistenProgress = null;
   let unlistenShutdown = null;
   let unlistenDragDrop = null;
@@ -214,6 +216,7 @@
         (t.state === "Completed" && settings.close_download_window_on_finish) ||
         t.state === "Cancelled"
       ) {
+        openWindowsSet.delete(t.id);
         openDownloadWindows = openDownloadWindows.filter((id) => id !== t.id);
       }
     }
@@ -486,15 +489,45 @@
 
   async function handleOpenDownloadWindow(taskId) {
     if (!taskId) return;
+    if (openWindowsSet.has(taskId)) {
+      if (typeof window !== "undefined" && (window.__TAURI_INTERNALS__ || window.__TAURI__)) {
+        try {
+          const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+          const existing = await WebviewWindow.getByLabel(`download-${taskId}`);
+          if (existing) {
+            await existing.show();
+            await existing.setFocus();
+          }
+        } catch {}
+      }
+      return;
+    }
+
     if (typeof window !== "undefined" && (window.__TAURI_INTERNALS__ || window.__TAURI__)) {
+      try {
+        const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+        const existing = await WebviewWindow.getByLabel(`download-${taskId}`);
+        if (existing) {
+          openWindowsSet.add(taskId);
+          await existing.show();
+          await existing.setFocus();
+          return;
+        }
+      } catch {}
+
+      openWindowsSet.add(taskId);
       try {
         await invoke("open_download_window", { id: taskId });
         return;
       } catch (err) {
         console.warn("Failed to open native download window:", err);
+        openWindowsSet.delete(taskId);
+        return;
       }
     }
+
     // Fallback for browser mock/preview:
+    openWindowsSet.add(taskId);
     if (!openDownloadWindows.includes(taskId)) {
       openDownloadWindows = [...openDownloadWindows, taskId];
     }
@@ -518,6 +551,7 @@
   }
 
   function handleCloseDownloadWindow(id) {
+    openWindowsSet.delete(id);
     openDownloadWindows = openDownloadWindows.filter((wId) => wId !== id);
   }
 
@@ -712,6 +746,15 @@
           settingsOpen = true;
         });
 
+        // Window closed listener for deduplication tracking
+        unlistenWindowClosed = await listen("sayl://window-closed", (event) => {
+          const id = event.payload;
+          if (id) {
+            openWindowsSet.delete(id);
+            openDownloadWindows = openDownloadWindows.filter((wId) => wId !== id);
+          }
+        });
+
         // Backward-compatible progress listener (Req 11)
         unlistenProgress = await listen("sayl://progress", (event) => {
           const payload = event.payload;
@@ -790,6 +833,7 @@
     if (unlistenTasksChanged) unlistenTasksChanged();
     if (unlistenTrayAction) unlistenTrayAction();
     if (unlistenOpenSettings) unlistenOpenSettings();
+    if (unlistenWindowClosed) unlistenWindowClosed();
     if (unlistenProgress) unlistenProgress();
     if (unlistenDragDrop) unlistenDragDrop();
     if (unlistenShutdown) unlistenShutdown();

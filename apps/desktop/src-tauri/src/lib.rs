@@ -895,13 +895,17 @@ pub mod commands {
         app_handle: tauri::AppHandle,
         id: String,
     ) -> Result<(), String> {
-        let label = format!("download-{}", id);
+        let trimmed = id.trim();
+        if trimmed.is_empty() {
+            return Err("Task ID cannot be empty".into());
+        }
+        let label = format!("download-{}", trimmed);
         if let Some(win) = app_handle.get_webview_window(&label) {
             let _ = win.show();
             let _ = win.set_focus();
             return Ok(());
         }
-        let url = format!("index.html?task={}", id);
+        let url = format!("index.html?task={}", trimmed);
         tauri::WebviewWindowBuilder::new(&app_handle, &label, tauri::WebviewUrl::App(url.into()))
             .title("تنزيل")
             .inner_size(480.0, 360.0)
@@ -919,6 +923,7 @@ pub mod commands {
         if let Some(win) = app_handle.get_webview_window(&label) {
             let _ = win.close();
         }
+        let _ = app_handle.emit("sayl://window-closed", &id);
         Ok(())
     }
 }
@@ -1037,6 +1042,12 @@ pub fn run() {
             }
         })
         .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Destroyed = event {
+                let label = window.label();
+                if let Some(task_id) = label.strip_prefix("download-") {
+                    let _ = window.app_handle().emit("sayl://window-closed", task_id);
+                }
+            }
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() != "main" {
                     return;

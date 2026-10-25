@@ -37,6 +37,7 @@
           on:delete={(e) => dispatch("delete", e.detail)}
           on:reveal={(e) => dispatch("reveal", e.detail)}
           on:openFile={(e) => dispatch("openFile", e.detail)}
+          on:properties={(e) => dispatch("properties", e.detail)}
         />
       {/each}
     </div>
@@ -54,6 +55,7 @@
         on:delete={(e) => dispatch("delete", e.detail)}
         on:reveal={(e) => dispatch("reveal", e.detail)}
         on:openFile={(e) => dispatch("openFile", e.detail)}
+        on:properties={(e) => dispatch("properties", e.detail)}
       />
     </div>
   {/if}

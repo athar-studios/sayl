@@ -149,7 +149,7 @@
     if (task.state === "Completed") {
       dispatch("openFile", task.id);
     } else {
-      dispatch("reveal", task.id);
+      dispatch("properties", task.id);
     }
   }
 
@@ -365,6 +365,7 @@
           class="grid-row task-row"
           class:selected={isSelected}
           class:failed-row={isFailed}
+          class:paused-row={isPaused}
           on:click={(e) => handleRowClick(e, task)}
           on:dblclick={(e) => handleRowDblClick(e, task)}
           on:contextmenu={(e) => handleContextMenu(e, task)}
@@ -415,28 +416,26 @@
           <!-- 3. الحالة / التقدم -->
           <td class="col-status cell-status">
             {#if isDownloading}
-              <div class="cell-progress-bar" role="progressbar" aria-valuenow={percent ?? 0} aria-valuemin="0" aria-valuemax="100">
-                <div
-                  class="cell-progress-fill"
-                  style="width: {percent !== null ? percent + '%' : '30%'};"
-                ></div>
+              <div class="cell-progress-container">
+                <div class="cell-progress-bar" role="progressbar" aria-valuenow={percent ?? 0} aria-valuemin="0" aria-valuemax="100">
+                  <div
+                    class="cell-progress-fill"
+                    style="width: {percent !== null ? percent + '%' : '30%'};"
+                  ></div>
+                </div>
                 <div class="cell-progress-text">
+                  <span class="cell-state-label">{$t("state." + task.state)}</span>
                   {#if percent !== null}
                     <span class="cell-percent-label"><bdi dir="ltr">{percent}%</bdi></span>
-                    {#if totalFormatted && writtenFormatted}
-                      <span class="cell-size-label"><bdi dir="ltr">{writtenFormatted} / {totalFormatted}</bdi></span>
-                    {:else if totalFormatted || writtenFormatted}
-                      <span class="cell-size-label"><bdi dir="ltr">{totalFormatted || writtenFormatted}</bdi></span>
-                    {/if}
-                  {:else}
-                    <span class="cell-size-label"><bdi dir="ltr">{writtenFormatted}</bdi></span>
                   {/if}
                 </div>
               </div>
             {:else if isPaused}
               {#if percent !== null}
-                <div class="cell-progress-bar paused-bar" role="progressbar" aria-valuenow={percent} aria-valuemin="0" aria-valuemax="100">
-                  <div class="cell-progress-fill paused-fill" style="width: {percent}%;"></div>
+                <div class="cell-progress-container">
+                  <div class="cell-progress-bar paused-bar" role="progressbar" aria-valuenow={percent} aria-valuemin="0" aria-valuemax="100">
+                    <div class="cell-progress-fill paused-fill" style="width: {percent}%;"></div>
+                  </div>
                   <div class="cell-progress-text">
                     <span class="cell-state-label">{$t("state.Paused")}</span>
                     <span class="cell-percent-label"><bdi dir="ltr">{percent}%</bdi></span>
@@ -454,10 +453,22 @@
                 {$t("state.Completed")}
               </span>
             {:else if isFailed}
-              <span class="state-badge state-failed">
-                <span class="state-dot"></span>
-                {$t("state.Failed")}
-              </span>
+              {#if percent !== null && percent > 0}
+                <div class="cell-progress-container">
+                  <div class="cell-progress-bar failed-bar" role="progressbar" aria-valuenow={percent} aria-valuemin="0" aria-valuemax="100">
+                    <div class="cell-progress-fill failed-fill" style="width: {percent}%;"></div>
+                  </div>
+                  <div class="cell-progress-text">
+                    <span class="cell-state-label">{$t("state.Failed")}</span>
+                    <span class="cell-percent-label"><bdi dir="ltr">{percent}%</bdi></span>
+                  </div>
+                </div>
+              {:else}
+                <span class="state-badge state-failed">
+                  <span class="state-dot"></span>
+                  {$t("state.Failed")}
+                </span>
+              {/if}
             {:else if task.state === "Queued"}
               <span class="state-badge state-queued">
                 <span class="state-dot"></span>
@@ -496,7 +507,7 @@
           <!-- 6. آخر محاولة -->
           <td class="col-date cell-date">
             <span class="date-text">
-              <bdi dir="ltr">{formatDate(displayDate, $currentLang)}</bdi>
+              <bdi>{formatDate(displayDate, $currentLang)}</bdi>
             </span>
           </td>
 
@@ -792,53 +803,94 @@
     color: #f87171;
   }
 
-  /* Inline cell progress bar */
-  .cell-progress-bar {
+  /* Inline cell progress bar (Windows 11 Style) */
+  .cell-progress-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     width: 100%;
-    height: 18px;
-    background: #d8e2ec;
+    min-width: 0;
+  }
+
+  .cell-progress-bar {
+    flex: 1;
+    min-width: 36px;
+    height: 6px;
+    background: #e5e7eb;
     border-radius: 3px;
     position: relative;
     overflow: hidden;
-    border: 1px solid #7c94a8;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+    border: none;
+    box-shadow: none;
   }
 
   :global([data-theme="dark"]) .cell-progress-bar {
-    background: #0f1f4d;
-    border-color: #254499;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+    background: #1f2937;
+    border: none;
+    box-shadow: none;
   }
 
   .cell-progress-fill {
     height: 100%;
     background: #00b6bd;
+    border-radius: 3px;
     transition: width 0.15s ease-out;
   }
 
-  .paused-fill {
-    background: #d97706;
+  .cell-progress-fill.paused-fill {
+    background: #9ca3af;
+  }
+
+  .cell-progress-fill.failed-fill {
+    background: #dc2626;
   }
 
   .cell-progress-text {
-    position: absolute;
-    inset: 0;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
     gap: 6px;
-    font-size: 10.5px;
-    font-weight: 700;
-    color: #0b1a4e;
-    text-shadow: 0 0 2px rgba(255, 255, 255, 0.9);
-    pointer-events: none;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: #1f2937;
     white-space: nowrap;
-    overflow: hidden;
+    flex-shrink: 0;
   }
 
   :global([data-theme="dark"]) .cell-progress-text {
-    color: #ffffff;
-    text-shadow: 0 0 2px rgba(0, 0, 0, 0.9);
+    color: #f3f4f6;
+  }
+
+  .cell-state-label {
+    font-weight: 600;
+  }
+
+  .cell-percent-label {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Paused row text contrast */
+  .grid-row.paused-row td,
+  .grid-row.paused-row .file-name-text,
+  .grid-row.paused-row .cell-size,
+  .grid-row.paused-row .date-text,
+  .grid-row.paused-row .desc-text {
+    color: #4b5563;
+  }
+
+  :global([data-theme="dark"]) .grid-row.paused-row td,
+  :global([data-theme="dark"]) .grid-row.paused-row .file-name-text,
+  :global([data-theme="dark"]) .grid-row.paused-row .cell-size,
+  :global([data-theme="dark"]) .grid-row.paused-row .date-text,
+  :global([data-theme="dark"]) .grid-row.paused-row .desc-text {
+    color: #9ca3af;
+  }
+
+  .grid-row.paused-row.selected td,
+  .grid-row.paused-row.selected .file-name-text,
+  .grid-row.paused-row.selected .cell-size,
+  .grid-row.paused-row.selected .date-text,
+  .grid-row.paused-row.selected .desc-text {
+    color: inherit;
   }
 
   .state-badge {
@@ -865,11 +917,15 @@
   }
 
   .state-paused {
-    color: #d97706;
+    color: #4b5563;
+  }
+
+  :global([data-theme="dark"]) .state-paused {
+    color: #9ca3af;
   }
 
   .state-paused .state-dot {
-    background: #d97706;
+    background: #9ca3af;
   }
 
   .state-failed {

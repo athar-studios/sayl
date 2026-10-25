@@ -38,25 +38,24 @@
   const sections = SETTINGS_SECTIONS;
 
   let wasOpen = false;
-  $: if (open && !wasOpen) {
-    localSettings = normalizeSettings(settings);
-    saveSuccess = false;
-    saveError = null;
-    activeSection = initialSection || "general";
-    if (activeSection === "extension") {
-      loadExtensionStatus();
+  $: if (open !== wasOpen) {
+    wasOpen = open;
+    if (open) {
+      localSettings = normalizeSettings(settings);
+      saveSuccess = false;
+      saveError = null;
+      activeSection = initialSection || "general";
+      if (activeSection === "extension") {
+        loadExtensionStatus();
+      }
     }
-  }
-  $: wasOpen = open;
-
-  $: if (open && activeSection === "extension" && !nativeHostStatus && !loadingExtensionState) {
-    loadExtensionStatus();
   }
 
   $: hostSummary = getHostStatusSummary(nativeHostStatus, browserList);
   $: hasBrowsers = hasInstalledBrowsers(browserList);
 
   async function loadExtensionStatus() {
+    if (loadingExtensionState) return;
     loadingExtensionState = true;
     try {
       const [nhRes, bRes] = await Promise.allSettled([
