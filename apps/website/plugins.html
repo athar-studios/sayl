@@ -52,9 +52,10 @@
   </script>
 </head>
 <body class="page-inner">
+  <canvas id="flow" aria-hidden="true"></canvas>
   <div class="lang-modal-overlay" id="lang-modal" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
     <div class="lang-modal-card">
-      <img src="/icon.svg" alt="سيل" class="modal-logo" width="52" height="36">
+      <img src="/favicon.svg?v=2" alt="شعار سيل" width="56" height="38" style="margin-bottom:12px">
       <h2 id="lang-modal-title">اختر لغة الموقع · Choose Language</h2>
       <p>يمكنك تغيير اللغة في أي وقت من زر التبديل بأعلى الصفحة.</p>
       <div class="lang-choices">
@@ -71,8 +72,8 @@
   </div>
   <div class="wrap">
     <header>
-      <a href="/" class="brand" aria-label="سيل">
-        <img src="/icon.svg" alt="سيل" class="brand-logo" width="52" height="36">
+      <a href="/" class="brand" aria-label="سيل - الصفحة الرئيسية">
+        <img class="brand-logo" src="/icon.svg" alt="سيل" width="57" height="40">
       </a>
       <nav aria-label="التنقل الرئيسي">
         <a href="/docs">التوثيق</a>
@@ -187,9 +188,8 @@
     <footer>
       <div class="footer-wrap">
         <div class="footer-brand">
-          <a href="/" aria-label="سيل">
-            <img src="/icon.svg" alt="سيل" class="footer-logo" width="52" height="36">
-          </a>
+          <img class="footer-logo" src="/icon.svg" alt="سيل" width="54" height="38">
+          <span><strong>سيل · SAYL</strong></span>
         </div>
         <div class="footer-links">
           <a href="/docs">التوثيق</a>
@@ -212,6 +212,7 @@
     </footer>
   </div>
 
+  <script src="/flow.js" defer></script>
   <script src="/site.js" defer></script>
 </body>
 </html>

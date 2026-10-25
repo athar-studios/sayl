@@ -70,9 +70,10 @@
   </script>
 </head>
 <body class="page-home">
+  <canvas id="flow" aria-hidden="true"></canvas>
   <div class="lang-modal-overlay" id="lang-modal" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
     <div class="lang-modal-card">
-      <img src="/icon.svg" alt="سيل" class="modal-logo" width="52" height="36">
+      <img src="/favicon.svg?v=2" alt="Sayl logo" width="56" height="38" style="margin-bottom:12px">
       <h2 id="lang-modal-title">Choose Language · اختر لغة الموقع</h2>
       <p>You can toggle your preferred language anytime from the header button.</p>
       <div class="lang-choices">
@@ -89,8 +90,8 @@
   </div>
   <div class="wrap">
     <header>
-      <a href="/en" class="brand" aria-label="Sayl">
-        <img src="/icon.svg" alt="Sayl" class="brand-logo" width="52" height="36">
+      <a href="/en" class="brand" aria-label="Sayl - Home">
+        <img class="brand-logo" src="/icon.svg" alt="Sayl" width="57" height="40">
       </a>
       <nav aria-label="Primary navigation">
         <a href="/en/docs">Docs</a>
@@ -106,7 +107,6 @@
     </header>
     <!-- Hero Section -->
     <section class="hero">
-      <canvas id="flow"></canvas>
       <div class="hero-content">
         <div class="logo-anim" role="img" aria-label="Sayl Animated Logo">
           <canvas id="logo" width="380" height="96"></canvas>
@@ -237,9 +237,8 @@
     <footer>
       <div class="footer-wrap">
         <div class="footer-brand">
-          <a href="/en" aria-label="Sayl">
-            <img src="/icon.svg" alt="Sayl" class="footer-logo" width="52" height="36">
-          </a>
+          <img class="footer-logo" src="/icon.svg" alt="Sayl" width="54" height="38">
+          <span><strong>Sayl · سيل</strong></span>
         </div>
         <div class="footer-links">
           <a href="/en/docs">Docs</a>
