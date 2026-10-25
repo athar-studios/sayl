@@ -3554,6 +3554,7 @@ name = "sayl-desktop"
 version = "0.1.0"
 dependencies = [
  "sayl-app",
+ "sayl-bridge",
  "sayl-core",
  "sayl-storage",
  "serde",

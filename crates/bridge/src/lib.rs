@@ -11,6 +11,7 @@
 
 pub mod dispatch;
 pub mod host;
+pub mod install;
 pub mod message;
 pub mod protocol;
 pub mod validate;
