@@ -204,6 +204,81 @@ function handleBrowserMock(command, args) {
     case "get_shutdown_status":
       return { ...mockShutdownStatus };
 
+    case "native_host_status":
+      return {
+        install_dir: "C:\\Program Files\\Sayl",
+        extension_dir: "C:\\Users\\User\\AppData\\Local\\Sayl\\extension\\chromium",
+        extension_dir_firefox: "C:\\Users\\User\\AppData\\Local\\Sayl\\extension\\firefox",
+        manifest_path: "C:\\Program Files\\Sayl\\native-messaging-host.json",
+        firefox_manifest_path: "C:\\Program Files\\Sayl\\native-messaging-host-firefox.json",
+        bridge_present: true,
+        extension_present: true,
+        registered: {
+          chrome: true,
+          edge: false,
+          brave: false,
+          opera: false,
+          vivaldi: false,
+          firefox: false,
+        },
+      };
+
+    case "browser_status":
+      return [
+        {
+          id: "chrome",
+          name: "Google Chrome",
+          installed: true,
+          host_registered: true,
+          connected: true,
+          extension_page_url: "chrome://extensions",
+          store_url: "",
+          activate_kind: "unpacked",
+        },
+        {
+          id: "edge",
+          name: "Microsoft Edge",
+          installed: true,
+          host_registered: false,
+          connected: false,
+          extension_page_url: "edge://extensions",
+          store_url: "",
+          activate_kind: "store",
+        },
+        {
+          id: "brave",
+          name: "Brave",
+          installed: true,
+          host_registered: false,
+          connected: false,
+          extension_page_url: "brave://extensions",
+          store_url: "",
+          activate_kind: "unpacked",
+        },
+        {
+          id: "firefox",
+          name: "Mozilla Firefox",
+          installed: false,
+          host_registered: false,
+          connected: false,
+          extension_page_url: "about:addons",
+          store_url: "",
+          activate_kind: "store",
+        },
+      ];
+
+    case "prepare_extension":
+      return "C:\\Users\\User\\AppData\\Local\\Sayl\\extension\\chromium";
+
+    case "test_native_host":
+      return { ok: true, roundtrip_ms: 12, message: "OK" };
+
+    case "open_extension_folder":
+    case "open_browser_extensions":
+    case "register_native_host":
+    case "unregister_native_host":
+      return null;
+
     default:
       return null;
   }

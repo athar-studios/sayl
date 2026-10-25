@@ -24,6 +24,10 @@
   import DuplicateTaskDialog from "./lib/DuplicateTaskDialog.svelte";
   import DownloadWindow from "./lib/DownloadWindow.svelte";
   import SettingsPanel from "./lib/SettingsPanel.svelte";
+  import Splash from "./lib/Splash.svelte";
+  import Tour from "./lib/Tour.svelte";
+  import ExtensionGuideDialog from "./lib/ExtensionGuideDialog.svelte";
+  import { isTourCompleted, clearTourCompleted } from "./lib/tour.js";
 
   let tasks = [];
   let selectedId = null;
@@ -34,6 +38,12 @@
   let addDialogOpen = false;
   let droppedUrl = "";
   let settingsOpen = false;
+  let settingsInitialSection = "general";
+
+  // Splash & Tour state
+  let initialDataLoaded = false;
+  let tourActive = false;
+  let extensionGuideOpen = false;
 
   // Duplicate task dialog state
   let duplicateDialogOpen = false;
@@ -432,6 +442,10 @@
   }
 
   function handleGlobalKeydown(e) {
+    if (tourActive || extensionGuideOpen) {
+      return;
+    }
+
     const activeEl = document.activeElement;
     const isEditing =
       activeEl &&
@@ -486,10 +500,31 @@
     }
   }
 
+  function handleReplayTour() {
+    clearTourCompleted();
+    settingsOpen = false;
+    setTimeout(() => {
+      tourActive = true;
+    }, 200);
+  }
+
+  function handleOpenExtensionGuideFromTour() {
+    tourActive = false;
+    extensionGuideOpen = true;
+  }
+
   onMount(async () => {
     // Initial mount: exactly one get_settings + one list_tasks (Req 11)
     await loadSettings();
     await loadTasks();
+    initialDataLoaded = true;
+
+    // First-run onboarding tour (runs once per machine)
+    if (!isTourCompleted()) {
+      setTimeout(() => {
+        tourActive = true;
+      }, 400);
+    }
 
     // Listen to Tauri events if available
     try {
@@ -610,6 +645,9 @@
   on:drop={handleDomDrop}
 />
 
+<!-- Splash Screen (Req 1) -->
+<Splash ready={initialDataLoaded} />
+
 <div class="app-layout">
   <!-- Collapsible Category & Status Sidebar (Req 2) -->
   <Sidebar
@@ -641,13 +679,16 @@
       on:delete={() => selectedId && handleCancelTask(selectedId)}
       on:retry={() => selectedId && handleRetryTask(selectedId)}
       on:openFolder={() => invoke("open_download_folder")}
-      on:settings={() => (settingsOpen = true)}
+      on:settings={() => {
+        settingsInitialSection = "general";
+        settingsOpen = true;
+      }}
       on:theme={(e) => applyTheme(e.detail)}
       on:toggleAutoShutdown={(e) => (autoShutdown = e.detail)}
     />
 
     <!-- Filter & Search Bar: State filter tabs, Search box, View mode toggle (Req 3) -->
-    <div class="filter-controls-bar">
+    <div id="tour-search-filter" class="filter-controls-bar">
       <div class="state-filter-tabs" role="tablist" aria-label="Filter downloads by state">
         {#each STATE_FILTERS as sf (sf.id)}
           {@const count = stateCounts[sf.id] || 0}
@@ -747,7 +788,7 @@
     {/if}
 
     <!-- Main Tasks View (Default Table or Cards) (Req 4) -->
-    <main class="app-main">
+    <main id="tour-task-area" class="app-main">
       <TaskList
         tasks={filteredTasks}
         totalTasksCount={tasks.length}
@@ -824,9 +865,28 @@
   <!-- Settings Panel -->
   <SettingsPanel
     open={settingsOpen}
+    initialSection={settingsInitialSection}
     bind:settings
-    on:close={() => (settingsOpen = false)}
+    on:close={() => {
+      settingsOpen = false;
+      settingsInitialSection = "general";
+    }}
     on:changeTheme={(e) => applyTheme(e.detail)}
+    on:replayTour={handleReplayTour}
+  />
+
+  <!-- First-Run Onboarding Tour (Req 2) -->
+  <Tour
+    active={tourActive}
+    on:finish={() => (tourActive = false)}
+    on:skip={() => (tourActive = false)}
+    on:openExtensionGuide={handleOpenExtensionGuideFromTour}
+  />
+
+  <!-- Extension Guide Dialog (Req 4 / Tour Step 6) -->
+  <ExtensionGuideDialog
+    open={extensionGuideOpen}
+    on:close={() => (extensionGuideOpen = false)}
   />
 
   <!-- Floating Download Windows Stack (Req 8) -->

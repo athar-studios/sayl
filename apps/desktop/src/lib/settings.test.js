@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { DEFAULT_SETTINGS, SETTINGS_KEYS, normalizeSettings } from "./settings.js";
 
 describe("Settings contract & defaults (settings.js)", () => {
-  it("has exactly the 10 documented keys in SETTINGS_KEYS", () => {
-    expect(SETTINGS_KEYS).toHaveLength(10);
+  it("has exactly the 13 documented keys in SETTINGS_KEYS", () => {
+    expect(SETTINGS_KEYS).toHaveLength(13);
     expect(SETTINGS_KEYS).toEqual([
       "download_dir",
       "max_concurrent_tasks",
@@ -15,10 +15,13 @@ describe("Settings contract & defaults (settings.js)", () => {
       "prevent_sleep",
       "show_download_window",
       "close_download_window_on_finish",
+      "close_action",
+      "run_at_startup",
+      "close_notice_shown",
     ]);
   });
 
-  it("default settings object contains exactly the 10 documented keys", () => {
+  it("default settings object contains exactly the 13 documented keys", () => {
     const keys = Object.keys(DEFAULT_SETTINGS).sort();
     const expectedKeys = [...SETTINGS_KEYS].sort();
     expect(keys).toEqual(expectedKeys);
@@ -34,6 +37,9 @@ describe("Settings contract & defaults (settings.js)", () => {
     expect(DEFAULT_SETTINGS.prevent_sleep).toBe(true);
     expect(DEFAULT_SETTINGS.show_download_window).toBe(true);
     expect(DEFAULT_SETTINGS.close_download_window_on_finish).toBe(false);
+    expect(DEFAULT_SETTINGS.close_action).toBe("background");
+    expect(DEFAULT_SETTINGS.run_at_startup).toBe(false);
+    expect(DEFAULT_SETTINGS.close_notice_shown).toBe(false);
   });
 
   it("normalizeSettings populates missing keys with valid defaults", () => {
@@ -50,10 +56,43 @@ describe("Settings contract & defaults (settings.js)", () => {
     expect(partial.prevent_sleep).toBe(false);
     expect(partial.show_download_window).toBe(true);
     expect(partial.close_download_window_on_finish).toBe(false);
+    expect(partial.close_action).toBe("background");
+    expect(partial.run_at_startup).toBe(false);
+    expect(partial.close_notice_shown).toBe(false);
   });
 
   it("rejects invalid view_mode in normalizeSettings and falls back to 'table'", () => {
     const res = normalizeSettings({ view_mode: "invalid_view" });
     expect(res.view_mode).toBe("table");
+  });
+
+  it("preserves and normalizes close_action, run_at_startup, and close_notice_shown", () => {
+    const res = normalizeSettings({
+      close_action: "quit",
+      run_at_startup: true,
+      close_notice_shown: true,
+    });
+    expect(res.close_action).toBe("quit");
+    expect(res.run_at_startup).toBe(true);
+    expect(res.close_notice_shown).toBe(true);
+
+    const invalid = normalizeSettings({
+      close_action: "unknown_action",
+      run_at_startup: "not_a_bool",
+      close_notice_shown: 123,
+    });
+    expect(invalid.close_action).toBe("background");
+    expect(invalid.run_at_startup).toBe(false);
+    expect(invalid.close_notice_shown).toBe(false);
+  });
+
+  it("preserves unknown backend fields when normalizing", () => {
+    const custom = normalizeSettings({
+      custom_backend_field: "sayl-extension-v1",
+      extra_num: 42,
+    });
+    expect(custom.custom_backend_field).toBe("sayl-extension-v1");
+    expect(custom.extra_num).toBe(42);
+    expect(custom.view_mode).toBe("table");
   });
 });
