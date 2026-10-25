@@ -902,18 +902,14 @@ pub mod commands {
             return Ok(());
         }
         let url = format!("index.html?task={}", id);
-        tauri::WebviewWindowBuilder::new(
-            &app_handle,
-            &label,
-            tauri::WebviewUrl::App(url.into()),
-        )
-        .title("تنزيل")
-        .inner_size(480.0, 360.0)
-        .min_inner_size(420.0, 320.0)
-        .resizable(true)
-        .decorations(true)
-        .build()
-        .map_err(|e| format!("Failed to create download window: {e}"))?;
+        tauri::WebviewWindowBuilder::new(&app_handle, &label, tauri::WebviewUrl::App(url.into()))
+            .title("تنزيل")
+            .inner_size(480.0, 360.0)
+            .min_inner_size(420.0, 320.0)
+            .resizable(true)
+            .decorations(true)
+            .build()
+            .map_err(|e| format!("Failed to create download window: {e}"))?;
         Ok(())
     }
 

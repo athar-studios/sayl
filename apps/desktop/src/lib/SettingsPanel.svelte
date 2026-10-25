@@ -142,7 +142,7 @@
     try {
       const payload = normalizeSettings(localSettings);
       if (!payload.download_dir || !payload.download_dir.trim()) {
-        payload.download_dir = settings.download_dir || "C:\\Users\\Dragonfly\\Downloads";
+        payload.download_dir = settings.download_dir || "C:\\Users\\User\\Downloads";
       }
       const updated = await safeInvoke("set_settings", { settings: payload });
       if (updated) {
