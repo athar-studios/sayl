@@ -104,7 +104,7 @@ pub async fn run_sequential_download(
                         .and_then(|s| s.parse::<u64>().ok());
                     return Err(CoreError::http(
                         Some(code),
-                        format!("server returned error status: {status}"),
+                        format!("HTTP {status}"),
                         retry_after_secs,
                     ));
                 }

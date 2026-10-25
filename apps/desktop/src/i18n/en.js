@@ -79,6 +79,10 @@ export default {
     deleteWithFile: "Delete with file...",
     copyUrl: "Copy URL",
     properties: "Properties",
+    addDownload: "Add Download",
+    resumeAll: "Resume All",
+    pauseAll: "Pause All",
+    selectAll: "Select All",
   },
   statusbar: {
     activeTasks: "Active Tasks: {active} of {total}",
@@ -151,6 +155,7 @@ export default {
   },
   downloadWindow: {
     title: "Download Window",
+    size: "Size",
     parts: "Parts",
     connections: "Connections",
     speed: "Speed",

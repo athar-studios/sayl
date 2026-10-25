@@ -1,6 +1,4 @@
 use std::path::Path;
-#[cfg(target_os = "windows")]
-use std::process::Command;
 
 pub const REG_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
 pub const REG_VALUE_NAME: &str = "SAYL";
@@ -19,48 +17,29 @@ where
     args.into_iter().any(|arg| arg.as_ref() == "--hidden")
 }
 
-/// Applies or removes the autostart registry entry via `reg.exe`.
+/// Applies or removes the autostart registry entry via direct registry operations (`winreg`).
 pub fn set_autostart(enable: bool) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
+        use winreg::enums::HKEY_CURRENT_USER;
+        use winreg::RegKey;
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let (key, _) = hkcu
+            .create_subkey(r"Software\Microsoft\Windows\CurrentVersion\Run")
+            .map_err(|e| format!("Failed to open or create Run registry key: {e}"))?;
+
         if enable {
             let current_exe = std::env::current_exe()
                 .map_err(|e| format!("Failed to get current executable path: {e}"))?;
             let cmd_val = build_autostart_command_value(&current_exe);
-
-            let status = Command::new("reg.exe")
-                .args([
-                    "add",
-                    REG_KEY,
-                    "/v",
-                    REG_VALUE_NAME,
-                    "/t",
-                    "REG_SZ",
-                    "/d",
-                    &cmd_val,
-                    "/f",
-                ])
-                .status()
-                .map_err(|e| format!("Failed to execute reg.exe: {e}"))?;
-
-            if !status.success() {
-                return Err(format!(
-                    "reg.exe add failed with exit code: {:?}",
-                    status.code()
-                ));
-            }
+            key.set_value(REG_VALUE_NAME, &cmd_val)
+                .map_err(|e| format!("Failed to set autostart registry value: {e}"))?;
         } else {
-            let status = Command::new("reg.exe")
-                .args(["delete", REG_KEY, "/v", REG_VALUE_NAME, "/f"])
-                .status()
-                .map_err(|e| format!("Failed to execute reg.exe: {e}"))?;
-
-            // If the key did not exist, reg.exe returns 1, but we treat that as successful removal
-            if !status.success() && status.code() != Some(1) {
-                return Err(format!(
-                    "reg.exe delete failed with exit code: {:?}",
-                    status.code()
-                ));
+            match key.delete_value(REG_VALUE_NAME) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(format!("Failed to delete autostart registry value: {e}")),
             }
         }
         Ok(())

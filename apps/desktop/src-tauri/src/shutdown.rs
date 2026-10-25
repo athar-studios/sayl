@@ -74,9 +74,11 @@ impl ShutdownRunner for SystemShutdownRunner {
     fn run(&self) -> Result<(), String> {
         #[cfg(target_os = "windows")]
         {
-            std::process::Command::new("shutdown")
-                .args(["/s", "/t", "0"])
-                .spawn()
+            use std::os::windows::process::CommandExt;
+            let mut cmd = std::process::Command::new("shutdown");
+            cmd.args(["/s", "/t", "0"]);
+            cmd.creation_flags(0x08000000);
+            cmd.spawn()
                 .map_err(|e| format!("Failed to execute shutdown command: {e}"))?;
             Ok(())
         }

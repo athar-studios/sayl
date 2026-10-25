@@ -222,15 +222,48 @@
     }
   }
 
-  function applyTheme(th) {
-    settings.theme = th;
-    if (typeof document !== "undefined") {
-      if (th === "system") {
-        document.documentElement.removeAttribute("data-theme");
-      } else {
-        document.documentElement.setAttribute("data-theme", th);
-      }
+  let mediaQueryList = null;
+  let unlistenThemeChanged = null;
+
+  function getOsTheme() {
+    if (typeof window !== "undefined" && window.matchMedia) {
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     }
+    return "light";
+  }
+
+  function applyTheme(th) {
+    settings.theme = th || "system";
+    if (typeof document !== "undefined") {
+      let resolvedTheme = th;
+      if (th === "system" || !th) {
+        resolvedTheme = getOsTheme();
+      }
+      document.documentElement.setAttribute("data-theme", resolvedTheme);
+    }
+  }
+
+  function handleOsThemeChange() {
+    if (settings.theme === "system") {
+      applyTheme("system");
+    }
+  }
+
+  function handleSettingsUpdated(newSettings) {
+    if (!newSettings) return;
+    settings = normalizeSettings({ ...settings, ...newSettings });
+    if (newSettings.language) {
+      setLanguage(newSettings.language);
+    }
+    if (newSettings.theme) {
+      applyTheme(newSettings.theme);
+    }
+  }
+
+  function handleToggleLanguage() {
+    toggleLanguage();
+    settings.language = $currentLang;
+    invoke("set_settings", { settings: normalizeSettings(settings) }).catch(() => {});
   }
 
   function handleUrlDrop(url) {
@@ -824,6 +857,30 @@
           console.warn("Tauri onDragDropEvent listener registration:", err);
         }
       }
+
+      if (typeof window !== "undefined") {
+        if (window.matchMedia) {
+          mediaQueryList = window.matchMedia("(prefers-color-scheme: dark)");
+          mediaQueryList.addEventListener("change", handleOsThemeChange);
+        }
+        if (window.__TAURI_INTERNALS__ || window.__TAURI__) {
+          import("@tauri-apps/api/webviewWindow")
+            .then(({ getCurrentWebviewWindow }) => {
+              const win = getCurrentWebviewWindow();
+              if (win && typeof win.onThemeChanged === "function") {
+                win
+                  .onThemeChanged(() => {
+                    handleOsThemeChange();
+                  })
+                  .then((unlisten) => {
+                    unlistenThemeChanged = unlisten;
+                  })
+                  .catch(() => {});
+              }
+            })
+            .catch(() => {});
+        }
+      }
     } catch {
       // Standalone browser / test mode
     }
@@ -837,6 +894,10 @@
     if (unlistenProgress) unlistenProgress();
     if (unlistenDragDrop) unlistenDragDrop();
     if (unlistenShutdown) unlistenShutdown();
+    if (mediaQueryList && typeof mediaQueryList.removeEventListener === "function") {
+      mediaQueryList.removeEventListener("change", handleOsThemeChange);
+    }
+    if (unlistenThemeChanged) unlistenThemeChanged();
     stopCountdownTimer();
   });
 </script>
@@ -845,6 +906,7 @@
   on:keydown={handleGlobalKeydown}
   on:dragover={handleDomDragOver}
   on:drop={handleDomDrop}
+  on:contextmenu|preventDefault
 />
 
 <!-- Splash Screen (Req 1) -->
@@ -888,7 +950,7 @@
       on:toggleSidebar={() => handleToggleSidebar(!settings.sidebar_collapsed)}
       on:toggleToolbar={() => (showToolbar = !showToolbar)}
       on:toggleStatusbar={() => (showStatusbar = !showStatusbar)}
-      on:toggleLanguage={toggleLanguage}
+      on:toggleLanguage={handleToggleLanguage}
       on:openScheduler={() => (schedulerOpen = true)}
       on:openSettings={() => {
         settingsInitialSection = "general";
@@ -990,6 +1052,9 @@
           on:reveal={(e) => handleRevealTask(e.detail)}
           on:openFile={(e) => handleOpenFileTask(e.detail)}
           on:properties={(e) => handleOpenProperties(e.detail)}
+          on:resumeAll={handleResumeAll}
+          on:pauseAll={handlePauseAll}
+          on:selectAll={handleSelectAll}
         />
       </main>
     </div>
@@ -1075,6 +1140,7 @@
       settingsInitialSection = "general";
     }}
     on:changeTheme={(e) => applyTheme(e.detail)}
+    on:update={(e) => handleSettingsUpdated(e.detail)}
     on:replayTour={handleReplayTour}
   />
 
@@ -1224,6 +1290,8 @@
     width: 20px;
     height: 20px;
     object-fit: contain;
+    opacity: 1;
+    filter: none;
   }
 
   .titlebar-title {

@@ -79,6 +79,10 @@ export default {
     deleteWithFile: "حذف مع الملف...",
     copyUrl: "نسخ الرابط",
     properties: "الخصائص",
+    addDownload: "إضافة تنزيل",
+    resumeAll: "استئناف الكل",
+    pauseAll: "إيقاف الكل",
+    selectAll: "تحديد الكل",
   },
   statusbar: {
     activeTasks: "المهام النشطة: {active} من {total}",
@@ -151,6 +155,7 @@ export default {
   },
   downloadWindow: {
     title: "نافذة التحميل",
+    size: "الحجم",
     parts: "الأجزاء",
     connections: "الاتصالات",
     speed: "السرعة",

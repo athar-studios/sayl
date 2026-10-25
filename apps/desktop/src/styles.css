@@ -24,16 +24,18 @@
 }
 
 :root {
-  /* SAYL Light Mode - Brand Palette */
+  /* SAYL Light Mode - Unified Palette */
   --color-bg: #f5f8fc;
   --color-bg-card: #ffffff;
   --color-bg-card-hover: #f0f4fa;
-  --color-bg-alt: #ebf1f8;
+  --color-bg-alt: #ffffff;
+  --color-bg-subtle: #f5f8fc;
   --color-border: #d4e0ee;
+  --color-border-subtle: #e5e7eb;
   --color-border-focus: #00b6bd;
-  --color-text: #0b1a4e;
-  --color-text-muted: #4b5d84;
-  --color-text-subtle: #6e80a5;
+  --color-text: #1f2937;
+  --color-text-muted: #4b5563;
+  --color-text-subtle: #6b7280;
   --color-accent: #00b6bd;
   --color-accent-hover: #009ea4;
   --color-accent-active: #0b1a4e;
@@ -55,9 +57,9 @@
   --state-queued: #64748b;
   --progress-gradient: linear-gradient(135deg, #00b6bd, #0b1a4e);
 
-  --shadow-sm: 0 1px 2px 0 rgb(11 26 78 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(11 26 78 / 0.08), 0 2px 4px -2px rgb(11 26 78 / 0.06);
-  --shadow-lg: 0 10px 15px -3px rgb(11 26 78 / 0.12), 0 4px 6px -4px rgb(11 26 78 / 0.08);
+  --shadow-sm: 0 1px 2px 0 rgb(31 41 55 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(31 41 55 / 0.08), 0 2px 4px -2px rgb(31 41 55 / 0.06);
+  --shadow-lg: 0 10px 15px -3px rgb(31 41 55 / 0.12), 0 4px 6px -4px rgb(31 41 55 / 0.08);
 
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -70,17 +72,52 @@
   --transition-normal: 120ms ease;
 }
 
-/* SAYL Dark Mode - Indigo palette: Deeper page #070F2E, Card/Header #0B1A4E */
-[data-theme="dark"] {
-  --color-bg: #070f2e;
-  --color-bg-card: #0b1a4e;
-  --color-bg-card-hover: #102361;
-  --color-bg-alt: #0d1e56;
-  --color-border: #162b6e;
+[data-theme="light"] {
+  --color-bg: #f5f8fc;
+  --color-bg-card: #ffffff;
+  --color-bg-card-hover: #f0f4fa;
+  --color-bg-alt: #ffffff;
+  --color-bg-subtle: #f5f8fc;
+  --color-border: #d4e0ee;
+  --color-border-subtle: #e5e7eb;
   --color-border-focus: #00b6bd;
-  --color-text: #f1f5f9;
-  --color-text-muted: #a0b2d6;
-  --color-text-subtle: #93a4c8;
+  --color-text: #1f2937;
+  --color-text-muted: #4b5563;
+  --color-text-subtle: #6b7280;
+  --color-accent: #00b6bd;
+  --color-accent-hover: #009ea4;
+  --color-accent-active: #0b1a4e;
+  --color-accent-light: #e0f9fa;
+  --color-accent-text: #ffffff;
+  --color-accent-gradient: linear-gradient(135deg, #00b6bd, #0b1a4e);
+  --color-danger: #dc2626;
+  --color-danger-hover: #b91c1c;
+  --color-danger-light: #fee2e2;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-info: #0284c7;
+
+  --state-running: #00b6bd;
+  --state-completed: #16a34a;
+  --state-paused: #d97706;
+  --state-failed: #dc2626;
+  --state-queued: #64748b;
+  --progress-gradient: linear-gradient(135deg, #00b6bd, #0b1a4e);
+}
+
+/* SAYL Dark Mode - Unified Palette */
+[data-theme="dark"] {
+  --color-bg: #111827;
+  --color-bg-card: #1f2937;
+  --color-bg-card-hover: #374151;
+  --color-bg-alt: #1f2937;
+  --color-bg-subtle: #111827;
+  --color-border: #374151;
+  --color-border-subtle: rgba(255, 255, 255, 0.08);
+  --color-border-focus: #00b6bd;
+  --color-text: #f3f4f6;
+  --color-text-muted: #d1d5db;
+  --color-text-subtle: #9ca3af;
   --color-accent: #00b6bd;
   --color-accent-hover: #13ccd4;
   --color-accent-active: #009ea4;
@@ -94,26 +131,28 @@
   --color-warning: #fbbf24;
   --color-info: #38bdf8;
 
-  /* Semantic State Colours (Req 5: lighter teal #5eead4 for dark mode progress) */
+  /* Semantic State Colours */
   --state-running: #00b6bd;
   --state-completed: #22c55e;
   --state-paused: #fbbf24;
   --state-failed: #ef4444;
-  --state-queued: #94a3b8;
+  --state-queued: #9ca3af;
   --progress-gradient: linear-gradient(135deg, #00b6bd, #5eead4);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --color-bg: #070f2e;
-    --color-bg-card: #0b1a4e;
-    --color-bg-card-hover: #102361;
-    --color-bg-alt: #0d1e56;
-    --color-border: #162b6e;
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    --color-bg: #111827;
+    --color-bg-card: #1f2937;
+    --color-bg-card-hover: #374151;
+    --color-bg-alt: #1f2937;
+    --color-bg-subtle: #111827;
+    --color-border: #374151;
+    --color-border-subtle: rgba(255, 255, 255, 0.08);
     --color-border-focus: #00b6bd;
-    --color-text: #f1f5f9;
-    --color-text-muted: #a0b2d6;
-    --color-text-subtle: #93a4c8;
+    --color-text: #f3f4f6;
+    --color-text-muted: #d1d5db;
+    --color-text-subtle: #9ca3af;
     --color-accent: #00b6bd;
     --color-accent-hover: #13ccd4;
     --color-accent-active: #009ea4;
@@ -131,7 +170,7 @@
     --state-completed: #22c55e;
     --state-paused: #fbbf24;
     --state-failed: #ef4444;
-    --state-queued: #94a3b8;
+    --state-queued: #9ca3af;
     --progress-gradient: linear-gradient(135deg, #00b6bd, #5eead4);
   }
 }

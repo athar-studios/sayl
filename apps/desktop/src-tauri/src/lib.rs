@@ -742,9 +742,11 @@ pub mod commands {
 
         #[cfg(target_os = "windows")]
         {
-            std::process::Command::new("explorer")
-                .arg(&dir)
-                .spawn()
+            use std::os::windows::process::CommandExt;
+            let mut cmd = std::process::Command::new("explorer");
+            cmd.arg(&dir);
+            cmd.creation_flags(0x08000000);
+            cmd.spawn()
                 .map_err(|e| format!("Failed to open directory in explorer: {e}"))?;
         }
 
@@ -772,15 +774,18 @@ pub mod commands {
 
         #[cfg(target_os = "windows")]
         {
+            use std::os::windows::process::CommandExt;
             if file_path.exists() {
-                std::process::Command::new("explorer")
-                    .arg(format!("/select,{}", file_path.display()))
-                    .spawn()
+                let mut cmd = std::process::Command::new("explorer");
+                cmd.arg(format!("/select,{}", file_path.display()));
+                cmd.creation_flags(0x08000000);
+                cmd.spawn()
                     .map_err(|e| format!("Failed to reveal file: {e}"))?;
             } else {
-                std::process::Command::new("explorer")
-                    .arg(&record.save_path)
-                    .spawn()
+                let mut cmd = std::process::Command::new("explorer");
+                cmd.arg(&record.save_path);
+                cmd.creation_flags(0x08000000);
+                cmd.spawn()
                     .map_err(|e| format!("Failed to open folder: {e}"))?;
             }
         }
@@ -812,9 +817,11 @@ pub mod commands {
 
         #[cfg(target_os = "windows")]
         {
-            std::process::Command::new("explorer")
-                .arg(&file_path)
-                .spawn()
+            use std::os::windows::process::CommandExt;
+            let mut cmd = std::process::Command::new("explorer");
+            cmd.arg(&file_path);
+            cmd.creation_flags(0x08000000);
+            cmd.spawn()
                 .map_err(|e| format!("Failed to open file: {e}"))?;
         }
 
@@ -893,6 +900,7 @@ pub mod commands {
     #[tauri::command]
     pub async fn open_download_window(
         app_handle: tauri::AppHandle,
+        state: State<'_, AppState>,
         id: String,
     ) -> Result<(), String> {
         let trimmed = id.trim();
@@ -905,13 +913,41 @@ pub mod commands {
             let _ = win.set_focus();
             return Ok(());
         }
+
+        let is_dark = {
+            let theme_str = state
+                .settings
+                .read()
+                .map(|s| s.theme.clone())
+                .unwrap_or_else(|_| "system".into());
+            if theme_str == "dark" {
+                true
+            } else if theme_str == "light" {
+                false
+            } else if let Some(main_win) = app_handle.get_webview_window("main") {
+                main_win
+                    .theme()
+                    .map(|t| matches!(t, tauri::Theme::Dark))
+                    .unwrap_or(false)
+            } else {
+                false
+            }
+        };
+
+        let bg_color = if is_dark {
+            tauri::window::Color(31, 41, 55, 255) // #1f2937
+        } else {
+            tauri::window::Color(255, 255, 255, 255) // #ffffff
+        };
+
         let url = format!("index.html?task={}", trimmed);
         tauri::WebviewWindowBuilder::new(&app_handle, &label, tauri::WebviewUrl::App(url.into()))
             .title("تنزيل")
-            .inner_size(480.0, 360.0)
-            .min_inner_size(420.0, 320.0)
-            .resizable(true)
+            .visible(false)
+            .inner_size(460.0, 260.0)
+            .resizable(false)
             .decorations(true)
+            .background_color(bg_color)
             .build()
             .map_err(|e| format!("Failed to create download window: {e}"))?;
         Ok(())

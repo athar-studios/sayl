@@ -1,16 +1,20 @@
 <script>
   import { t } from "./i18n.js";
   import { createEventDispatcher } from "svelte";
-  import logoFull from "../assets/logo-full.svg";
-  import logoWhite from "../assets/logo-white.svg";
+  import logoFullRaw from "../assets/logo-full.svg?raw";
+  import logoWhiteRaw from "../assets/logo-white.svg?raw";
 
   const dispatch = createEventDispatcher();
 </script>
 
 <div class="empty-state">
   <div class="empty-logo-wrap" aria-hidden="true">
-    <img src={logoFull} alt="SAYL" class="empty-logo-img logo-light" />
-    <img src={logoWhite} alt="SAYL" class="empty-logo-img logo-dark" />
+    <div class="empty-logo-svg logo-light">
+      {@html logoFullRaw}
+    </div>
+    <div class="empty-logo-svg logo-dark">
+      {@html logoWhiteRaw}
+    </div>
   </div>
   <h2 class="empty-title">{$t("empty.title")}</h2>
   <p class="empty-desc">{$t("empty.description")}</p>
@@ -42,22 +46,30 @@
     margin-bottom: 1.5rem;
   }
 
-  .empty-logo-img {
+  .empty-logo-svg {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    filter: drop-shadow(0 4px 12px rgba(0, 182, 189, 0.25));
+  }
+
+  .empty-logo-svg :global(svg) {
     width: 100%;
     height: 100%;
     object-fit: contain;
-    filter: drop-shadow(0 4px 12px rgba(0, 182, 189, 0.2));
   }
 
   .logo-dark {
     display: none;
   }
   .logo-light {
-    display: block;
+    display: flex;
   }
 
   :global([data-theme="dark"]) .logo-dark {
-    display: block !important;
+    display: flex !important;
   }
   :global([data-theme="dark"]) .logo-light {
     display: none !important;
@@ -65,7 +77,7 @@
 
   @media (prefers-color-scheme: dark) {
     :global(:root:not([data-theme="light"])) .logo-dark {
-      display: block;
+      display: flex;
     }
     :global(:root:not([data-theme="light"])) .logo-light {
       display: none;
@@ -97,15 +109,18 @@
     font-size: 0.925rem;
     font-weight: 600;
     border-radius: var(--radius-md);
-    box-shadow: 0 4px 12px rgba(0, 182, 189, 0.3);
-    transition: filter var(--transition-normal), transform var(--transition-normal);
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 182, 189, 0.35);
+    transition: transform 120ms ease, box-shadow 120ms ease;
   }
 
   .empty-action-btn:hover {
-    filter: brightness(1.08);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(0, 182, 189, 0.45);
   }
 
   .empty-action-btn:active {
-    transform: scale(0.98);
+    transform: translateY(0);
   }
 </style>

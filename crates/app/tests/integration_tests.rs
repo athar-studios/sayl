@@ -815,3 +815,151 @@ async fn test_scheduler_cancel_queued_task() {
         task1_requests
     );
 }
+
+#[tokio::test]
+async fn test_404_stores_real_error_text() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let mut buf = [0u8; 1024];
+            let _ = socket.read(&mut buf).await;
+            let resp = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+            let _ = socket.write_all(resp.as_bytes()).await;
+        }
+    });
+
+    let dl_dir = make_temp_dir();
+    let store_dir = make_temp_dir();
+    let config = EngineConfig::default();
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+
+    let url = format!("http://{addr}/notfound.bin");
+    let task_id = engine.add(&url).await.expect("add task");
+
+    let eng = engine.clone();
+    let _ = tokio::spawn(async move { eng.start(task_id).await });
+
+    let terminal_state = wait_for_terminal(&engine, task_id, Duration::from_secs(5)).await;
+    assert_eq!(terminal_state, DownloadState::Failed);
+
+    let task = engine.get_task(task_id).unwrap().unwrap();
+    assert!(
+        task.error.as_deref().unwrap_or("").contains("404"),
+        "error must contain 404, got: {:?}",
+        task.error
+    );
+}
+
+#[tokio::test]
+async fn test_retry_failed_task() {
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    let size = 16384;
+    server.set_resource_size(size);
+    let addr = server.start().await.expect("start fixture server");
+
+    let dl_dir = make_temp_dir();
+    let store_dir = make_temp_dir();
+    let config = EngineConfig::default();
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+
+    let url = format!("http://{addr}/retry_test.dat");
+    let task_id = engine.add(&url).await.expect("add task");
+
+    // Manually mark task as Failed with an error to simulate previous failure
+    let store = Store::open(&store_dir.path().join("sayl.db")).expect("open store");
+    {
+        let mut record = engine.get_task(task_id).unwrap().unwrap();
+        record.state = DownloadState::Failed;
+        record.error = Some("Previous failure test error".to_string());
+        record.error_kind = Some("http_500".to_string());
+        store.upsert_task(&record).unwrap();
+    }
+
+    // Now call start: retry should be allowed, resetting state, clearing error, and completing!
+    let eng = engine.clone();
+    let handle = tokio::spawn(async move { eng.start(task_id).await });
+    let terminal_state = wait_for_terminal(&engine, task_id, Duration::from_secs(10)).await;
+    let _ = handle.await;
+
+    assert_eq!(terminal_state, DownloadState::Completed);
+    let final_task = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(final_task.error, None, "error must be cleared on retry");
+    assert_eq!(
+        final_task.error_kind, None,
+        "error_kind must be cleared on retry"
+    );
+}
+
+#[tokio::test]
+async fn test_parallel_429_fallback_to_sequential() {
+    let size = 16384usize;
+    let expected_data = generate_bytes(size);
+    let data_clone = expected_data.clone();
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let data = data_clone.clone();
+            tokio::spawn(async move {
+                let mut buf = [0u8; 2048];
+                let n = socket.read(&mut buf).await.unwrap_or(0);
+                let req = String::from_utf8_lossy(&buf[..n]);
+
+                if req.starts_with("HEAD") {
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                } else if req.contains("Range: bytes=") {
+                    if req.contains("Range: bytes=0-0") {
+                        let resp = format!(
+                            "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-0/{}\r\nContent-Length: 1\r\nConnection: close\r\n\r\n{}",
+                            size, data[0] as char
+                        );
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                    } else {
+                        // Parallel worker range request: simulate 429 throttling!
+                        let resp = "HTTP/1.1 429 Too Many Requests\r\nRetry-After: 0\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                    }
+                } else {
+                    // Sequential full GET without Range: succeed!
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                    let _ = socket.write_all(&data).await;
+                }
+            });
+        }
+    });
+
+    let dl_dir = make_temp_dir();
+    let store_dir = make_temp_dir();
+    let config = EngineConfig::default();
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+
+    let url = format!("http://{addr}/test_429_fallback.dat");
+    let task_id = engine.add(&url).await.expect("add task");
+
+    let eng = engine.clone();
+    let handle = tokio::spawn(async move { eng.start(task_id).await });
+    let terminal_state = wait_for_terminal(&engine, task_id, Duration::from_secs(10)).await;
+    let _ = handle.await;
+
+    assert_eq!(terminal_state, DownloadState::Completed);
+    let final_task = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(final_task.written, size as u64);
+
+    let final_path = dl_dir.path().join(&final_task.filename);
+    let bytes = tokio::fs::read(&final_path).await.expect("read final file");
+    assert_eq!(bytes, expected_data);
+}

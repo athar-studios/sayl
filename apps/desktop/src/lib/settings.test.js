@@ -117,4 +117,15 @@ describe("Settings contract & defaults (settings.js)", () => {
       expect(typeof sec.id).toBe("string");
     }
   });
+
+  it("preserves language and other settings when theme changes", () => {
+    const base = { ...DEFAULT_SETTINGS, language: "en", theme: "system" };
+    const changedTheme = normalizeSettings({ ...base, theme: "dark" });
+    expect(changedTheme.language).toBe("en");
+    expect(changedTheme.theme).toBe("dark");
+
+    const changedLang = normalizeSettings({ ...changedTheme, language: "ar" });
+    expect(changedLang.language).toBe("ar");
+    expect(changedLang.theme).toBe("dark");
+  });
 });

@@ -120,7 +120,7 @@ impl DownloadState {
             Self::Cancelling => &[Self::Cancelled, Self::Failed],
             Self::Completed => &[],
             Self::Cancelled => &[],
-            Self::Failed => &[],
+            Self::Failed => &[Self::Queued, Self::Probing],
         }
     }
 
@@ -313,8 +313,9 @@ mod tests {
                     }
                 }
 
-                // Property 2: Terminal states can NEVER transition to any state
-                if from.is_terminal() {
+                // Property 2: Terminal states (Completed, Cancelled) can NEVER transition to any state.
+                // Failed allows retry to Queued and Probing.
+                if from.is_terminal() && from != DownloadState::Failed {
                     assert!(
                         res.is_err(),
                         "Terminal state {:?} must never transition to {:?}",
@@ -370,11 +371,26 @@ mod tests {
         // Cancelling: 2 (Cancelled, Failed)
         // Completed: 0
         // Cancelled: 0
-        // Failed: 0
-        // Total valid = 3 + 4 + 4 + 3 + 3 + 3 + 3 + 2 = 25
-        // Plus 8 nonterminal self-loops (Queued, Probing, Downloading, Verifying, Finalizing, Pausing, Paused, Cancelling) = 33
-        assert_eq!(valid_count, 33);
-        assert_eq!(invalid_count, 88);
+        // Failed: 2 (Queued, Probing)
+        // Total valid = 3 + 4 + 4 + 3 + 3 + 3 + 3 + 2 + 2 = 27
+        // Plus 8 nonterminal self-loops (Queued, Probing, Downloading, Verifying, Finalizing, Pausing, Paused, Cancelling) = 35
+        assert_eq!(valid_count, 35);
+        assert_eq!(invalid_count, 86);
+    }
+
+    #[test]
+    fn test_retry_from_failed() {
+        assert_eq!(
+            transition(DownloadState::Failed, DownloadState::Queued),
+            Ok(DownloadState::Queued)
+        );
+        assert_eq!(
+            transition(DownloadState::Failed, DownloadState::Probing),
+            Ok(DownloadState::Probing)
+        );
+        assert!(transition(DownloadState::Failed, DownloadState::Downloading).is_err());
+        assert!(transition(DownloadState::Failed, DownloadState::Completed).is_err());
+        assert!(transition(DownloadState::Failed, DownloadState::Cancelled).is_err());
     }
 
     #[test]

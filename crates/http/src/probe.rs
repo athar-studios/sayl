@@ -107,7 +107,7 @@ pub async fn probe_with_options(
                 } else if status.is_client_error() || status.is_server_error() {
                     return Err(HttpError::status(
                         status.as_u16(),
-                        format!("HEAD probe rejected: {status}"),
+                        format!("HTTP {status}"),
                         None,
                     ));
                 } else {
@@ -183,6 +183,13 @@ pub async fn probe_with_options(
 
         let get_res = execute_get_with_redirects(client, &mut tracker, &range_headers).await?;
         final_status = get_res.status();
+        if final_status.is_client_error() || final_status.is_server_error() {
+            return Err(HttpError::status(
+                final_status.as_u16(),
+                format!("HTTP {final_status}"),
+                None,
+            ));
+        }
         let hdrs = get_res.headers();
 
         // Update headers from GET response if missing

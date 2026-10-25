@@ -206,10 +206,8 @@ pub async fn run_parallel_download_with_options(
     let num_workers = max_connections.min(total_chunks).max(1);
 
     let total_downloaded = Arc::new(AtomicU64::new(0));
-    let first_error = Arc::new(Mutex::new(None::<CoreError>));
-    // Shared throttle counter: increments on each 429/503 seen by any worker.
-    // At >= 2 consecutive throttles, workers release and stop so the engine can downgrade.
-    let throttle_count = Arc::new(std::sync::atomic::AtomicU32::new(0));
+    let fatal_error = Arc::new(Mutex::new(None::<CoreError>));
+    let throttled = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let range_unsupported = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let start_time = Instant::now();
 
@@ -281,8 +279,8 @@ pub async fn run_parallel_download_with_options(
         let shared_file = Arc::clone(&shared_file);
         let total_downloaded = Arc::clone(&total_downloaded);
         let table = Arc::clone(&table);
-        let first_error = Arc::clone(&first_error);
-        let throttle_count = Arc::clone(&throttle_count);
+        let fatal_error = Arc::clone(&fatal_error);
+        let throttled = Arc::clone(&throttled);
         let range_unsupported = Arc::clone(&range_unsupported);
         let cancel_token = cancel_token.clone();
         let pause_token = pause_token.clone();
@@ -294,6 +292,12 @@ pub async fn run_parallel_download_with_options(
 
             loop {
                 if cancel_token.is_cancelled() || pause_token.is_cancelled() {
+                    break;
+                }
+                if range_unsupported.load(Ordering::Relaxed)
+                    || throttled.load(Ordering::Relaxed)
+                    || fatal_error.lock().await.is_some()
+                {
                     break;
                 }
 
@@ -335,7 +339,7 @@ pub async fn run_parallel_download_with_options(
                         let mut tbl = table.lock().await;
                         tbl.release(lease);
                         let err = CoreError::http(None, e.to_string(), None);
-                        let mut err_guard = first_error.lock().await;
+                        let mut err_guard = fatal_error.lock().await;
                         if err_guard.is_none() {
                             *err_guard = Some(err);
                         }
@@ -356,20 +360,32 @@ pub async fn run_parallel_download_with_options(
                             let status = r.status();
                             let code = status.as_u16();
                             if code == 429 || code == 503 {
-                                let prev = throttle_count
-                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                                if prev >= 1 {
-                                    // 2+ consecutive throttles: downgrade to single connection
-                                    let mut tbl = table.lock().await;
-                                    tbl.release(lease);
-                                    tracing::warn!(
-                                        "worker {worker_id}: {code} seen {} times, downgrading connections",
-                                        prev + 1
-                                    );
-                                    break None;
+                                throttled.store(true, std::sync::atomic::Ordering::Relaxed);
+                                let mut tbl = table.lock().await;
+                                tbl.release(lease);
+                                let retry_after_secs = r
+                                    .headers()
+                                    .get(reqwest::header::RETRY_AFTER)
+                                    .and_then(|v| v.to_str().ok())
+                                    .and_then(|s| s.parse::<u64>().ok());
+                                let status_text = if code == 429 {
+                                    "HTTP 429 Too Many Requests"
+                                } else {
+                                    "HTTP 503 Service Unavailable"
+                                };
+                                let err = CoreError::http(
+                                    Some(code),
+                                    status_text.to_string(),
+                                    retry_after_secs,
+                                );
+                                let mut err_guard = fatal_error.lock().await;
+                                if err_guard.is_none() {
+                                    *err_guard = Some(err);
                                 }
-                            } else if status.is_success() {
-                                throttle_count.store(0, std::sync::atomic::Ordering::Relaxed);
+                                tracing::warn!(
+                                    "worker {worker_id}: received {code}, signaling fallback to sequential"
+                                );
+                                break None;
                             }
                             if status != reqwest::StatusCode::PARTIAL_CONTENT
                                 && status != reqwest::StatusCode::OK
@@ -407,7 +423,7 @@ pub async fn run_parallel_download_with_options(
                                     ),
                                     retry_after_secs,
                                 );
-                                let mut err_guard = first_error.lock().await;
+                                let mut err_guard = fatal_error.lock().await;
                                 if err_guard.is_none() {
                                     *err_guard = Some(err);
                                 }
@@ -445,17 +461,17 @@ pub async fn run_parallel_download_with_options(
                             }
                             let mut tbl = table.lock().await;
                             tbl.release(lease);
-                            let core_err = CoreError::http(
-                                None,
-                                format!("worker {worker_id} request error: {err}"),
-                                None,
-                            );
-                            let mut err_guard = first_error.lock().await;
-                            if err_guard.is_none() {
-                                *err_guard = Some(core_err);
-                            }
                             consecutive_failures += 1;
                             if consecutive_failures >= 3 {
+                                let core_err = CoreError::http(
+                                    None,
+                                    format!("worker {worker_id} request error: {err}"),
+                                    None,
+                                );
+                                let mut err_guard = fatal_error.lock().await;
+                                if err_guard.is_none() {
+                                    *err_guard = Some(core_err);
+                                }
                                 break None;
                             }
                             tokio::time::sleep(Duration::from_millis(30)).await;
@@ -464,10 +480,10 @@ pub async fn run_parallel_download_with_options(
                     }
                 };
 
-                // If we broke out without a response (throttle downgrade or range unsupported), skip processing
+                // If we broke out without a response, stop this worker cleanly
                 let res = match res_opt {
                     Some(r) => r,
-                    None => continue,
+                    None => break,
                 };
 
                 // 3. Stream bytes and write at exact offset
@@ -509,7 +525,7 @@ pub async fn run_parallel_download_with_options(
                                                     expected_end
                                                 ),
                                             );
-                                            let mut err_guard = first_error.lock().await;
+                                            let mut err_guard = fatal_error.lock().await;
                                             if err_guard.is_none() {
                                                 *err_guard = Some(err);
                                             }
@@ -527,7 +543,7 @@ pub async fn run_parallel_download_with_options(
                                                 e,
                                                 format!("worker {worker_id} write_at"),
                                             );
-                                            let mut err_guard = first_error.lock().await;
+                                            let mut err_guard = fatal_error.lock().await;
                                             if err_guard.is_none() {
                                                 *err_guard = Some(err);
                                             }
@@ -558,12 +574,12 @@ pub async fn run_parallel_download_with_options(
                 if let Some(err) = stream_err {
                     let mut tbl = table.lock().await;
                     tbl.release(lease);
-                    let mut err_guard = first_error.lock().await;
-                    if err_guard.is_none() {
-                        *err_guard = Some(err);
-                    }
                     consecutive_failures += 1;
                     if consecutive_failures >= 3 {
+                        let mut err_guard = fatal_error.lock().await;
+                        if err_guard.is_none() {
+                            *err_guard = Some(err);
+                        }
                         break;
                     }
                     tokio::time::sleep(Duration::from_millis(30)).await;
@@ -581,18 +597,18 @@ pub async fn run_parallel_download_with_options(
                 if worker_offset != expected_end {
                     let mut tbl = table.lock().await;
                     tbl.release(lease);
-                    let err = CoreError::validation(
-                        "range",
-                        format!(
-                            "worker {worker_id} stream truncated: wrote {worker_offset} of expected {expected_end}"
-                        ),
-                    );
-                    let mut err_guard = first_error.lock().await;
-                    if err_guard.is_none() {
-                        *err_guard = Some(err);
-                    }
                     consecutive_failures += 1;
                     if consecutive_failures >= 3 {
+                        let err = CoreError::validation(
+                            "range",
+                            format!(
+                                "worker {worker_id} stream truncated: wrote {worker_offset} of expected {expected_end}"
+                            ),
+                        );
+                        let mut err_guard = fatal_error.lock().await;
+                        if err_guard.is_none() {
+                            *err_guard = Some(err);
+                        }
                         break;
                     }
                     tokio::time::sleep(Duration::from_millis(30)).await;
@@ -737,7 +753,19 @@ pub async fn run_parallel_download_with_options(
         ));
     }
 
-    let err_opt = { first_error.lock().await.take() };
+    if throttled.load(std::sync::atomic::Ordering::Relaxed) {
+        let err_opt = { fatal_error.lock().await.take() };
+        if let Some(err) = err_opt {
+            return Err(err);
+        }
+        return Err(CoreError::http(
+            Some(429),
+            "HTTP 429 Too Many Requests".to_string(),
+            None,
+        ));
+    }
+
+    let err_opt = { fatal_error.lock().await.take() };
     if let Some(err) = err_opt {
         return Err(err);
     }

@@ -311,7 +311,7 @@ mod tests {
 
     #[test]
     fn test_probe_failure_on_unreachable_endpoint() {
-        // Without an active server, engine.add probe fails and maps to add_failed
+        // Without an active server, the download task is accepted into the engine queue
         let (mut dispatcher, dl, st) = make_test_dispatcher(true);
         let resp = dispatcher.handle(Request::Download {
             url: "http://127.0.0.1:1/file.iso".to_string(),
@@ -319,8 +319,11 @@ mod tests {
             referrer: None,
         });
         match resp {
+            Response::Accepted { task_id } => {
+                assert!(!task_id.is_empty());
+            }
             Response::Error { code, .. } => assert_eq!(code, "add_failed"),
-            other => panic!("expected Error add_failed, got {other:?}"),
+            other => panic!("expected Accepted or add_failed, got {other:?}"),
         }
         cleanup_dirs(dl, st);
     }

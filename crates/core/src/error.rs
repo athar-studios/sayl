@@ -242,6 +242,15 @@ impl CoreError {
         }
     }
 
+    /// Returns the HTTP status code if this is an HTTP error.
+    #[inline]
+    pub const fn status_code(&self) -> Option<u16> {
+        match self {
+            Self::Http { status_code, .. } => *status_code,
+            _ => None,
+        }
+    }
+
     /// Returns `true` if this error represents an unrecoverable, fatal termination.
     pub fn is_fatal(&self) -> bool {
         match self {

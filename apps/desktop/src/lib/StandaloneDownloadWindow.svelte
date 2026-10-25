@@ -39,17 +39,29 @@
     }
   }
 
+  function applyActiveTheme(theme) {
+    if (theme === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+    } else if (theme === "light") {
+      document.documentElement.setAttribute("data-theme", "light");
+    } else {
+      const isOsDark =
+        typeof window !== "undefined" &&
+        window.matchMedia &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.setAttribute("data-theme", isOsDark ? "dark" : "light");
+    }
+  }
+
   onMount(async () => {
     try {
       const s = await safeInvoke("get_settings");
       if (s) {
         settings = normalizeSettings(s);
         if (s.language) setLanguage(s.language);
-        if (s.theme && s.theme !== "system") {
-          document.documentElement.setAttribute("data-theme", s.theme);
-        } else {
-          document.documentElement.removeAttribute("data-theme");
-        }
+        applyActiveTheme(s.theme);
+      } else {
+        applyActiveTheme("system");
       }
 
       const tasks = await safeInvoke("list_tasks");
@@ -60,6 +72,15 @@
           if (found.filename) {
             document.title = found.filename;
           }
+        }
+      }
+
+      if (typeof window !== "undefined" && (window.__TAURI_INTERNALS__ || window.__TAURI__)) {
+        const { getCurrentWebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+        const win = getCurrentWebviewWindow();
+        if (win) {
+          await win.show();
+          await win.setFocus();
         }
       }
 
@@ -144,7 +165,7 @@
     margin: 0;
     padding: 0;
     overflow: hidden;
-    background: #f0f0f0;
+    background: var(--color-bg, #f5f8fc);
   }
 
   .standalone-window-container {
@@ -154,16 +175,19 @@
     align-items: stretch;
     justify-content: stretch;
     box-sizing: border-box;
-    background: #f0f0f0;
+    background: var(--color-bg, #f5f8fc);
   }
 
   .standalone-window-container :global(.download-window) {
     width: 100%;
     height: 100%;
+    max-width: none;
+    max-height: none;
     border-radius: 0;
     border: none;
     box-shadow: none;
     box-sizing: border-box;
+    padding: 1rem;
   }
 
   .loading-state {

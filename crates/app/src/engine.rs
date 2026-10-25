@@ -138,26 +138,41 @@ impl Engine {
         let parsed_url =
             Url::parse(url_str).map_err(|e| CoreError::validation("url", e.to_string()))?;
 
-        // Probe the URL
+        // Probe the URL (best-effort to populate metadata; full probing and error handling runs in run_download)
         let probe_res = sayl_http::probe::probe_with_options(
             &self.inner.client,
             parsed_url.clone(),
             ProbeOptions::default(),
         )
-        .await
-        .map_err(CoreError::from)?;
+        .await;
 
-        let filename = probe_res.filename.clone().unwrap_or_else(|| {
-            sayl_http::filename::derive_filename(None, &probe_res.final_url, None)
-        });
+        let (filename, final_url, total_size, etag, last_modified, content_type) = match probe_res {
+            Ok(res) => {
+                let derived = res.filename.clone().unwrap_or_else(|| {
+                    sayl_http::filename::derive_filename(None, &res.final_url, None)
+                });
+                (
+                    derived,
+                    Some(res.final_url.to_string()),
+                    res.content_length,
+                    res.etag,
+                    res.last_modified,
+                    res.content_type,
+                )
+            }
+            Err(_) => {
+                let derived = sayl_http::filename::derive_filename(None, &parsed_url, None);
+                (derived, None, None, None, None, None)
+            }
+        };
 
         let task_id = TaskId::new();
         let mut record = TaskRecord::with_id(task_id, url_str, &self.inner.download_dir, &filename);
-        record.final_url = Some(probe_res.final_url.to_string());
-        record.total_size = probe_res.content_length;
-        record.etag = probe_res.etag.clone();
-        record.last_modified = probe_res.last_modified.clone();
-        record.content_type = probe_res.content_type.clone();
+        record.final_url = final_url;
+        record.total_size = total_size;
+        record.etag = etag;
+        record.last_modified = last_modified;
+        record.content_type = content_type;
         record.state = DownloadState::Queued;
 
         self.inner.store.upsert_task(&record)?;
@@ -192,13 +207,19 @@ impl Engine {
     /// starts downloading when the scheduler promotes it (global slot + origin permit available).
     pub async fn start(&self, task_id: TaskId) -> Result<(), CoreError> {
         // 1. Load task record
-        let record =
+        let mut record =
             self.inner.store.get_task(task_id)?.ok_or_else(|| {
                 CoreError::storage("not_found", format!("task {task_id} not found"))
             })?;
 
-        // If already terminal, reject
-        if record.state.is_terminal() {
+        // If in Failed state, allow retry! Reset the state to Queued, clear previous error fields, and proceed with download
+        if record.state == DownloadState::Failed {
+            self.remove_scheduler_id(task_id);
+            record.error = None;
+            record.error_kind = None;
+            self.transition_and_persist(&mut record, DownloadState::Queued)
+                .await?;
+        } else if record.state.is_terminal() {
             return Err(CoreError::validation(
                 "state",
                 format!("task {task_id} is in terminal state {}", record.state),
@@ -373,7 +394,21 @@ impl Engine {
                     .transition_and_persist(&mut record, DownloadState::Failed)
                     .await;
                 let core_err = CoreError::from(err);
-                record.error = Some(core_err.to_string());
+                let err_msg = match &core_err {
+                    CoreError::Http {
+                        status_code: Some(code),
+                        message,
+                        ..
+                    } => {
+                        if message.starts_with("HTTP ") {
+                            message.clone()
+                        } else {
+                            format!("HTTP {code} {message}")
+                        }
+                    }
+                    _ => core_err.to_string(),
+                };
+                record.error = Some(err_msg.clone());
                 record.error_kind = Some(core_err.error_kind().to_string());
                 let _ = self.inner.store.upsert_task(&record);
                 let _ = self
@@ -383,7 +418,7 @@ impl Engine {
                         task_id,
                         EventKind::Error,
                         EventPayload::Error {
-                            error: core_err.to_string(),
+                            error: err_msg,
                             retryable: core_err.is_retryable(),
                         },
                     )
@@ -623,11 +658,18 @@ impl Engine {
                         QueueTaskStatus::Cancelled
                     }
                     Err(err) => {
-                        // Fallback: if the server ignored Range requests (200 instead of 206),
-                        // retry with sequential single-stream download instead of failing.
-                        if err.error_kind() == "range_unsupported" {
+                        let should_fallback = err.error_kind() == "range_unsupported"
+                            || err.error_kind() == "http_429"
+                            || err.error_kind() == "http_503"
+                            || err.error_kind() == "network"
+                            || err.error_kind() == "timeout"
+                            || matches!(err.status_code(), Some(429 | 503 | 416))
+                            || matches!(err, CoreError::Io { .. })
+                            || err.to_string().to_ascii_lowercase().contains("incomplete");
+
+                        if should_fallback {
                             tracing::warn!(
-                                "parallel download unsupported (server ignores Range), falling back to sequential"
+                                "parallel download failed ({err}), falling back smoothly to sequential"
                             );
                             let seq_result = crate::sequential::run_sequential_download(
                                 &self.inner.client,
@@ -697,7 +739,21 @@ impl Engine {
                                     let _ = self
                                         .transition_and_persist(&mut record, DownloadState::Failed)
                                         .await;
-                                    record.error = Some(seq_err.to_string());
+                                    let err_msg = match &seq_err {
+                                        CoreError::Http {
+                                            status_code: Some(code),
+                                            message,
+                                            ..
+                                        } => {
+                                            if message.starts_with("HTTP ") {
+                                                message.clone()
+                                            } else {
+                                                format!("HTTP {code} {message}")
+                                            }
+                                        }
+                                        _ => seq_err.to_string(),
+                                    };
+                                    record.error = Some(err_msg.clone());
                                     record.error_kind = Some(seq_err.error_kind().to_string());
                                     let _ = self.inner.store.upsert_task(&record);
                                     let _ = self
@@ -707,7 +763,7 @@ impl Engine {
                                             task_id,
                                             EventKind::Error,
                                             EventPayload::Error {
-                                                error: seq_err.to_string(),
+                                                error: err_msg,
                                                 retryable: seq_err.is_retryable(),
                                             },
                                         )
@@ -723,7 +779,21 @@ impl Engine {
                             let _ = self
                                 .transition_and_persist(&mut record, DownloadState::Failed)
                                 .await;
-                            record.error = Some(err.to_string());
+                            let err_msg = match &err {
+                                CoreError::Http {
+                                    status_code: Some(code),
+                                    message,
+                                    ..
+                                } => {
+                                    if message.starts_with("HTTP ") {
+                                        message.clone()
+                                    } else {
+                                        format!("HTTP {code} {message}")
+                                    }
+                                }
+                                _ => err.to_string(),
+                            };
+                            record.error = Some(err_msg.clone());
                             record.error_kind = Some(err.error_kind().to_string());
                             let _ = self.inner.store.upsert_task(&record);
                             let _ = self
@@ -733,7 +803,7 @@ impl Engine {
                                     task_id,
                                     EventKind::Error,
                                     EventPayload::Error {
-                                        error: err.to_string(),
+                                        error: err_msg,
                                         retryable: err.is_retryable(),
                                     },
                                 )
@@ -807,7 +877,21 @@ impl Engine {
                         let _ = self
                             .transition_and_persist(&mut record, DownloadState::Failed)
                             .await;
-                        record.error = Some(err.to_string());
+                        let err_msg = match &err {
+                            CoreError::Http {
+                                status_code: Some(code),
+                                message,
+                                ..
+                            } => {
+                                if message.starts_with("HTTP ") {
+                                    message.clone()
+                                } else {
+                                    format!("HTTP {code} {message}")
+                                }
+                            }
+                            _ => err.to_string(),
+                        };
+                        record.error = Some(err_msg.clone());
                         record.error_kind = Some(err.error_kind().to_string());
                         let _ = self.inner.store.upsert_task(&record);
                         let _ = self
@@ -817,7 +901,7 @@ impl Engine {
                                 task_id,
                                 EventKind::Error,
                                 EventPayload::Error {
-                                    error: err.to_string(),
+                                    error: err_msg,
                                     retryable: err.is_retryable(),
                                 },
                             )

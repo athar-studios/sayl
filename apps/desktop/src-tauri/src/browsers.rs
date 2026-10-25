@@ -83,8 +83,35 @@ pub trait BrowserProbeSource {
     fn env_var(&self, name: &str) -> Option<String>;
 }
 
-/// Live production probe using the Windows filesystem and `reg.exe`.
+/// Live production probe using the Windows filesystem and direct registry reads via `winreg`.
 pub struct SystemBrowserProbe;
+
+#[cfg(target_os = "windows")]
+fn parse_reg_key(full_path: &str) -> Option<(winreg::RegKey, &str)> {
+    if let Some(sub) = full_path.strip_prefix(r"HKCU\") {
+        Some((
+            winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER),
+            sub,
+        ))
+    } else if let Some(sub) = full_path.strip_prefix(r"HKEY_CURRENT_USER\") {
+        Some((
+            winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER),
+            sub,
+        ))
+    } else if let Some(sub) = full_path.strip_prefix(r"HKLM\") {
+        Some((
+            winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE),
+            sub,
+        ))
+    } else if let Some(sub) = full_path.strip_prefix(r"HKEY_LOCAL_MACHINE\") {
+        Some((
+            winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE),
+            sub,
+        ))
+    } else {
+        None
+    }
+}
 
 impl BrowserProbeSource for SystemBrowserProbe {
     fn file_exists(&self, path: &Path) -> bool {
@@ -92,34 +119,39 @@ impl BrowserProbeSource for SystemBrowserProbe {
     }
 
     fn registry_key_exists(&self, key: &str) -> bool {
-        match std::process::Command::new("reg")
-            .args(["query", key])
-            .output()
+        #[cfg(target_os = "windows")]
         {
-            Ok(out) => out.status.success(),
-            Err(_) => false,
+            if let Some((root, subkey)) = parse_reg_key(key) {
+                root.open_subkey(subkey).is_ok()
+            } else {
+                false
+            }
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = key;
+            false
         }
     }
 
     fn registry_key_default_value(&self, key: &str) -> Option<String> {
-        let output = std::process::Command::new("reg")
-            .args(["query", key, "/ve"])
-            .output()
-            .ok()?;
-        if !output.status.success() {
-            return None;
-        }
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        for line in stdout.lines() {
-            if let Some(pos) = line.find("REG_SZ") {
-                let val = line[pos + "REG_SZ".len()..].trim();
-                let clean = val.trim_matches('"').trim();
-                if !clean.is_empty() {
-                    return Some(clean.to_string());
-                }
+        #[cfg(target_os = "windows")]
+        {
+            let (root, subkey) = parse_reg_key(key)?;
+            let regkey = root.open_subkey(subkey).ok()?;
+            let val: String = regkey.get_value("").ok()?;
+            let clean = val.trim_matches('"').trim();
+            if !clean.is_empty() {
+                Some(clean.to_string())
+            } else {
+                None
             }
         }
-        None
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = key;
+            None
+        }
     }
 
     fn env_var(&self, name: &str) -> Option<String> {
@@ -399,9 +431,14 @@ pub fn launch_browser_extensions_page<P: BrowserProbeSource>(
         }
     };
 
-    std::process::Command::new(&exe)
-        .arg(meta.extension_page_url)
-        .spawn()
+    let mut cmd = std::process::Command::new(&exe);
+    cmd.arg(meta.extension_page_url);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    cmd.spawn()
         .map_err(|e| format!("Failed to launch {} extensions page: {e}", meta.name))?;
 
     Ok(())

@@ -1,7 +1,8 @@
 <script>
-  import { t, setLanguage } from "./i18n.js";
+  import { t, currentLang, setLanguage } from "./i18n.js";
   import { safeInvoke } from "./tauri.js";
   import { DEFAULT_SETTINGS, normalizeSettings, SETTINGS_SECTIONS } from "./settings.js";
+  import iconSvg from "../assets/icon.svg";
   import {
     SUPPORTED_BROWSERS,
     BROWSER_ICONS,
@@ -38,16 +39,26 @@
   const sections = SETTINGS_SECTIONS;
 
   let wasOpen = false;
+  let prevInitialSection = initialSection;
+
   $: if (open !== wasOpen) {
     wasOpen = open;
     if (open) {
-      localSettings = normalizeSettings(settings);
+      localSettings = normalizeSettings({
+        ...settings,
+        language: $currentLang,
+        theme: settings.theme || "system",
+      });
       saveSuccess = false;
       saveError = null;
       activeSection = initialSection || "general";
-      if (activeSection === "extension") {
-        loadExtensionStatus();
-      }
+    }
+  }
+
+  $: if (open && initialSection !== prevInitialSection) {
+    prevInitialSection = initialSection;
+    if (initialSection) {
+      activeSection = initialSection;
     }
   }
 
@@ -139,7 +150,10 @@
     saveError = null;
     saveSuccess = false;
     try {
-      const payload = normalizeSettings(localSettings);
+      const payload = normalizeSettings({
+        ...settings,
+        ...localSettings,
+      });
       if (!payload.download_dir || !payload.download_dir.trim()) {
         payload.download_dir = settings.download_dir || "C:\\Users\\User\\Downloads";
       }
@@ -176,6 +190,8 @@
   function handleKeydown(e) {
     if (!open) return;
     if (e.key === "Escape" && !extensionGuideOpen) {
+      e.preventDefault();
+      e.stopPropagation();
       handleClose();
     }
   }
@@ -197,7 +213,12 @@
       <!-- Header -->
       <div class="modal-header">
         <h3 id="settings-title" class="modal-title">{$t("settings.title")}</h3>
-        <button class="close-btn" on:click={handleClose} aria-label={$t("settings.close")}>
+        <button
+          type="button"
+          class="close-btn"
+          on:click|stopPropagation|preventDefault={handleClose}
+          aria-label={$t("settings.close")}
+        >
           <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18" aria-hidden="true">
             <path
               fill-rule="evenodd"
@@ -222,7 +243,6 @@
                 e.preventDefault();
                 e.stopPropagation();
                 activeSection = sec.id;
-                if (sec.id === "extension") loadExtensionStatus();
               }}
             >
               <span>{$t(sec.labelKey)}</span>
@@ -698,7 +718,7 @@
               <h4 id="section-heading" class="section-heading">{$t("settings.aboutTitle")}</h4>
 
               <div class="about-hero">
-                <div class="about-logo-circle">سيل</div>
+                <img src={iconSvg} alt="سيل" class="about-logo-img" />
                 <div class="about-meta">
                   <h3 class="about-app-name">{$t("app.fullName")}</h3>
                   <span class="about-version">{$t("settings.version")} 0.1.0</span>
@@ -836,6 +856,8 @@
     justify-content: space-between;
     padding: 1rem 1.5rem;
     border-bottom: 1px solid var(--color-border);
+    position: relative;
+    z-index: 20;
   }
 
   .modal-title {
@@ -846,20 +868,26 @@
   }
 
   .close-btn {
-    width: 2rem;
-    height: 2rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
     color: var(--color-text-muted);
     border-radius: var(--radius-sm);
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     background: transparent;
     border: none;
     cursor: pointer;
+    position: relative;
+    z-index: 30;
+    pointer-events: auto;
+    padding: 0;
   }
 
   .close-btn:hover {
-    background: var(--color-bg-hover);
+    background: var(--color-bg-hover, rgba(0, 0, 0, 0.05));
     color: var(--color-text);
   }
 
@@ -881,6 +909,7 @@
     pointer-events: auto;
     position: relative;
     z-index: 10;
+    flex-shrink: 0;
   }
 
   .nav-tab-btn {
@@ -894,6 +923,14 @@
     font-weight: 600;
     cursor: pointer;
     transition: all 120ms ease;
+    user-select: none;
+    width: 100%;
+    display: block;
+    pointer-events: auto;
+  }
+
+  .nav-tab-btn span {
+    pointer-events: none;
   }
 
   .nav-tab-btn:hover {
@@ -1279,17 +1316,13 @@
     padding: 1rem 0;
   }
 
-  .about-logo-circle {
+  .about-logo-img {
     width: 52px;
     height: 52px;
-    border-radius: 50%;
-    background: #01b2bb;
-    color: #ffffff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.25rem;
-    font-weight: 700;
+    object-fit: contain;
+    opacity: 1;
+    filter: none;
+    flex-shrink: 0;
   }
 
   .about-app-name {

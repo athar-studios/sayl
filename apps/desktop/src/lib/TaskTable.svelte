@@ -153,6 +153,22 @@
     }
   }
 
+  const MENU_WIDTH = 220;
+  const MENU_HEIGHT = 280;
+  let emptyMenuOpen = false;
+
+  function calculatePosition(e) {
+    const isRtl = $currentLang === "ar";
+    let x;
+    if (isRtl) {
+      x = Math.max(8, Math.min(window.innerWidth - MENU_WIDTH - 8, e.clientX - MENU_WIDTH));
+    } else {
+      x = Math.max(8, Math.min(window.innerWidth - MENU_WIDTH - 8, e.clientX));
+    }
+    const y = Math.max(8, Math.min(window.innerHeight - MENU_HEIGHT - 8, e.clientY));
+    return { x, y };
+  }
+
   function handleContextMenu(e, task) {
     e.preventDefault();
     e.stopPropagation();
@@ -161,15 +177,35 @@
       dispatch("select", { id: task.id, ctrlKey: false, shiftKey: false });
     }
 
+    closeContextMenu();
     contextMenuTask = task;
-    contextMenuX = Math.min(window.innerWidth - 240, e.clientX);
-    contextMenuY = Math.min(window.innerHeight - 300, e.clientY);
+    const pos = calculatePosition(e);
+    contextMenuX = pos.x;
+    contextMenuY = pos.y;
     contextMenuOpen = true;
+  }
+
+  function handleEmptyContextMenu(e) {
+    e.preventDefault();
+    if (e.target && (e.target.closest(".grid-row") || e.target.closest(".context-menu-popup"))) {
+      return;
+    }
+    closeContextMenu();
+    const pos = calculatePosition(e);
+    contextMenuX = pos.x;
+    contextMenuY = pos.y;
+    emptyMenuOpen = true;
   }
 
   function closeContextMenu() {
     contextMenuOpen = false;
+    emptyMenuOpen = false;
     contextMenuTask = null;
+  }
+
+  function handleEmptyCtxAction(action) {
+    closeContextMenu();
+    dispatch(action);
   }
 
   function handleCtxAction(action, detail) {
@@ -188,7 +224,7 @@
   }
 
   function handleWindowKeydown(e) {
-    if (e.key === "Escape" && contextMenuOpen) {
+    if (e.key === "Escape" && (contextMenuOpen || emptyMenuOpen)) {
       closeContextMenu();
     }
   }
@@ -200,7 +236,7 @@
   class="table-container"
   role="region"
   aria-label={$t("view.table")}
-  on:contextmenu|preventDefault
+  on:contextmenu={handleEmptyContextMenu}
 >
   <table class="tasks-table">
     <thead>
@@ -632,6 +668,60 @@
     >
       <span class="ctx-label">{$t("contextMenu.properties")}</span>
       <kbd class="ctx-shortcut">Alt+Enter</kbd>
+    </button>
+  </div>
+{/if}
+
+<!-- Empty-Space Context Menu -->
+{#if emptyMenuOpen}
+  <div
+    class="context-menu-popup"
+    style="top: {contextMenuY}px; left: {contextMenuX}px;"
+    role="menu"
+    tabindex="-1"
+    on:click|stopPropagation
+    on:keydown|stopPropagation
+  >
+    <!-- Add Download -->
+    <button
+      class="ctx-item"
+      role="menuitem"
+      on:click={() => handleEmptyCtxAction("add")}
+    >
+      <span class="ctx-label">{$t("contextMenu.addDownload")}</span>
+      <kbd class="ctx-shortcut">Ctrl+N</kbd>
+    </button>
+
+    <div class="ctx-sep" role="separator"></div>
+
+    <!-- Resume All -->
+    <button
+      class="ctx-item"
+      role="menuitem"
+      on:click={() => handleEmptyCtxAction("resumeAll")}
+    >
+      <span class="ctx-label">{$t("contextMenu.resumeAll")}</span>
+    </button>
+
+    <!-- Pause All -->
+    <button
+      class="ctx-item"
+      role="menuitem"
+      on:click={() => handleEmptyCtxAction("pauseAll")}
+    >
+      <span class="ctx-label">{$t("contextMenu.pauseAll")}</span>
+    </button>
+
+    <div class="ctx-sep" role="separator"></div>
+
+    <!-- Select All -->
+    <button
+      class="ctx-item"
+      role="menuitem"
+      on:click={() => handleEmptyCtxAction("selectAll")}
+    >
+      <span class="ctx-label">{$t("contextMenu.selectAll")}</span>
+      <kbd class="ctx-shortcut">Ctrl+A</kbd>
     </button>
   </div>
 {/if}

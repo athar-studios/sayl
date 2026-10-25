@@ -376,6 +376,10 @@ pub async fn run_bridge_ping(bridge_exe: &Path) -> NativeHostPing {
     let start = std::time::Instant::now();
     let mut cmd = tokio::process::Command::new(bridge_exe);
     cmd.arg("--ping");
+    #[cfg(target_os = "windows")]
+    {
+        cmd.creation_flags(0x08000000);
+    }
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::piped());
 
@@ -416,9 +420,11 @@ pub fn open_extension_folder() -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("explorer")
-            .arg(&dir)
-            .spawn()
+        use std::os::windows::process::CommandExt;
+        let mut cmd = std::process::Command::new("explorer");
+        cmd.arg(&dir);
+        cmd.creation_flags(0x08000000);
+        cmd.spawn()
             .map_err(|e| format!("Failed to open extension directory in explorer: {e}"))?;
     }
     #[cfg(not(target_os = "windows"))]

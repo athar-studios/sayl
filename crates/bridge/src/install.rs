@@ -6,7 +6,6 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use serde::{Deserialize, Serialize};
 
@@ -192,60 +191,116 @@ pub trait RegistryOperations {
     fn key_has_default(&self, key_path: &str, expected_value: Option<&str>) -> bool;
 }
 
-/// Production implementation of [`RegistryOperations`] using Windows `reg.exe`.
+#[cfg(target_os = "windows")]
+fn parse_reg_key(full_path: &str) -> Option<(winreg::RegKey, &str)> {
+    if let Some(sub) = full_path.strip_prefix(r"HKCU\") {
+        Some((
+            winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER),
+            sub,
+        ))
+    } else if let Some(sub) = full_path.strip_prefix(r"HKEY_CURRENT_USER\") {
+        Some((
+            winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER),
+            sub,
+        ))
+    } else if let Some(sub) = full_path.strip_prefix(r"HKLM\") {
+        Some((
+            winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE),
+            sub,
+        ))
+    } else if let Some(sub) = full_path.strip_prefix(r"HKEY_LOCAL_MACHINE\") {
+        Some((
+            winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE),
+            sub,
+        ))
+    } else {
+        None
+    }
+}
+
+/// Production implementation of [`RegistryOperations`] using Windows `winreg`.
 pub struct WindowsRegistry;
 
 impl RegistryOperations for WindowsRegistry {
     fn set_key_default(&mut self, key_path: &str, value: &str) -> Result<(), String> {
-        let output = Command::new("reg")
-            .args(["add", key_path, "/ve", "/t", "REG_SZ", "/d", value, "/f"])
-            .output()
-            .map_err(|e| format!("Failed to spawn reg.exe add: {e}"))?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("reg add failed for {key_path}: {stderr}"));
+        #[cfg(target_os = "windows")]
+        {
+            let (root, subkey) = parse_reg_key(key_path)
+                .ok_or_else(|| format!("Invalid registry root in {key_path}"))?;
+            let (key, _) = root
+                .create_subkey(subkey)
+                .map_err(|e| format!("Failed to create/open registry key {key_path}: {e}"))?;
+            key.set_value("", &value)
+                .map_err(|e| format!("Failed to set default value for {key_path}: {e}"))?;
+            Ok(())
         }
-        Ok(())
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = (key_path, value);
+            Ok(())
+        }
     }
 
     fn delete_key(&mut self, key_path: &str) -> Result<(), String> {
-        let output = Command::new("reg")
-            .args(["delete", key_path, "/f"])
-            .output()
-            .map_err(|e| format!("Failed to spawn reg.exe delete: {e}"))?;
-
-        // Ignore exit code if key was already missing; only report spawn/system failure.
-        let _ = output;
-        Ok(())
+        #[cfg(target_os = "windows")]
+        {
+            if let Some((root, subkey)) = parse_reg_key(key_path) {
+                match root.delete_subkey_all(subkey) {
+                    Ok(()) => Ok(()),
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                    Err(e) => Err(format!("Failed to delete registry key {key_path}: {e}")),
+                }
+            } else {
+                Ok(())
+            }
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = key_path;
+            Ok(())
+        }
     }
 
     fn key_exists(&self, key_path: &str) -> bool {
-        match Command::new("reg").args(["query", key_path]).output() {
-            Ok(output) => output.status.success(),
-            Err(_) => false,
+        #[cfg(target_os = "windows")]
+        {
+            if let Some((root, subkey)) = parse_reg_key(key_path) {
+                root.open_subkey(subkey).is_ok()
+            } else {
+                false
+            }
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = key_path;
+            false
         }
     }
 
     fn key_has_default(&self, key_path: &str, expected_value: Option<&str>) -> bool {
-        match Command::new("reg")
-            .args(["query", key_path, "/ve"])
-            .output()
+        #[cfg(target_os = "windows")]
         {
-            Ok(output) => {
-                if !output.status.success() {
-                    return false;
+            let (root, subkey) = match parse_reg_key(key_path) {
+                Some(pair) => pair,
+                None => return false,
+            };
+            let key = match root.open_subkey(subkey) {
+                Ok(k) => k,
+                Err(_) => return false,
+            };
+            if let Some(expected) = expected_value {
+                match key.get_value::<String, _>("") {
+                    Ok(val) => val == expected,
+                    Err(_) => false,
                 }
-                if let Some(expected) = expected_value {
-                    let stdout = String::from_utf8_lossy(&output.stdout);
-                    // Standard reg query output:
-                    // (Default)    REG_SZ    <value>
-                    stdout.contains(expected)
-                } else {
-                    true
-                }
+            } else {
+                true
             }
-            Err(_) => false,
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = (key_path, expected_value);
+            false
         }
     }
 }
