@@ -9,7 +9,7 @@ export const DEFAULT_SETTINGS = {
   max_connections_per_task: 4,
   theme: "system",
   language: "ar",
-  view_mode: "cards",
+  view_mode: "table",
   sidebar_collapsed: false,
   prevent_sleep: true,
   show_download_window: true,

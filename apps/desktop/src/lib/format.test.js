@@ -1,5 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { formatBytes, formatSpeed, formatEta, formatPercent, formatBidi } from "./format.js";
+import {
+  formatBytes,
+  formatSpeed,
+  formatEta,
+  formatPercent,
+  formatBidi,
+  formatDate,
+  canPause,
+  canResume,
+  canPauseTask,
+  canResumeTask,
+} from "./format.js";
 
 describe("Formatting helpers", () => {
   describe("formatBytes", () => {
@@ -101,6 +112,53 @@ describe("Formatting helpers", () => {
       expect(res).not.toContain(")");
       expect(res).toBe("52.5٪");
       expect(res.endsWith("٪")).toBe(true);
+    });
+  });
+
+  describe("formatDate", () => {
+    it("falls back to — when date is missing or invalid", () => {
+      expect(formatDate(null)).toBe("—");
+      expect(formatDate(undefined)).toBe("—");
+      expect(formatDate("")).toBe("—");
+      expect(formatDate("invalid-date-string")).toBe("—");
+    });
+
+    it("formats ISO date strings in Arabic and English", () => {
+      const iso = "2026-03-29T12:00:00Z";
+      const arDate = formatDate(iso, "ar");
+      const enDate = formatDate(iso, "en");
+      expect(arDate).not.toBe("—");
+      expect(enDate).not.toBe("—");
+      expect(arDate).toContain("2026");
+      expect(enDate).toContain("2026");
+    });
+  });
+
+  describe("canPauseTask and canResumeTask enablement", () => {
+    it("allows pause for Queued, Probing, Downloading, Verifying, Finalizing", () => {
+      const pausable = ["Queued", "Probing", "Downloading", "Verifying", "Finalizing"];
+      for (const st of pausable) {
+        expect(canPauseTask(st)).toBe(true);
+      }
+      expect(canPauseTask("Paused")).toBe(false);
+      expect(canPauseTask("Completed")).toBe(false);
+      expect(canPauseTask("Cancelled")).toBe(false);
+    });
+
+    it("allows resume for Paused, Pausing, Failed, Queued, Cancelled", () => {
+      const resumable = ["Paused", "Pausing", "Failed", "Queued", "Cancelled"];
+      for (const st of resumable) {
+        expect(canResumeTask(st)).toBe(true);
+      }
+      expect(canResumeTask("Downloading")).toBe(false);
+      expect(canResumeTask("Completed")).toBe(false);
+    });
+
+    it("keeps backward-compatible canPause and canResume definitions", () => {
+      expect(canPause("Downloading")).toBe(true);
+      expect(canPause("Queued")).toBe(false);
+      expect(canResume("Paused")).toBe(true);
+      expect(canResume("Downloading")).toBe(false);
     });
   });
 });

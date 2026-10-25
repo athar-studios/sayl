@@ -6,8 +6,12 @@ export default {
   },
   toolbar: {
     add: "Add Download",
-    resumeAll: "Resume All",
+    resume: "Resume",
+    pause: "Pause",
     pauseAll: "Pause All",
+    delete: "Delete",
+    retry: "Retry",
+    resumeAll: "Resume All",
     openFolder: "Open Downloads",
     settings: "Settings",
     language: "العربية",
@@ -28,6 +32,11 @@ export default {
   },
   sidebar: {
     title: "Categories",
+    statusTitle: "Status",
+    active: "Active",
+    completed: "Completed",
+    paused: "Paused",
+    failed: "Failed",
     collapse: "Collapse sidebar",
     expand: "Expand sidebar",
   },
@@ -47,11 +56,14 @@ export default {
   table: {
     name: "Name",
     size: "Size",
+    status: "Status",
     progress: "Progress",
     speed: "Speed",
     eta: "Remaining",
-    status: "Status",
+    date: "Date",
     actions: "Actions",
+    retry: "Retry",
+    delete: "Delete",
   },
   duplicate: {
     title: "Download Already Exists",
@@ -63,9 +75,15 @@ export default {
   downloadWindow: {
     title: "Download Window",
     parts: "Parts",
+    connections: "Connections",
+    speed: "Speed",
+    eta: "Remaining",
+    progress: "Progress",
+    autoClose: "Close window automatically",
     openFile: "Open file",
     revealFolder: "Show in folder",
     close: "Close window",
+    retry: "Retry",
   },
   shutdown: {
     toggle: "Shut down machine when all downloads finish",
@@ -92,6 +110,9 @@ export default {
     activeTasks: "Active Tasks",
     totalSpeed: "Total Speed",
     freeSpace: "Free Space",
+    preventSleep: "Prevent Sleep",
+    autoShutdown: "Shut down when finished",
+    shutdownArmed: "Shutdown: Armed",
   },
   dialog: {
     addTitle: "Add New Download",
@@ -180,5 +201,56 @@ export default {
   toast: {
     error: "Error",
     success: "Success",
+  },
+  errors: {
+    details: "Details",
+    rate_limited: {
+      title: "Rate limit exceeded",
+      hint: "The server asked to slow down; SAYL will retry automatically.",
+    },
+    service_unavailable: {
+      title: "Service temporarily unavailable",
+      hint: "The download server is under maintenance or heavy load. Please retry later.",
+    },
+    range_unsupported: {
+      title: "Resuming not supported",
+      hint: "The server does not support byte ranges; download must restart from beginning.",
+    },
+    connection_limit: {
+      title: "Connection limit reached",
+      hint: "The server rejected concurrent connections; SAYL will reduce them and retry.",
+    },
+    network: {
+      title: "Network connection error",
+      hint: "Could not reach the server. Check your internet connection; SAYL will retry.",
+    },
+    not_found: {
+      title: "File not found (404)",
+      hint: "The requested file no longer exists at this URL.",
+    },
+    forbidden: {
+      title: "Access forbidden (403)",
+      hint: "The server denied access to this file; special permissions may be required.",
+    },
+    unauthorized: {
+      title: "Authentication required (401)",
+      hint: "This download requires valid login credentials or session tokens.",
+    },
+    disk: {
+      title: "Disk or storage error",
+      hint: "Failed to save file. Check disk space and folder write permissions.",
+    },
+    integrity: {
+      title: "Integrity check failed",
+      hint: "The downloaded file is corrupted or its size does not match expected data.",
+    },
+    canceled: {
+      title: "Download cancelled",
+      hint: "The download was stopped and cancelled.",
+    },
+    unknown: {
+      title: "Download failed",
+      hint: "An unexpected error occurred while downloading this file.",
+    },
   },
 };

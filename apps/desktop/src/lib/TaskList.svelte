@@ -8,7 +8,7 @@
   export let tasks = [];
   export let selectedId = null;
   export let totalTasksCount = 0;
-  export let viewMode = "cards"; // "cards" | "table"
+  export let viewMode = "table"; // Requirement 4: default view_mode is "table"
 
   const dispatch = createEventDispatcher();
 </script>
@@ -20,19 +20,7 @@
     <div class="empty-tab-notice">
       <p>{$t("tabs.empty")}</p>
     </div>
-  {:else if viewMode === "table"}
-    <div class="table-view-wrapper">
-      <TaskTable
-        {tasks}
-        {selectedId}
-        on:select={(e) => dispatch("select", e.detail)}
-        on:pause={(e) => dispatch("pause", e.detail)}
-        on:resume={(e) => dispatch("resume", e.detail)}
-        on:cancel={(e) => dispatch("cancel", e.detail)}
-        on:reveal={(e) => dispatch("reveal", e.detail)}
-      />
-    </div>
-  {:else}
+  {:else if viewMode === "cards"}
     <div class="task-grid" role="feed" aria-busy="false">
       {#each tasks as task (task.id)}
         <TaskCard
@@ -41,10 +29,26 @@
           on:select={(e) => dispatch("select", e.detail)}
           on:pause={(e) => dispatch("pause", e.detail)}
           on:resume={(e) => dispatch("resume", e.detail)}
+          on:retry={(e) => dispatch("retry", e.detail)}
           on:cancel={(e) => dispatch("cancel", e.detail)}
           on:reveal={(e) => dispatch("reveal", e.detail)}
+          on:openFile={(e) => dispatch("openFile", e.detail)}
         />
       {/each}
+    </div>
+  {:else}
+    <div class="table-view-wrapper">
+      <TaskTable
+        {tasks}
+        {selectedId}
+        on:select={(e) => dispatch("select", e.detail)}
+        on:pause={(e) => dispatch("pause", e.detail)}
+        on:resume={(e) => dispatch("resume", e.detail)}
+        on:retry={(e) => dispatch("retry", e.detail)}
+        on:cancel={(e) => dispatch("cancel", e.detail)}
+        on:reveal={(e) => dispatch("reveal", e.detail)}
+        on:openFile={(e) => dispatch("openFile", e.detail)}
+      />
     </div>
   {/if}
 </div>
