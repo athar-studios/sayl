@@ -92,6 +92,10 @@ jobs:
           key: release-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: release-${{ runner.os }}-
 
+      - name: Validate installer flow policies
+        shell: pwsh
+        run: pwsh -NoProfile -File tools/check-installer-flow.ps1
+
       - name: Run the release pipeline
         shell: pwsh
         run: pwsh -NoProfile -File tools/release.ps1 -Version "${{ steps.ver.outputs.version }}"

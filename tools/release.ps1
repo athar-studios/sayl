@@ -140,6 +140,7 @@ $CargoBridgeCmd = "cargo build --release -p sayl-bridge"
 $StageDir = Join-Path $DesktopDir "src-tauri\resources"
 $HostStageDir = Join-Path $StageDir "host"
 $ExtStageDir = Join-Path $StageDir "extensions\browser\chromium"
+$ExtFirefoxStageDir = Join-Path $StageDir "extensions\browser\firefox"
 
 if ($DryRun) {
     Write-Host "[DRY-RUN] Working directory: $RepoRoot" -ForegroundColor Cyan
@@ -149,6 +150,7 @@ if ($DryRun) {
     Write-Host "[DRY-RUN]   - host/com.sayl.downloader.json"
     Write-Host "[DRY-RUN]   - host/icon.ico"
     Write-Host "[DRY-RUN]   - extensions/browser/chromium/**"
+    Write-Host "[DRY-RUN]   - extensions/browser/firefox/**"
 } else {
     Push-Location $RepoRoot
     try {
@@ -170,11 +172,15 @@ if ($DryRun) {
         if (-not (Test-Path -LiteralPath $ExtStageDir)) {
             New-Item -ItemType Directory -Path $ExtStageDir -Force | Out-Null
         }
+        if (-not (Test-Path -LiteralPath $ExtFirefoxStageDir)) {
+            New-Item -ItemType Directory -Path $ExtFirefoxStageDir -Force | Out-Null
+        }
 
         Copy-Item -LiteralPath $BuiltBridgePath -Destination (Join-Path $HostStageDir "sayl-bridge.exe") -Force
         Copy-Item -LiteralPath (Join-Path $RepoRoot "extensions\browser\host\com.sayl.downloader.json") -Destination (Join-Path $HostStageDir "com.sayl.downloader.json") -Force
         Copy-Item -LiteralPath (Join-Path $RepoRoot "assets\brand\icon.ico") -Destination (Join-Path $HostStageDir "icon.ico") -Force
         Copy-Item -Path (Join-Path $RepoRoot "extensions\browser\chromium\*") -Destination $ExtStageDir -Recurse -Force
+        Copy-Item -Path (Join-Path $RepoRoot "extensions\browser\firefox\*") -Destination $ExtFirefoxStageDir -Recurse -Force
 
         # Stage release configuration overlay for Tauri CLI
         $DesktopInstallerDir = Join-Path $DesktopDir "installer"
@@ -210,7 +216,8 @@ if ($DryRun) {
         $RequiredStagedFiles = @(
             (Join-Path $DesktopDir "src-tauri\resources\host\sayl-bridge.exe"),
             (Join-Path $DesktopDir "src-tauri\resources\host\com.sayl.downloader.json"),
-            (Join-Path $DesktopDir "src-tauri\resources\extensions\browser\chromium")
+            (Join-Path $DesktopDir "src-tauri\resources\extensions\browser\chromium"),
+            (Join-Path $DesktopDir "src-tauri\resources\extensions\browser\firefox")
         )
         foreach ($staged in $RequiredStagedFiles) {
             if (-not (Test-Path -LiteralPath $staged)) {
