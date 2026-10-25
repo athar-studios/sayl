@@ -72,6 +72,19 @@ describe("Task Filtering Logic (filters.js)", () => {
       expect(matchesStateFilter("Completed", "failed")).toBe(false);
       expect(matchesStateFilter("Paused", "failed")).toBe(false);
     });
+
+    it("matches 'incomplete' (غير مكتمل) and 'queue' (قائمة الانتظار) for IDM tree branch filters", () => {
+      expect(matchesStateFilter("Downloading", "incomplete")).toBe(true);
+      expect(matchesStateFilter("Paused", "incomplete")).toBe(true);
+      expect(matchesStateFilter("Queued", "incomplete")).toBe(true);
+      expect(matchesStateFilter("Failed", "incomplete")).toBe(true);
+      expect(matchesStateFilter("Completed", "incomplete")).toBe(false);
+      expect(matchesStateFilter("Completed", "غير مكتمل")).toBe(false);
+
+      expect(matchesStateFilter("Queued", "queue")).toBe(true);
+      expect(matchesStateFilter("Queued", "قائمة الانتظار")).toBe(true);
+      expect(matchesStateFilter("Downloading", "queue")).toBe(false);
+    });
   });
 
   describe("Query matching against filename and URL", () => {

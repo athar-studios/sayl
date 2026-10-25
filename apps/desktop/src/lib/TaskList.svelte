@@ -7,13 +7,16 @@
 
   export let tasks = [];
   export let selectedId = null;
+  export let selectedIds = [];
   export let totalTasksCount = 0;
   export let viewMode = "table"; // Requirement 4: default view_mode is "table"
 
   const dispatch = createEventDispatcher();
+
+  $: isSelected = (id) => (selectedIds.length > 0 ? selectedIds.includes(id) : selectedId === id);
 </script>
 
-<div class="task-list-container">
+<div class="task-list-container" class:cards-mode={viewMode === "cards"}>
   {#if tasks.length === 0 && totalTasksCount === 0}
     <EmptyState on:add={() => dispatch("add")} />
   {:else if tasks.length === 0 && totalTasksCount > 0}
@@ -25,12 +28,13 @@
       {#each tasks as task (task.id)}
         <TaskCard
           {task}
-          selected={selectedId === task.id}
+          selected={isSelected(task.id)}
           on:select={(e) => dispatch("select", e.detail)}
           on:pause={(e) => dispatch("pause", e.detail)}
           on:resume={(e) => dispatch("resume", e.detail)}
           on:retry={(e) => dispatch("retry", e.detail)}
           on:cancel={(e) => dispatch("cancel", e.detail)}
+          on:delete={(e) => dispatch("delete", e.detail)}
           on:reveal={(e) => dispatch("reveal", e.detail)}
           on:openFile={(e) => dispatch("openFile", e.detail)}
         />
@@ -41,11 +45,13 @@
       <TaskTable
         {tasks}
         {selectedId}
+        {selectedIds}
         on:select={(e) => dispatch("select", e.detail)}
         on:pause={(e) => dispatch("pause", e.detail)}
         on:resume={(e) => dispatch("resume", e.detail)}
         on:retry={(e) => dispatch("retry", e.detail)}
         on:cancel={(e) => dispatch("cancel", e.detail)}
+        on:delete={(e) => dispatch("delete", e.detail)}
         on:reveal={(e) => dispatch("reveal", e.detail)}
         on:openFile={(e) => dispatch("openFile", e.detail)}
       />
@@ -57,9 +63,14 @@
   .task-list-container {
     flex: 1;
     overflow-y: auto;
-    padding: 1.25rem 1.5rem;
     display: flex;
     flex-direction: column;
+    height: 100%;
+    width: 100%;
+  }
+
+  .task-list-container.cards-mode {
+    padding: 1.25rem 1.5rem;
   }
 
   .task-grid {
@@ -72,9 +83,10 @@
   }
 
   .table-view-wrapper {
-    max-width: 1100px;
-    margin: 0 auto;
     width: 100%;
+    height: 100%;
+    flex: 1;
+    display: flex;
   }
 
   .empty-tab-notice {

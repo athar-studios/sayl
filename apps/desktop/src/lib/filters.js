@@ -42,6 +42,12 @@ export function matchesStateFilter(taskState, filter = "all") {
   if (f === "all" || f === "الكل") {
     return true;
   }
+  if (f === "incomplete" || f === "غير مكتمل") {
+    return taskState !== "Completed";
+  }
+  if (f === "queue" || f === "قائمة الانتظار") {
+    return taskState === "Queued";
+  }
   if (f === "active" || f === "يعمل") {
     return ACTIVE_STATES.includes(taskState);
   }
@@ -123,12 +129,20 @@ export function getStateCounts(tasks) {
     paused: 0,
     completed: 0,
     failed: 0,
+    incomplete: 0,
+    queue: 0,
   };
 
   if (!Array.isArray(tasks)) return counts;
 
   counts.all = tasks.length;
   for (const t of tasks) {
+    if (t.state !== "Completed") {
+      counts.incomplete += 1;
+    }
+    if (t.state === "Queued") {
+      counts.queue += 1;
+    }
     if (ACTIVE_STATES.includes(t.state)) {
       counts.active += 1;
     } else if (PAUSED_STATES.includes(t.state)) {

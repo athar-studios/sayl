@@ -120,9 +120,9 @@
     </div>
 
     <div class="progress-labels">
-      <span class="size-text"><bdi>{writtenFormatted}</bdi> / <bdi>{totalFormatted}</bdi></span>
+      <span class="size-text"><bdi dir="ltr">{writtenFormatted}</bdi> / <bdi dir="ltr">{totalFormatted}</bdi></span>
       {#if percentFormatted}
-        <span class="percent-text"><bdi>{percentFormatted}</bdi></span>
+        <span class="percent-text"><bdi dir="ltr">{percentFormatted}</bdi></span>
       {/if}
     </div>
   </div>
@@ -147,9 +147,9 @@
       <span class="metric-label">{$t("downloadWindow.progress")}</span>
       <span class="metric-val">
         {#if percentFormatted}
-          <bdi>{percentFormatted}</bdi>
+          <bdi dir="ltr">{percentFormatted}</bdi>
         {:else if isCompleted}
-          <bdi>{formatPercent(100, $currentLang)}</bdi>
+          <bdi dir="ltr">{formatPercent(100, $currentLang)}</bdi>
         {:else}
           <bdi>—</bdi>
         {/if}
@@ -160,7 +160,7 @@
       <span class="metric-label">{$t("downloadWindow.speed")}</span>
       <span class="metric-val">
         {#if isDownloading}
-          <bdi>{speedFormatted}</bdi>
+          <bdi dir="ltr">{speedFormatted}</bdi>
         {:else}
           <bdi>—</bdi>
         {/if}
@@ -171,7 +171,7 @@
       <span class="metric-label">{$t("downloadWindow.eta")}</span>
       <span class="metric-val">
         {#if isDownloading}
-          <bdi>{etaFormatted}</bdi>
+          <bdi dir="ltr">{etaFormatted}</bdi>
         {:else}
           <bdi>—</bdi>
         {/if}
@@ -182,7 +182,7 @@
       <span class="metric-label">{$t("downloadWindow.connections")}</span>
       <span class="metric-val">
         {#if task.connections !== null && task.connections !== undefined}
-          <bdi>{task.connections}</bdi>
+          <bdi dir="ltr">{task.connections}</bdi>
         {:else}
           <bdi>—</bdi>
         {/if}
@@ -193,7 +193,7 @@
       <span class="metric-label">{$t("downloadWindow.parts")}</span>
       <span class="metric-val">
         {#if task.parts !== null && task.parts !== undefined}
-          <bdi>{task.parts}</bdi>
+          <bdi dir="ltr">{task.parts}</bdi>
         {:else}
           <bdi>—</bdi>
         {/if}
@@ -306,19 +306,19 @@
 
         {#if allowCancel}
           <button
-            class="control-btn control-btn-danger"
-            title={$t("toolbar.delete")}
-            aria-label={$t("toolbar.delete")}
+            class="control-btn control-btn-cancel"
+            title={$t("task.cancel")}
+            aria-label={$t("task.cancel")}
             on:click={() => dispatch("cancel", task.id)}
           >
             <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true">
               <path
                 fill-rule="evenodd"
-                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
                 clip-rule="evenodd"
               />
             </svg>
-            <span>{$t("toolbar.delete")}</span>
+            <span>{$t("task.cancel")}</span>
           </button>
         {/if}
       </div>
@@ -630,7 +630,8 @@
     background-color: var(--color-accent-light);
   }
 
-  .control-btn-danger:hover {
+  .control-btn-danger:hover,
+  .control-btn-cancel:hover {
     background-color: var(--color-danger-light);
     color: var(--color-danger);
   }

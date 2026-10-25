@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from "svelte";
-  import { t, currentLang, setLanguage } from "./lib/i18n.js";
+  import { t, currentLang, setLanguage, toggleLanguage } from "./lib/i18n.js";
   import { safeInvoke, toasts, removeToast, showToast } from "./lib/tauri.js";
   import { canPauseTask, canResumeTask, formatSpeed } from "./lib/format.js";
   import { DEFAULT_SETTINGS, normalizeSettings } from "./lib/settings.js";
@@ -17,20 +17,32 @@
   } from "./lib/shutdown.js";
   import { recordInvoke, startClick, endClick } from "./lib/perf.js";
 
+  import MenuBar from "./lib/MenuBar.svelte";
   import Sidebar from "./lib/Sidebar.svelte";
   import Toolbar from "./lib/Toolbar.svelte";
   import TaskList from "./lib/TaskList.svelte";
   import AddTaskDialog from "./lib/AddTaskDialog.svelte";
   import DuplicateTaskDialog from "./lib/DuplicateTaskDialog.svelte";
+  import DeleteConfirmDialog from "./lib/DeleteConfirmDialog.svelte";
   import DownloadWindow from "./lib/DownloadWindow.svelte";
   import SettingsPanel from "./lib/SettingsPanel.svelte";
   import Splash from "./lib/Splash.svelte";
   import Tour from "./lib/Tour.svelte";
   import ExtensionGuideDialog from "./lib/ExtensionGuideDialog.svelte";
+  import logoFull from "./assets/logo-full.svg";
+  import logoWhite from "./assets/logo-white.svg";
   import { isTourCompleted, clearTourCompleted } from "./lib/tour.js";
+  import {
+    handleItemClick,
+    selectAll,
+    clearSelection,
+    moveSelection,
+  } from "./lib/selection.js";
 
   let tasks = [];
   let selectedId = null;
+  let selectedIds = [];
+  let lastAnchorId = null;
   let selectedCategory = "all";
   let selectedStateFilter = "all";
   let searchQuery = "";
@@ -39,6 +51,8 @@
   let droppedUrl = "";
   let settingsOpen = false;
   let settingsInitialSection = "general";
+  let showToolbar = true;
+  let showStatusbar = true;
 
   // Splash & Tour state
   let initialDataLoaded = false;
@@ -48,6 +62,10 @@
   // Duplicate task dialog state
   let duplicateDialogOpen = false;
   let duplicateExistingTask = null;
+
+  // Delete confirmation dialog state
+  let deleteDialogOpen = false;
+  let deleteTaskIds = [];
 
   // Floating download windows: array of task IDs
   let openDownloadWindows = [];
@@ -75,7 +93,9 @@
   }
 
   // Selected task object for Toolbar enablement (Req 1)
-  $: selectedTask = tasks.find((t) => t.id === selectedId) || null;
+  $: selectedTask = tasks.find((t) => t.id === selectedId) || (selectedIds.length === 1 ? tasks.find((t) => t.id === selectedIds[0]) : null) || null;
+  $: tasksToDelete = tasks.filter((t) => deleteTaskIds.includes(t.id));
+  $: deleteDialogFilename = tasksToDelete.length === 1 ? tasksToDelete[0].filename : "";
   $: canPauseAny = tasks.some((t) => canPauseTask(t.state));
   $: canResumeAny = tasks.some((t) => canResumeTask(t.state));
 
@@ -317,6 +337,72 @@
     }
   }
 
+  function handleSelectTask(detail) {
+    if (!detail) return;
+    if (typeof detail === "string") {
+      selectedIds = [detail];
+      selectedId = detail;
+      lastAnchorId = detail;
+    } else if (typeof detail === "object") {
+      const { id, ctrlKey, shiftKey } = detail;
+      const res = handleItemClick({
+        items: filteredTasks,
+        selectedIds,
+        clickedId: id,
+        event: { ctrlKey, shiftKey },
+        lastAnchorId,
+      });
+      selectedIds = res.selectedIds;
+      lastAnchorId = res.lastAnchorId;
+      selectedId = selectedIds[selectedIds.length - 1] || null;
+    }
+  }
+
+  function handleTriggerDelete(targetId) {
+    let idsToDelete = [];
+    if (typeof targetId === "string" && targetId) {
+      if (selectedIds.includes(targetId)) {
+        idsToDelete = [...selectedIds];
+      } else {
+        idsToDelete = [targetId];
+      }
+    } else if (selectedIds.length > 0) {
+      idsToDelete = [...selectedIds];
+    } else if (selectedId) {
+      idsToDelete = [selectedId];
+    }
+
+    if (idsToDelete.length === 0) return;
+
+    deleteTaskIds = idsToDelete;
+    deleteDialogOpen = true;
+  }
+
+  async function handleConfirmDelete(e) {
+    const { deleteFiles } = e.detail || { deleteFiles: false };
+    const ids = [...deleteTaskIds];
+    deleteDialogOpen = false;
+    deleteTaskIds = [];
+
+    const start = startClick();
+    try {
+      await invoke("delete_tasks", { ids, delete_files: deleteFiles });
+      const idSet = new Set(ids);
+      tasks = tasks.filter((t) => !idSet.has(t.id));
+      selectedIds = selectedIds.filter((id) => !idSet.has(id));
+      selectedId = selectedIds[selectedIds.length - 1] || null;
+    } catch {
+      // safeInvoke handles toast
+    } finally {
+      endClick(start, "delete-tasks");
+    }
+  }
+
+  function handleCancelDeleteDialog() {
+    deleteDialogOpen = false;
+    deleteTaskIds = [];
+  }
+
   async function handleCancelTask(id) {
     const start = startClick();
     try {
@@ -378,6 +464,27 @@
       await invoke("set_settings", { settings: full });
     } catch {
       //
+    }
+  }
+
+  function handleDeleteCompleted() {
+    const completedTasks = tasks.filter((t) => t.state === "Completed");
+    if (completedTasks.length === 0) return;
+    deleteTaskIds = completedTasks.map((t) => t.id);
+    deleteDialogOpen = true;
+  }
+
+  function handleSelectAll() {
+    selectedIds = selectAll(filteredTasks.length > 0 ? filteredTasks : tasks);
+    if (selectedIds.length > 0) {
+      selectedId = selectedIds[0];
+    }
+  }
+
+  function handleOpenProperties(id) {
+    const targetId = id || selectedId || (selectedIds.length > 0 ? selectedIds[0] : null);
+    if (targetId) {
+      handleOpenDownloadWindow(targetId);
     }
   }
 
@@ -461,6 +568,10 @@
     }
 
     if (e.key === "Escape") {
+      if (deleteDialogOpen) {
+        handleCancelDeleteDialog();
+        return;
+      }
       if (duplicateDialogOpen) {
         handleCancelDuplicateDialog();
         return;
@@ -479,23 +590,56 @@
         return;
       }
       selectedId = null;
+      selectedIds = [];
+      lastAnchorId = null;
       return;
     }
 
-    if (!isEditing && selectedId) {
-      const selectedT = tasks.find((t) => t.id === selectedId);
-      if (!selectedT) return;
+    if (!isEditing) {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
+        e.preventDefault();
+        selectedIds = selectAll(filteredTasks);
+        selectedId = selectedIds[selectedIds.length - 1] || null;
+        lastAnchorId = selectedIds[0] || null;
+        return;
+      }
 
-      if (e.code === "Space") {
-        e.preventDefault();
-        if (canPauseTask(selectedT.state)) {
-          handlePauseTask(selectedId);
-        } else if (canResumeTask(selectedT.state)) {
-          handleResumeTask(selectedId);
+      if (e.key === "Delete") {
+        if (selectedIds.length > 0 || selectedId) {
+          e.preventDefault();
+          handleTriggerDelete();
+          return;
         }
-      } else if (e.key === "Delete") {
-        e.preventDefault();
-        handleCancelTask(selectedId);
+      }
+
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        if (filteredTasks.length > 0) {
+          e.preventDefault();
+          const direction = e.key === "ArrowDown" ? "down" : "up";
+          const res = moveSelection({
+            items: filteredTasks,
+            selectedIds,
+            direction,
+            shiftKey: e.shiftKey,
+            lastAnchorId,
+          });
+          selectedIds = res.selectedIds;
+          lastAnchorId = res.lastAnchorId;
+          selectedId = res.activeId;
+          return;
+        }
+      }
+
+      if (selectedId) {
+        const selectedT = tasks.find((t) => t.id === selectedId);
+        if (selectedT && e.code === "Space") {
+          e.preventDefault();
+          if (canPauseTask(selectedT.state)) {
+            handlePauseTask(selectedId);
+          } else if (canResumeTask(selectedT.state)) {
+            handleResumeTask(selectedId);
+          }
+        }
       }
     }
   }
@@ -648,119 +792,85 @@
 <!-- Splash Screen (Req 1) -->
 <Splash ready={initialDataLoaded} />
 
-<div class="app-layout">
-  <!-- Collapsible Category & Status Sidebar (Req 2) -->
-  <Sidebar
-    collapsed={settings.sidebar_collapsed}
-    {selectedCategory}
-    {selectedStateFilter}
-    {categoryCounts}
-    statusCounts={stateCounts}
-    on:select={(e) => (selectedCategory = e.detail)}
-    on:selectState={(e) => (selectedStateFilter = e.detail)}
-    on:toggleCollapse={(e) => handleToggleSidebar(e.detail)}
-  />
-
+<div class="app-layout" role="application">
   <div class="app-content">
-    <!-- Top Toolbar (Req 1) -->
-    <Toolbar
-      {selectedTask}
-      {canPauseAny}
-      {canResumeAny}
-      theme={settings.theme}
-      {autoShutdown}
+    <!-- App Brand Header / Titlebar -->
+    <header class="app-titlebar">
+      <div class="titlebar-brand">
+        <img src={settings.theme === "dark" ? logoWhite : logoFull} alt="SAYL" class="titlebar-logo" />
+        <span class="titlebar-title">{$t("app.fullName")}</span>
+        <span class="titlebar-version">v0.1.0</span>
+      </div>
+    </header>
+
+    <!-- Classic Menu Bar (Requirement 3) -->
+    <MenuBar
+      viewMode={settings.view_mode || "table"}
+      showSidebar={!settings.sidebar_collapsed}
+      {showToolbar}
+      {showStatusbar}
+      canResumeSelected={selectedTask ? canResumeTask(selectedTask.state) : canResumeAny}
+      canPauseSelected={selectedTask ? canPauseTask(selectedTask.state) : canPauseAny}
+      hasSelected={selectedIds.length > 0 || !!selectedId}
       on:add={() => {
         droppedUrl = "";
         addDialogOpen = true;
       }}
+      on:openFolder={() => invoke("open_download_folder")}
+      on:exit={() => invoke("quit_app")}
       on:resume={() => selectedId && handleResumeTask(selectedId)}
       on:pause={() => selectedId && handlePauseTask(selectedId)}
       on:pauseAll={handlePauseAll}
-      on:delete={() => selectedId && handleCancelTask(selectedId)}
-      on:retry={() => selectedId && handleRetryTask(selectedId)}
-      on:openFolder={() => invoke("open_download_folder")}
-      on:settings={() => {
+      on:resumeAll={handleResumeAll}
+      on:delete={() => handleTriggerDelete()}
+      on:deleteCompleted={handleDeleteCompleted}
+      on:properties={() => handleOpenProperties()}
+      on:selectAll={handleSelectAll}
+      on:setViewMode={(e) => handleSetViewMode(e.detail)}
+      on:toggleSidebar={() => handleToggleSidebar(!settings.sidebar_collapsed)}
+      on:toggleToolbar={() => (showToolbar = !showToolbar)}
+      on:toggleStatusbar={() => (showStatusbar = !showStatusbar)}
+      on:toggleLanguage={toggleLanguage}
+      on:openScheduler={() => showToast("info", $t("menu.toolsSchedule"))}
+      on:openSettings={() => {
         settingsInitialSection = "general";
         settingsOpen = true;
       }}
-      on:theme={(e) => applyTheme(e.detail)}
-      on:toggleAutoShutdown={(e) => (autoShutdown = e.detail)}
+      on:startTour={handleReplayTour}
+      on:openExtensionGuide={() => (extensionGuideOpen = true)}
+      on:about={() => {
+        settingsInitialSection = "about";
+        settingsOpen = true;
+      }}
     />
 
-    <!-- Filter & Search Bar: State filter tabs, Search box, View mode toggle (Req 3) -->
-    <div id="tour-search-filter" class="filter-controls-bar">
-      <div class="state-filter-tabs" role="tablist" aria-label="Filter downloads by state">
-        {#each STATE_FILTERS as sf (sf.id)}
-          {@const count = stateCounts[sf.id] || 0}
-          <button
-            class="filter-tab-btn"
-            class:active={selectedStateFilter === sf.id}
-            role="tab"
-            aria-selected={selectedStateFilter === sf.id}
-            on:click={() => (selectedStateFilter = sf.id)}
-          >
-            <span>{$t("filter." + sf.id)}</span>
-            <span class="tab-badge" class:has-items={count > 0}><bdi>{count}</bdi></span>
-          </button>
-        {/each}
-      </div>
-
-      <div class="search-and-view-controls">
-        <div class="search-box">
-          <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" class="search-icon" aria-hidden="true">
-            <path
-              fill-rule="evenodd"
-              d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-              clip-rule="evenodd"
-            />
-          </svg>
-          <input
-            type="text"
-            class="search-input"
-            placeholder={$t("filter.searchPlaceholder")}
-            bind:value={searchQuery}
-          />
-          {#if searchQuery}
-            <button class="search-clear-btn" on:click={() => (searchQuery = "")} aria-label={$t("filter.clearSearch")}>
-              ×
-            </button>
-          {/if}
-        </div>
-
-        <div class="view-mode-toggle" role="radiogroup" aria-label={$t("settings.viewMode")}>
-          <button
-            class="view-mode-btn"
-            class:active={settings.view_mode === 'table'}
-            title={$t("view.table")}
-            aria-label={$t("view.table")}
-            aria-checked={settings.view_mode === 'table'}
-            role="radio"
-            on:click={() => handleSetViewMode("table")}
-          >
-            <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true">
-              <path
-                fill-rule="evenodd"
-                d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
-                clip-rule="evenodd"
-              />
-            </svg>
-          </button>
-          <button
-            class="view-mode-btn"
-            class:active={settings.view_mode === 'cards'}
-            title={$t("view.cards")}
-            aria-label={$t("view.cards")}
-            aria-checked={settings.view_mode === 'cards'}
-            role="radio"
-            on:click={() => handleSetViewMode("cards")}
-          >
-            <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true">
-              <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
+    <!-- Native Desktop Toolbar (Requirement 3) -->
+    {#if showToolbar}
+      <Toolbar
+        {selectedTask}
+        selectedCount={selectedIds.length}
+        {canPauseAny}
+        {canResumeAny}
+        bind:searchQuery
+        theme={settings.theme}
+        {autoShutdown}
+        on:add={() => {
+          droppedUrl = "";
+          addDialogOpen = true;
+        }}
+        on:resume={() => selectedId && handleResumeTask(selectedId)}
+        on:pause={() => selectedId && handlePauseTask(selectedId)}
+        on:pauseAll={handlePauseAll}
+        on:delete={() => handleTriggerDelete()}
+        on:deleteCompleted={handleDeleteCompleted}
+        on:schedule={() => showToast("info", $t("menu.toolsSchedule"))}
+        on:settings={() => {
+          settingsInitialSection = "general";
+          settingsOpen = true;
+        }}
+        on:search={(e) => (searchQuery = e.detail)}
+      />
+    {/if}
 
     <!-- Machine Shutdown Countdown Banner -->
     {#if shutdownArmed && shutdownSecondsLeft !== null}
@@ -777,7 +887,7 @@
           </div>
           <span class="countdown-text">
             {$t("shutdown.countdownTitle")}
-            <strong class="countdown-num"><bdi>{shutdownSecondsLeft}</bdi></strong>
+            <strong class="countdown-num"><bdi dir="ltr">{shutdownSecondsLeft}</bdi></strong>
             {$t("shutdown.secondsSuffix")}
           </span>
         </div>
@@ -787,59 +897,85 @@
       </div>
     {/if}
 
-    <!-- Main Tasks View (Default Table or Cards) (Req 4) -->
-    <main id="tour-task-area" class="app-main">
-      <TaskList
-        tasks={filteredTasks}
-        totalTasksCount={tasks.length}
-        {selectedId}
-        viewMode={settings.view_mode || "table"}
-        on:add={() => {
-          droppedUrl = "";
-          addDialogOpen = true;
-        }}
-        on:select={(e) => (selectedId = e.detail)}
-        on:pause={(e) => handlePauseTask(e.detail)}
-        on:resume={(e) => handleResumeTask(e.detail)}
-        on:retry={(e) => handleRetryTask(e.detail)}
-        on:cancel={(e) => handleCancelTask(e.detail)}
-        on:reveal={(e) => handleRevealTask(e.detail)}
-        on:openFile={(e) => handleOpenFileTask(e.detail)}
-      />
-    </main>
-
-    <!-- Bottom Status Bar (Req 6) -->
-    <footer class="app-summary-bar">
-      <div class="summary-metric">
-        <span class="metric-label">{$t("summary.activeTasks")}:</span>
-        <strong class="metric-value"><bdi>{activeTasksCount}</bdi></strong>
-      </div>
-
-      <span class="summary-divider" aria-hidden="true">•</span>
-
-      <div class="summary-metric">
-        <span class="metric-label">{$t("summary.totalSpeed")}:</span>
-        <strong class="metric-value"><bdi>{formatSpeed(totalSpeedBps, $currentLang)}</bdi></strong>
-      </div>
-
-      {#if settings.prevent_sleep && activeTasksCount > 0}
-        <span class="summary-divider" aria-hidden="true">•</span>
-        <div class="summary-indicator indicator-prevent-sleep" title={$t("summary.preventSleep")}>
-          <span class="indicator-dot"></span>
-          <span class="indicator-label">{$t("summary.preventSleep")}</span>
-        </div>
+    <!-- Main Workspace Area: Category Tree + Tasks Grid -->
+    <div class="app-workspace">
+      {#if !settings.sidebar_collapsed}
+        <Sidebar
+          collapsed={settings.sidebar_collapsed}
+          {selectedCategory}
+          {selectedStateFilter}
+          {categoryCounts}
+          statusCounts={stateCounts}
+          on:select={(e) => (selectedCategory = e.detail)}
+          on:selectState={(e) => (selectedStateFilter = e.detail)}
+          on:toggleCollapse={(e) => handleToggleSidebar(e.detail)}
+        />
       {/if}
 
-      {#if autoShutdown}
-        <span class="summary-divider" aria-hidden="true">•</span>
-        <div class="summary-indicator indicator-shutdown" class:armed={shutdownArmed}>
-          <span class="indicator-dot"></span>
-          <span class="indicator-label">
-            {shutdownArmed ? $t("summary.shutdownArmed") : $t("summary.autoShutdown")}
-          </span>
+      <main id="tour-task-area" class="app-main">
+        <TaskList
+          tasks={filteredTasks}
+          totalTasksCount={tasks.length}
+          {selectedId}
+          {selectedIds}
+          viewMode={settings.view_mode || "table"}
+          on:add={() => {
+            droppedUrl = "";
+            addDialogOpen = true;
+          }}
+          on:select={(e) => handleSelectTask(e.detail)}
+          on:pause={(e) => handlePauseTask(e.detail)}
+          on:resume={(e) => handleResumeTask(e.detail)}
+          on:retry={(e) => handleRetryTask(e.detail)}
+          on:cancel={(e) => handleCancelTask(e.detail)}
+          on:delete={(e) => handleTriggerDelete(e.detail)}
+          on:reveal={(e) => handleRevealTask(e.detail)}
+          on:openFile={(e) => handleOpenFileTask(e.detail)}
+          on:properties={(e) => handleOpenProperties(e.detail)}
+        />
+      </main>
+    </div>
+
+    <!-- Multi-pane Status Bar (Requirement 5) -->
+    {#if showStatusbar}
+      <footer class="app-statusbar app-summary-bar" id="tour-status-bar" role="status">
+        <!-- Panel 1: المهام النشطة: X من Y -->
+        <div class="status-pane panel-active">
+          <span>{$t("statusbar.activeTasks").replace("{active}", String(activeTasksCount)).replace("{total}", String(tasks.length))}</span>
         </div>
-      {/if}
-    </footer>
+
+        <!-- Panel 2: السرعة الإجمالية: XX.X MB/s -->
+        <div class="status-pane panel-speed">
+          <span>{$t("statusbar.totalSpeed")}</span>
+          <span class="speed-indicator"><bdi dir="ltr">{formatSpeed(totalSpeedBps, $currentLang)}</bdi></span>
+        </div>
+
+        <!-- Panel 3: المساحة الحرة على C: XXX GB -->
+        <div class="status-pane panel-disk">
+          <span>{$t("statusbar.diskSpace").replace("{space}", "")}<bdi dir="ltr">142.8 GB</bdi></span>
+        </div>
+
+        <!-- Panel 4: متصل (المضيف الأصلي نشط) -->
+        <div class="status-pane panel-bridge status-pane-flex">
+          <span class="bridge-indicator-dot" aria-hidden="true"></span>
+          <span>{$t("statusbar.bridgeConnected")}</span>
+        </div>
+
+        {#if settings.prevent_sleep && activeTasksCount > 0}
+          <div class="status-pane status-indicator" title={$t("summary.preventSleep")}>
+            <span class="indicator-dot dot-sleep"></span>
+            <span>{$t("summary.preventSleep")}</span>
+          </div>
+        {/if}
+
+        {#if autoShutdown}
+          <div class="status-pane status-indicator" class:armed={shutdownArmed}>
+            <span class="indicator-dot dot-shutdown"></span>
+            <span>{shutdownArmed ? $t("summary.shutdownArmed") : $t("summary.autoShutdown")}</span>
+          </div>
+        {/if}
+      </footer>
+    {/if}
   </div>
 
   <!-- Add Task Dialog -->
@@ -860,6 +996,15 @@
     on:openExisting={(e) => handleOpenExistingTask(e.detail)}
     on:downloadAgain={(e) => handleDownloadAgain(e.detail)}
     on:cancel={handleCancelDuplicateDialog}
+  />
+
+  <!-- Delete Confirmation Dialog (IDM style) -->
+  <DeleteConfirmDialog
+    open={deleteDialogOpen}
+    count={deleteTaskIds.length}
+    filename={deleteDialogFilename}
+    on:confirm={handleConfirmDelete}
+    on:cancel={handleCancelDeleteDialog}
   />
 
   <!-- Settings Panel -->
@@ -947,148 +1092,6 @@
     overflow: hidden;
   }
 
-  .filter-controls-bar {
-    background-color: var(--color-bg-card);
-    border-bottom: 1px solid var(--color-border);
-    padding: 0.35rem 1.25rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-    flex-shrink: 0;
-  }
-
-  .state-filter-tabs {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-  }
-
-  .filter-tab-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.825rem;
-    font-weight: 600;
-    color: var(--color-text-muted);
-    border-bottom: 2px solid transparent;
-    border-radius: 0;
-    white-space: nowrap;
-    transition: color var(--transition-normal), border-color var(--transition-normal);
-    cursor: pointer;
-  }
-
-  .filter-tab-btn:hover {
-    color: var(--color-text);
-  }
-
-  .filter-tab-btn.active {
-    color: var(--color-accent);
-    border-bottom-color: var(--color-accent);
-  }
-
-  .tab-badge {
-    font-size: 0.7rem;
-    font-weight: 700;
-    padding: 0.05rem 0.4rem;
-    border-radius: var(--radius-full);
-    background-color: var(--color-bg-alt);
-    color: var(--color-text-muted);
-  }
-
-  .filter-tab-btn.active .tab-badge.has-items {
-    background-color: var(--color-accent-light);
-    color: var(--color-accent);
-  }
-
-  .search-and-view-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-  }
-
-  .search-box {
-    position: relative;
-    display: flex;
-    align-items: center;
-    min-width: 220px;
-    max-width: 320px;
-  }
-
-  .search-icon {
-    position: absolute;
-    inset-inline-start: 0.65rem;
-    color: var(--color-text-subtle);
-    pointer-events: none;
-  }
-
-  .search-input {
-    width: 100%;
-    padding: 0.35rem 1.85rem 0.35rem 2rem;
-    font-size: 0.8rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    background-color: var(--color-bg-alt);
-    color: var(--color-text);
-    transition: border-color var(--transition-normal), background-color var(--transition-normal);
-  }
-
-  .search-input:focus {
-    outline: none;
-    border-color: var(--color-border-focus);
-    background-color: var(--color-bg-card);
-  }
-
-  .search-clear-btn {
-    position: absolute;
-    inset-inline-end: 0.45rem;
-    background: transparent;
-    color: var(--color-text-muted);
-    font-size: 1.1rem;
-    line-height: 1;
-    padding: 0.1rem 0.25rem;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-
-  .search-clear-btn:hover {
-    color: var(--color-text);
-  }
-
-  .view-mode-toggle {
-    display: flex;
-    align-items: center;
-    background-color: var(--color-bg-alt);
-    padding: 0.15rem;
-    border-radius: var(--radius-sm);
-    gap: 0.15rem;
-  }
-
-  .view-mode-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.85rem;
-    height: 1.85rem;
-    border-radius: var(--radius-sm);
-    color: var(--color-text-muted);
-    background: transparent;
-    transition: background-color var(--transition-normal), color var(--transition-normal);
-    cursor: pointer;
-  }
-
-  .view-mode-btn:hover {
-    color: var(--color-text);
-  }
-
-  .view-mode-btn.active {
-    background-color: var(--color-bg-card);
-    color: var(--color-accent);
-    box-shadow: var(--shadow-sm);
-  }
-
   /* Machine Shutdown Countdown Banner */
   .shutdown-countdown-banner {
     background: linear-gradient(135deg, rgba(220, 38, 38, 0.15), rgba(11, 26, 78, 0.25));
@@ -1130,74 +1133,154 @@
     filter: brightness(1.1);
   }
 
+  .app-titlebar {
+    height: 30px;
+    background: #f9f9fb;
+    border-bottom: 1px solid #e5e5e5;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    user-select: none;
+    -webkit-user-select: none;
+    flex-shrink: 0;
+  }
+
+  :global([data-theme="dark"]) .app-titlebar {
+    background: #070f2e;
+    border-bottom-color: #162b6e;
+  }
+
+  .titlebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .titlebar-logo {
+    width: 18px;
+    height: 18px;
+  }
+
+  .titlebar-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #0b1a4e;
+  }
+
+  :global([data-theme="dark"]) .titlebar-title {
+    color: #f1f5f9;
+  }
+
+  .titlebar-version {
+    font-size: 11px;
+    color: #6b7280;
+  }
+
+  :global([data-theme="dark"]) .titlebar-version {
+    color: #94a3b8;
+  }
+
+  .app-workspace {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+    background: #ffffff;
+  }
+
+  :global([data-theme="dark"]) .app-workspace {
+    background: #070f2e;
+  }
+
   .app-main {
     flex: 1;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-width: 0;
   }
 
-  /* Bottom Summary Bar (Req 6) */
-  .app-summary-bar {
-    height: 2.25rem;
-    background-color: var(--color-bg-card);
-    border-top: 1px solid var(--color-border);
+  /* Multi-pane Sunken Status Bar (Requirement 5) */
+  .app-statusbar {
+    height: 24px;
+    background: #f6f7f9;
+    border-top: 1px solid #dcdcdc;
     display: flex;
     align-items: center;
-    justify-content: center;
-    padding: 0 1.25rem;
-    gap: 1rem;
-    font-size: 0.775rem;
-    color: var(--color-text-muted);
+    padding: 0 4px;
+    gap: 2px;
+    font-size: 11.5px;
+    color: #4b5563;
     flex-shrink: 0;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
-  .summary-metric {
-    display: inline-flex;
+  :global([data-theme="dark"]) .app-statusbar {
+    background: #09143c;
+    border-top-color: #162b6e;
+    color: #cbd5e1;
+  }
+
+  .status-pane {
+    display: flex;
     align-items: center;
-    gap: 0.35rem;
+    padding: 0 8px;
+    border-inline-end: 1px solid #dcdcdc;
+    height: 18px;
+    gap: 6px;
+    white-space: nowrap;
+    font-size: 11.5px;
   }
 
-  .metric-label {
-    color: var(--color-text-subtle);
+  :global([data-theme="dark"]) .status-pane {
+    border-inline-end-color: #162b6e;
   }
 
-  .metric-value {
-    color: var(--color-text);
+  .status-pane-flex {
+    flex: 1;
+  }
+
+  .speed-indicator {
+    color: #008f95;
     font-weight: 700;
   }
 
-  .summary-divider {
-    color: var(--color-border);
+  :global([data-theme="dark"]) .speed-indicator {
+    color: #00b6bd;
   }
 
-  /* Status Bar Indicators */
-  .summary-indicator {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    font-size: 0.75rem;
+  .bridge-indicator-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #16a34a;
+    display: inline-block;
+  }
+
+  .status-indicator {
     font-weight: 600;
   }
 
-  .indicator-prevent-sleep {
+  .dot-sleep {
     color: var(--state-running, #00b6bd);
   }
 
-  .indicator-shutdown {
+  .dot-shutdown {
     color: var(--state-paused, #d97706);
   }
 
-  .indicator-shutdown.armed {
+  .status-indicator.armed {
     color: var(--state-failed, #dc2626);
     animation: pulse-armed 1.5s infinite;
   }
 
   .indicator-dot {
-    width: 0.45rem;
-    height: 0.45rem;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     background-color: currentColor;
+    display: inline-block;
   }
 
   @keyframes pulse-armed {
@@ -1290,15 +1373,11 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .filter-tab-btn,
-    .view-mode-btn {
-      transition: none !important;
-    }
     .toast-item,
     .shutdown-countdown-banner {
       animation: none !important;
     }
-    .indicator-shutdown.armed {
+    .status-indicator.armed {
       animation: none !important;
     }
   }

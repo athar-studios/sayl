@@ -5,6 +5,7 @@ import {
   formatEta,
   formatPercent,
   formatBidi,
+  formatLtr,
   formatDate,
   canPause,
   canResume,
@@ -16,9 +17,9 @@ describe("Formatting helpers", () => {
   describe("formatBytes", () => {
     it("handles zero and negative bytes", () => {
       expect(formatBytes(0, "en")).toBe("0 B");
-      expect(formatBytes(0, "ar")).toBe("0 بايت");
+      expect(formatBytes(0, "ar")).toBe("0 B");
       expect(formatBytes(-10, "en")).toBe("0 B");
-      expect(formatBytes(-10, "ar")).toBe("0 بايت");
+      expect(formatBytes(-10, "ar")).toBe("0 B");
     });
 
     it("handles null and undefined gracefully", () => {
@@ -32,25 +33,25 @@ describe("Formatting helpers", () => {
       expect(formatBytes(2147483648, "en")).toBe("2.0 GB");
     });
 
-    it("formats KB, MB, and GB properly in Arabic using standard Arabic units (كيلو / ميجا / جيجا)", () => {
-      expect(formatBytes(1024, "ar")).toBe("1.0 كيلو");
-      expect(formatBytes(5242880, "ar")).toBe("5.0 ميجا");
-      expect(formatBytes(2147483648, "ar")).toBe("2.0 جيجا");
+    it("formats KB, MB, and GB properly in Arabic using standard technical units (KB / MB / GB)", () => {
+      expect(formatBytes(1024, "ar")).toBe("1.0 KB");
+      expect(formatBytes(5242880, "ar")).toBe("5.0 MB");
+      expect(formatBytes(2147483648, "ar")).toBe("2.0 GB");
     });
   });
 
   describe("formatSpeed", () => {
     it("handles zero or empty speeds", () => {
       expect(formatSpeed(0, "en")).toBe("0 B/s");
-      expect(formatSpeed(null, "ar")).toBe("0 بايت/ث");
+      expect(formatSpeed(null, "ar")).toBe("0 B/s");
     });
 
     it("formats speeds with appropriate units in English and Arabic", () => {
       expect(formatSpeed(1024, "en")).toBe("1.0 KB/s");
       expect(formatSpeed(2621440, "en")).toBe("2.5 MB/s");
-      expect(formatSpeed(1024, "ar")).toBe("1.0 كيلو/ث");
-      expect(formatSpeed(2621440, "ar")).toBe("2.5 ميجا/ث");
-      expect(formatSpeed(1073741824, "ar")).toBe("1.0 جيجا/ث");
+      expect(formatSpeed(1024, "ar")).toBe("1.0 KB/s");
+      expect(formatSpeed(2621440, "ar")).toBe("2.5 MB/s");
+      expect(formatSpeed(1073741824, "ar")).toBe("1.0 GB/s");
     });
   });
 
@@ -78,11 +79,11 @@ describe("Formatting helpers", () => {
   });
 
   describe("formatPercent", () => {
-    it("renders percent in Arabic with Arabic percent symbol ٪ and no parentheses", () => {
-      expect(formatPercent(52.5, "ar")).toBe("52.5٪");
-      expect(formatPercent(100, "ar")).toBe("100٪");
-      expect(formatPercent(0, "ar")).toBe("0٪");
-      expect(formatPercent(75.33, "ar")).toBe("75.3٪");
+    it("renders percent in Arabic with standard percent symbol % and no parentheses", () => {
+      expect(formatPercent(52.5, "ar")).toBe("52.5%");
+      expect(formatPercent(100, "ar")).toBe("100%");
+      expect(formatPercent(0, "ar")).toBe("0%");
+      expect(formatPercent(75.33, "ar")).toBe("75.3%");
     });
 
     it("renders percent in English with % and no parentheses", () => {
@@ -100,18 +101,23 @@ describe("Formatting helpers", () => {
 
   describe("RTL safety and bidi isolate", () => {
     it("wraps mixed runs in Unicode isolate characters for RTL safety", () => {
-      const wrapped = formatBidi("52.5٪");
-      expect(wrapped).toBe("\u206852.5٪\u2069");
+      const wrapped = formatBidi("52.5%");
+      expect(wrapped).toBe("\u206852.5%\u2069");
       expect(formatBidi(null)).toBe("");
       expect(formatBidi("")).toBe("");
+
+      const ltrWrapped = formatLtr("14.2 MB/s");
+      expect(ltrWrapped).toBe("\u206614.2 MB/s\u2069");
+      expect(formatLtr(null)).toBe("");
+      expect(formatLtr("")).toBe("");
     });
 
-    it("ensures Arabic percent does not include latin brackets or incorrect order", () => {
+    it("ensures percent formatting does not include brackets and maintains LTR isolation order", () => {
       const res = formatPercent(52.5, "ar");
       expect(res).not.toContain("(");
       expect(res).not.toContain(")");
-      expect(res).toBe("52.5٪");
-      expect(res.endsWith("٪")).toBe(true);
+      expect(res).toBe("52.5%");
+      expect(res.endsWith("%")).toBe(true);
     });
   });
 

@@ -6,6 +6,16 @@ const dictionaries = { ar, en };
 
 export const currentLang = writable("ar");
 
+if (typeof window !== "undefined" && window.location?.search) {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const l = params.get("lang");
+    if (l === "en" || l === "ar") {
+      setLanguage(l);
+    }
+  } catch {}
+}
+
 export function setLanguage(lang) {
   if (lang !== "ar" && lang !== "en") {
     lang = "ar";

@@ -53,31 +53,106 @@ export async function safeInvoke(command, args = {}) {
 /**
  * Safe mock state for local browser development/preview.
  */
-const mockTasks = [
+export let mockTasks = [
   {
     id: "01900000-0000-7000-8000-000000000001",
     url: "https://releases.ubuntu.com/24.04/ubuntu-24.04-desktop-amd64.iso",
     filename: "ubuntu-24.04-desktop-amd64.iso",
     state: "Downloading",
-    total_size: 6100000000,
-    written: 3200000000,
-    speed_bps: 14500000,
-    eta_secs: 200,
+    total_size: 6228000000,
+    written: 3985000000,
+    speed_bps: 14889779,
+    eta_secs: 258,
     error: null,
     mime: "application/x-iso9660-image",
+    created_at: new Date(Date.now() - 3600000).toISOString(),
     parts: 8,
   },
   {
     id: "01900000-0000-7000-8000-000000000002",
-    url: "https://example.com/archive.zip",
-    filename: "archive.zip",
+    url: "https://example.com/node-v20.18.0-x64.msi",
+    filename: "Node-v20.18.0-x64.msi",
+    state: "Downloading",
+    total_size: 32925286,
+    written: 26998734,
+    speed_bps: 3250585,
+    eta_secs: 8,
+    error: null,
+    mime: "application/x-msi",
+    created_at: new Date(Date.now() - 1800000).toISOString(),
+    parts: 4,
+  },
+  {
+    id: "01900000-0000-7000-8000-000000000003",
+    url: "https://example.com/win32-x64-user/stable/VSCodeUserSetup.exe",
+    filename: "VSCodeUserSetup-x64-1.94.2.exe",
+    state: "Paused",
+    total_size: 103284736,
+    written: 46478131,
+    speed_bps: 0,
+    eta_secs: null,
+    error: null,
+    mime: "application/x-msdownload",
+    created_at: new Date(Date.now() - 7200000).toISOString(),
+    parts: 4,
+  },
+  {
+    id: "01900000-0000-7000-8000-000000000004",
+    url: "https://example.com/archive-backup-2026.zip",
+    filename: "archive-backup-2026.zip",
     state: "Completed",
-    total_size: 250000000,
-    written: 250000000,
+    total_size: 256901120,
+    written: 256901120,
     speed_bps: 0,
     eta_secs: null,
     error: null,
     mime: "application/zip",
+    created_at: new Date(Date.now() - 86400000).toISOString(),
+    completed_at: new Date(Date.now() - 85000000).toISOString(),
+    parts: 4,
+  },
+  {
+    id: "01900000-0000-7000-8000-000000000005",
+    url: "https://sayl.site/releases/SAYL-Setup-x64-0.1.0.exe",
+    filename: "sayl-desktop-setup-v0.1.0.exe",
+    state: "Completed",
+    total_size: 6522100,
+    written: 6522100,
+    speed_bps: 0,
+    eta_secs: null,
+    error: null,
+    mime: "application/x-msdownload",
+    created_at: new Date(Date.now() - 172800000).toISOString(),
+    completed_at: new Date(Date.now() - 172700000).toISOString(),
+    parts: 2,
+  },
+  {
+    id: "01900000-0000-7000-8000-000000000006",
+    url: "https://example.com/specification-v3-final.pdf",
+    filename: "specification-v3-final.pdf",
+    state: "Completed",
+    total_size: 14889779,
+    written: 14889779,
+    speed_bps: 0,
+    eta_secs: null,
+    error: null,
+    mime: "application/pdf",
+    created_at: new Date(Date.now() - 259200000).toISOString(),
+    completed_at: new Date(Date.now() - 259100000).toISOString(),
+    parts: 1,
+  },
+  {
+    id: "01900000-0000-7000-8000-000000000007",
+    url: "https://example.com/debian-12.7.0-amd64-netinst.iso",
+    filename: "debian-12.7.0-amd64-netinst.iso",
+    state: "Queued",
+    total_size: 671088640,
+    written: 0,
+    speed_bps: 0,
+    eta_secs: null,
+    error: null,
+    mime: "application/x-iso9660-image",
+    created_at: new Date().toISOString(),
     parts: 4,
   },
 ];
@@ -166,6 +241,20 @@ function handleBrowserMock(command, args) {
         task.state = "Cancelled";
         task.speed_bps = 0;
         task.eta_secs = null;
+      }
+      return null;
+    }
+
+    case "delete_tasks": {
+      const rawIds = Array.isArray(args.ids) ? args.ids : (args.id ? [args.id] : []);
+      const idSet = new Set(rawIds);
+      mockTasks = mockTasks.filter((t) => !idSet.has(t.id));
+      return Array.from(idSet);
+    }
+
+    case "delete_task": {
+      if (args.id) {
+        mockTasks = mockTasks.filter((t) => t.id !== args.id);
       }
       return null;
     }

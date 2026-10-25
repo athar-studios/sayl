@@ -17,7 +17,7 @@
 
 <br>
 
-<img src="docs/ui-mockups/01-main-light-ar.png" alt="واجهة برنامج سيل الرئيسية" width="880">
+<img src="docs/screenshots/main-window-ar.png" alt="واجهة برنامج سيل الرئيسية" width="880">
 
 </div>
 

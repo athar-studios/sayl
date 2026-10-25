@@ -8,75 +8,393 @@
     formatDate,
     canPauseTask,
     canResumeTask,
-    canCancel,
   } from "./format.js";
   import { friendlyError } from "./errors.js";
-  import StatusPill from "./StatusPill.svelte";
-  import { createEventDispatcher } from "svelte";
+  import { createEventDispatcher, onMount } from "svelte";
 
   export let tasks = [];
   export let selectedId = null;
+  export let selectedIds = [];
 
   const dispatch = createEventDispatcher();
+
+  const STORAGE_WIDTHS_KEY = "sayl_col_widths_v2";
+
+  // Default widths in px
+  const DEFAULT_WIDTHS = {
+    name: 260,
+    size: 90,
+    status: 180,
+    eta: 90,
+    speed: 100,
+    date: 130,
+    desc: 220,
+  };
+
+  let colWidths = { ...DEFAULT_WIDTHS };
+
+  // Sorting
+  let sortColumn = "date";
+  let sortDirection = "desc"; // 'asc' | 'desc'
+
+  // Context Menu state
+  let contextMenuOpen = false;
+  let contextMenuX = 0;
+  let contextMenuY = 0;
+  let contextMenuTask = null;
+
+  // Column Resizing state
+  let isResizing = false;
+  let resizingCol = null;
+  let startX = 0;
+  let startWidth = 0;
+
+  onMount(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_WIDTHS_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === "object") {
+          colWidths = { ...DEFAULT_WIDTHS, ...parsed };
+        }
+      }
+    } catch {}
+  });
+
+  function saveColWidths() {
+    try {
+      localStorage.setItem(STORAGE_WIDTHS_KEY, JSON.stringify(colWidths));
+    } catch {}
+  }
+
+  function startResize(e, colKey) {
+    e.preventDefault();
+    e.stopPropagation();
+    isResizing = true;
+    resizingCol = colKey;
+    startX = e.clientX;
+    startWidth = colWidths[colKey] || DEFAULT_WIDTHS[colKey];
+
+    window.addEventListener("mousemove", handleResizeMove);
+    window.addEventListener("mouseup", handleResizeEnd);
+  }
+
+  function handleResizeMove(e) {
+    if (!isResizing || !resizingCol) return;
+    const isRtl = $currentLang === "ar";
+    const delta = isRtl ? startX - e.clientX : e.clientX - startX;
+    const newWidth = Math.max(50, startWidth + delta);
+    colWidths[resizingCol] = newWidth;
+  }
+
+  function handleResizeEnd() {
+    if (isResizing) {
+      isResizing = false;
+      resizingCol = null;
+      window.removeEventListener("mousemove", handleResizeMove);
+      window.removeEventListener("mouseup", handleResizeEnd);
+      saveColWidths();
+    }
+  }
+
+  function handleSort(colKey) {
+    if (sortColumn === colKey) {
+      sortDirection = sortDirection === "asc" ? "desc" : "asc";
+    } else {
+      sortColumn = colKey;
+      sortDirection = colKey === "date" || colKey === "size" ? "desc" : "asc";
+    }
+  }
+
+  $: isRowSelected = (id) => (selectedIds.length > 0 ? selectedIds.includes(id) : selectedId === id);
 
   function getPercent(task) {
     if (!task.total_size || task.total_size <= 0) return null;
     return Math.min(100, Math.max(0, Math.round((task.written / task.total_size) * 1000) / 10));
   }
+
+  // Sorted tasks
+  $: sortedTasks = [...tasks].sort((a, b) => {
+    let cmp = 0;
+    if (sortColumn === "name") {
+      cmp = (a.filename || "").localeCompare(b.filename || "");
+    } else if (sortColumn === "size") {
+      cmp = (a.total_size || 0) - (b.total_size || 0);
+    } else if (sortColumn === "status") {
+      const pctA = getPercent(a) ?? -1;
+      const pctB = getPercent(b) ?? -1;
+      cmp = pctA !== pctB ? pctA - pctB : (a.state || "").localeCompare(b.state || "");
+    } else if (sortColumn === "eta") {
+      cmp = (a.eta_secs || 0) - (b.eta_secs || 0);
+    } else if (sortColumn === "speed") {
+      cmp = (a.speed_bps || 0) - (b.speed_bps || 0);
+    } else if (sortColumn === "date") {
+      const dateA = new Date(a.completed_at || a.created_at || 0).getTime();
+      const dateB = new Date(b.completed_at || b.created_at || 0).getTime();
+      cmp = dateA - dateB;
+    }
+    return sortDirection === "asc" ? cmp : -cmp;
+  });
+
+  function handleRowClick(e, task) {
+    closeContextMenu();
+    dispatch("select", {
+      id: task.id,
+      ctrlKey: e.ctrlKey || e.metaKey,
+      shiftKey: e.shiftKey,
+    });
+  }
+
+  function handleRowDblClick(e, task) {
+    if (task.state === "Completed") {
+      dispatch("openFile", task.id);
+    } else {
+      dispatch("reveal", task.id);
+    }
+  }
+
+  function handleContextMenu(e, task) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!isRowSelected(task.id)) {
+      dispatch("select", { id: task.id, ctrlKey: false, shiftKey: false });
+    }
+
+    contextMenuTask = task;
+    contextMenuX = Math.min(window.innerWidth - 240, e.clientX);
+    contextMenuY = Math.min(window.innerHeight - 300, e.clientY);
+    contextMenuOpen = true;
+  }
+
+  function closeContextMenu() {
+    contextMenuOpen = false;
+    contextMenuTask = null;
+  }
+
+  function handleCtxAction(action, detail) {
+    const task = contextMenuTask;
+    closeContextMenu();
+    if (!task) return;
+
+    if (action === "copyUrl") {
+      if (task.url && navigator?.clipboard) {
+        navigator.clipboard.writeText(task.url);
+      }
+      return;
+    }
+
+    dispatch(action, detail ?? task.id);
+  }
+
+  function handleWindowKeydown(e) {
+    if (e.key === "Escape" && contextMenuOpen) {
+      closeContextMenu();
+    }
+  }
 </script>
 
-<div class="table-container" role="region" aria-label={$t("view.table")}>
+<svelte:window on:keydown={handleWindowKeydown} on:click={closeContextMenu} />
+
+<div
+  class="table-container"
+  role="region"
+  aria-label={$t("view.table")}
+  on:contextmenu|preventDefault
+>
   <table class="tasks-table">
     <thead>
-      <tr>
-        <!-- Requirement 4: Exact column order and labels:
-             الاسم (name), الحجم (size), الحالة (state), التقدّم (progress), السرعة (speed), المتبقي (eta), التاريخ (date) -->
-        <th class="col-name" scope="col">{$t("table.name")}</th>
-        <th class="col-size" scope="col">{$t("table.size")}</th>
-        <th class="col-status" scope="col">{$t("table.status")}</th>
-        <th class="col-progress" scope="col">{$t("table.progress")}</th>
-        <th class="col-speed" scope="col">{$t("table.speed")}</th>
-        <th class="col-eta" scope="col">{$t("table.eta")}</th>
-        <th class="col-date" scope="col">{$t("table.date")}</th>
-        <!-- Row actions accessible without a labeled column header -->
-        <th class="col-actions" aria-hidden="true"></th>
+      <tr class="grid-header">
+        <!-- 1. الاسم (Name) -->
+        <th
+          class="col-name"
+          style="width: {colWidths.name}px;"
+          scope="col"
+          on:click={() => handleSort("name")}
+        >
+          <div class="th-content">
+            <span>{$t("table.name")}</span>
+            {#if sortColumn === "name"}
+              <span class="sort-arrow">{sortDirection === "asc" ? "▲" : "▼"}</span>
+            {/if}
+          </div>
+          <div
+            class="col-resizer"
+            on:mousedown={(e) => startResize(e, "name")}
+            role="separator"
+            aria-orientation="vertical"
+          ></div>
+        </th>
+
+        <!-- 2. الحجم (Size) -->
+        <th
+          class="col-size"
+          style="width: {colWidths.size}px;"
+          scope="col"
+          on:click={() => handleSort("size")}
+        >
+          <div class="th-content">
+            <span>{$t("table.size")}</span>
+            {#if sortColumn === "size"}
+              <span class="sort-arrow">{sortDirection === "asc" ? "▲" : "▼"}</span>
+            {/if}
+          </div>
+          <div
+            class="col-resizer"
+            on:mousedown={(e) => startResize(e, "size")}
+            role="separator"
+            aria-orientation="vertical"
+          ></div>
+        </th>
+
+        <!-- 3. الحالة (Status / Progress) -->
+        <th
+          class="col-status"
+          style="width: {colWidths.status}px;"
+          scope="col"
+          on:click={() => handleSort("status")}
+        >
+          <div class="th-content">
+            <span>{$t("table.status")}</span>
+            {#if sortColumn === "status"}
+              <span class="sort-arrow">{sortDirection === "asc" ? "▲" : "▼"}</span>
+            {/if}
+          </div>
+          <div
+            class="col-resizer"
+            on:mousedown={(e) => startResize(e, "status")}
+            role="separator"
+            aria-orientation="vertical"
+          ></div>
+        </th>
+
+        <!-- 4. الوقت المتبقي (Time Left) -->
+        <th
+          class="col-eta"
+          style="width: {colWidths.eta}px;"
+          scope="col"
+          on:click={() => handleSort("eta")}
+        >
+          <div class="th-content">
+            <span>{$t("table.eta")}</span>
+            {#if sortColumn === "eta"}
+              <span class="sort-arrow">{sortDirection === "asc" ? "▲" : "▼"}</span>
+            {/if}
+          </div>
+          <div
+            class="col-resizer"
+            on:mousedown={(e) => startResize(e, "eta")}
+            role="separator"
+            aria-orientation="vertical"
+          ></div>
+        </th>
+
+        <!-- 5. سرعة النقل (Transfer Speed) -->
+        <th
+          class="col-speed"
+          style="width: {colWidths.speed}px;"
+          scope="col"
+          on:click={() => handleSort("speed")}
+        >
+          <div class="th-content">
+            <span>{$t("table.speed")}</span>
+            {#if sortColumn === "speed"}
+              <span class="sort-arrow">{sortDirection === "asc" ? "▲" : "▼"}</span>
+            {/if}
+          </div>
+          <div
+            class="col-resizer"
+            on:mousedown={(e) => startResize(e, "speed")}
+            role="separator"
+            aria-orientation="vertical"
+          ></div>
+        </th>
+
+        <!-- 6. آخر محاولة (Last Try / Date) -->
+        <th
+          class="col-date"
+          style="width: {colWidths.date}px;"
+          scope="col"
+          on:click={() => handleSort("date")}
+        >
+          <div class="th-content">
+            <span>{$t("table.date")}</span>
+            {#if sortColumn === "date"}
+              <span class="sort-arrow">{sortDirection === "asc" ? "▲" : "▼"}</span>
+            {/if}
+          </div>
+          <div
+            class="col-resizer"
+            on:mousedown={(e) => startResize(e, "date")}
+            role="separator"
+            aria-orientation="vertical"
+          ></div>
+        </th>
+
+        <!-- 7. الوصف (Description / URL) -->
+        <th
+          class="col-desc"
+          style="width: {colWidths.desc}px;"
+          scope="col"
+        >
+          <div class="th-content">
+            <span>{$t("table.desc")}</span>
+          </div>
+          <div
+            class="col-resizer"
+            on:mousedown={(e) => startResize(e, "desc")}
+            role="separator"
+            aria-orientation="vertical"
+          ></div>
+        </th>
       </tr>
     </thead>
     <tbody>
-      {#each tasks as task (task.id)}
+      {#each sortedTasks as task (task.id)}
         {@const percent = getPercent(task)}
-        {@const isSelected = selectedId === task.id}
-        {@const allowPause = canPauseTask(task.state)}
-        {@const allowResume = canResumeTask(task.state)}
-        {@const isFailed = task.state === "Failed"}
+        {@const isSelected = isRowSelected(task.id)}
         {@const isCompleted = task.state === "Completed"}
+        {@const isFailed = task.state === "Failed"}
+        {@const isDownloading = task.state === "Downloading" || task.state === "Probing" || task.state === "Verifying" || task.state === "Finalizing"}
+        {@const isPaused = task.state === "Paused" || task.state === "Pausing"}
         {@const displayDate = isCompleted ? task.completed_at : task.created_at}
+        {@const writtenFormatted = formatBytes(task.written || 0, $currentLang)}
+        {@const totalFormatted = task.total_size ? formatBytes(task.total_size, $currentLang) : ""}
+
         <tr
-          class="task-row"
+          class="grid-row task-row"
           class:selected={isSelected}
           class:failed-row={isFailed}
-          on:click={() => dispatch("select", task.id)}
+          on:click={(e) => handleRowClick(e, task)}
+          on:dblclick={(e) => handleRowDblClick(e, task)}
+          on:contextmenu={(e) => handleContextMenu(e, task)}
           tabindex="0"
           on:keydown={(e) => {
-            if (e.key === "Enter") dispatch("select", task.id);
+            if (e.key === "Enter") handleRowDblClick(e, task);
           }}
         >
           <!-- 1. الاسم -->
-          <td class="col-name cell-name">
-            <span class="file-name" title={task.filename}><bdi>{task.filename || "—"}</bdi></span>
+          <td class="col-name cell-name" title={task.filename || ""}>
+            <div class="col-filename">
+              <span class="file-icon" aria-hidden="true">
+                {#if isCompleted}
+                  📄
+                {:else if isDownloading}
+                  ⏬
+                {:else if isPaused}
+                  ⏸
+                {:else if isFailed}
+                  ⚠️
+                {:else}
+                  📦
+                {/if}
+              </span>
+              <span class="file-name-text"><bdi>{task.filename || "—"}</bdi></span>
+            </div>
             {#if isFailed}
               {@const err = friendlyError(task, $currentLang)}
-              <div class="friendly-error-block">
-                <div class="err-text-row">
-                  <span class="err-title">{err.title}</span>
-                  <span class="err-hint">{err.hint}</span>
-                </div>
-                {#if task.error}
-                  <details class="err-details">
-                    <summary class="err-summary" on:click|stopPropagation>{$t("errors.details")}</summary>
-                    <pre class="err-raw" dir="auto"><code>{task.error}</code></pre>
-                  </details>
-                {/if}
+              <div class="inline-error" title={err.hint || err.title}>
+                <span class="err-hint-text">{err.hint || err.title}</span>
               </div>
             {/if}
           </td>
@@ -85,166 +403,102 @@
           <td class="col-size cell-size">
             <span class="size-text">
               {#if task.total_size}
-                <bdi>{formatBytes(task.total_size, $currentLang)}</bdi>
+                <bdi dir="ltr">{formatBytes(task.total_size, $currentLang)}</bdi>
+              {:else if task.written}
+                <bdi dir="ltr">{writtenFormatted}</bdi>
               {:else}
                 <bdi>{$t("task.unknownSize")}</bdi>
               {/if}
             </span>
           </td>
 
-          <!-- 3. الحالة -->
+          <!-- 3. الحالة / التقدم -->
           <td class="col-status cell-status">
-            <StatusPill state={task.state} />
-          </td>
-
-          <!-- 4. التقدّم -->
-          <td class="col-progress cell-progress">
-            <div class="progress-wrapper">
-              <div
-                class="progress-track"
-                role="progressbar"
-                aria-valuenow={percent ?? 0}
-                aria-valuemin="0"
-                aria-valuemax="100"
-              >
+            {#if isDownloading}
+              <div class="cell-progress-bar" role="progressbar" aria-valuenow={percent ?? 0} aria-valuemin="0" aria-valuemax="100">
                 <div
-                  class="progress-fill"
-                  class:indeterminate={percent === null && (task.state === 'Downloading' || task.state === 'Probing')}
-                  class:completed={isCompleted}
-                  style="width: {percent !== null ? percent + '%' : (isCompleted ? '100%' : '0%')};"
+                  class="cell-progress-fill"
+                  style="width: {percent !== null ? percent + '%' : '30%'};"
                 ></div>
+                <div class="cell-progress-text">
+                  <bdi dir="ltr">
+                    {#if percent !== null}
+                      {percent}% ({totalFormatted || writtenFormatted})
+                    {:else}
+                      {writtenFormatted}
+                    {/if}
+                  </bdi>
+                </div>
               </div>
-              <span class="percent-label">
-                {#if percent !== null}
-                  <bdi>{formatPercent(percent, $currentLang)}</bdi>
-                {:else if isCompleted}
-                  <bdi>{formatPercent(100, $currentLang)}</bdi>
-                {:else}
-                  <bdi>—</bdi>
-                {/if}
-              </span>
-            </div>
-          </td>
-
-          <!-- 5. السرعة -->
-          <td class="col-speed cell-speed">
-            <span class="speed-text">
-              {#if task.state === "Downloading" && task.speed_bps}
-                <bdi>{formatSpeed(task.speed_bps, $currentLang)}</bdi>
+            {:else if isPaused}
+              {#if percent !== null}
+                <div class="cell-progress-bar paused-bar" role="progressbar" aria-valuenow={percent} aria-valuemin="0" aria-valuemax="100">
+                  <div class="cell-progress-fill paused-fill" style="width: {percent}%;"></div>
+                  <div class="cell-progress-text">
+                    {$t("state.Paused")} <bdi dir="ltr">({percent}%)</bdi>
+                  </div>
+                </div>
               {:else}
-                <bdi>—</bdi>
+                <span class="state-badge state-paused">
+                  <span class="state-dot"></span>
+                  {$t("state.Paused")}
+                </span>
               {/if}
-            </span>
+            {:else if isCompleted}
+              <span class="state-badge state-completed">
+                <span class="state-dot"></span>
+                {$t("state.Completed")}
+              </span>
+            {:else if isFailed}
+              <span class="state-badge state-failed">
+                <span class="state-dot"></span>
+                {$t("state.Failed")}
+              </span>
+            {:else if task.state === "Queued"}
+              <span class="state-badge state-queued">
+                <span class="state-dot"></span>
+                {$t("state.Queued")}
+              </span>
+            {:else}
+              <span class="state-badge">
+                <span class="state-dot"></span>
+                {$t("state." + task.state)}
+              </span>
+            {/if}
           </td>
 
-          <!-- 6. المتبقي -->
+          <!-- 4. الوقت المتبقي -->
           <td class="col-eta cell-eta">
             <span class="eta-text">
-              {#if task.state === "Downloading" && task.eta_secs}
-                <bdi>{formatEta(task.eta_secs, $currentLang)}</bdi>
+              {#if isDownloading && task.eta_secs}
+                <bdi dir="ltr">{formatEta(task.eta_secs, $currentLang)}</bdi>
               {:else}
-                <bdi>—</bdi>
+                —
               {/if}
             </span>
           </td>
 
-          <!-- 7. التاريخ -->
+          <!-- 5. سرعة النقل -->
+          <td class="col-speed cell-speed">
+            <span class="speed-text">
+              {#if isDownloading && task.speed_bps}
+                <bdi dir="ltr">{formatSpeed(task.speed_bps, $currentLang)}</bdi>
+              {:else}
+                —
+              {/if}
+            </span>
+          </td>
+
+          <!-- 6. آخر محاولة -->
           <td class="col-date cell-date">
             <span class="date-text">
-              <bdi>{formatDate(displayDate, $currentLang)}</bdi>
+              <bdi dir="ltr">{formatDate(displayDate, $currentLang)}</bdi>
             </span>
           </td>
 
-          <!-- Row actions (pause/resume/retry/delete/reveal/open) -->
-          <td class="col-actions cell-actions">
-            <div class="action-buttons">
-              {#if allowPause}
-                <button
-                  class="action-btn"
-                  title={$t("toolbar.pause")}
-                  aria-label="{$t('toolbar.pause')}: {task.filename}"
-                  on:click|stopPropagation={() => dispatch("pause", task.id)}
-                >
-                  <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15" aria-hidden="true">
-                    <path
-                      fill-rule="evenodd"
-                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z"
-                      clip-rule="evenodd"
-                    />
-                  </svg>
-                </button>
-              {/if}
-
-              {#if allowResume && !isFailed}
-                <button
-                  class="action-btn action-btn-accent"
-                  title={$t("toolbar.resume")}
-                  aria-label="{$t('toolbar.resume')}: {task.filename}"
-                  on:click|stopPropagation={() => dispatch("resume", task.id)}
-                >
-                  <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15" aria-hidden="true">
-                    <path
-                      fill-rule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
-                      clip-rule="evenodd"
-                    />
-                  </svg>
-                </button>
-              {/if}
-
-              {#if isFailed}
-                <button
-                  class="action-btn action-btn-retry"
-                  title={$t("table.retry")}
-                  aria-label="{$t('table.retry')}: {task.filename}"
-                  on:click|stopPropagation={() => dispatch("retry", task.id)}
-                >
-                  <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15" aria-hidden="true">
-                    <path
-                      fill-rule="evenodd"
-                      d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
-                      clip-rule="evenodd"
-                    />
-                  </svg>
-                </button>
-              {/if}
-
-              <button
-                class="action-btn action-btn-danger"
-                title={$t("table.delete")}
-                aria-label="{$t('table.delete')}: {task.filename}"
-                on:click|stopPropagation={() => dispatch("cancel", task.id)}
-              >
-                <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15" aria-hidden="true">
-                  <path
-                    fill-rule="evenodd"
-                    d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                    clip-rule="evenodd"
-                  />
-                </svg>
-              </button>
-
-              <button
-                class="action-btn"
-                title={isCompleted ? $t("task.openFile") : $t("task.revealFolder")}
-                aria-label="{isCompleted ? $t('task.openFile') : $t('task.revealFolder')}: {task.filename}"
-                on:click|stopPropagation={() => {
-                  if (isCompleted) {
-                    dispatch("openFile", task.id);
-                  } else {
-                    dispatch("reveal", task.id);
-                  }
-                }}
-              >
-                <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15" aria-hidden="true">
-                  <path
-                    fill-rule="evenodd"
-                    d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"
-                    clip-rule="evenodd"
-                  />
-                </svg>
-              </button>
-            </div>
+          <!-- 7. الوصف / الرابط -->
+          <td class="col-desc cell-desc" title={task.url || ""}>
+            <span class="desc-text"><bdi>{task.url || "—"}</bdi></span>
           </td>
         </tr>
       {/each}
@@ -252,258 +506,462 @@
   </table>
 </div>
 
+<!-- Desktop Right-Click Context Menu -->
+{#if contextMenuOpen && contextMenuTask}
+  {@const allowResume = canResumeTask(contextMenuTask.state)}
+  {@const allowPause = canPauseTask(contextMenuTask.state)}
+  {@const isCompleted = contextMenuTask.state === "Completed"}
+  {@const isFailed = contextMenuTask.state === "Failed"}
+
+  <div
+    class="context-menu-popup"
+    style="top: {contextMenuY}px; left: {contextMenuX}px;"
+    role="menu"
+    tabindex="-1"
+    on:click|stopPropagation
+    on:keydown|stopPropagation
+  >
+    <!-- Open File -->
+    <button
+      class="ctx-item"
+      role="menuitem"
+      disabled={!isCompleted}
+      on:click={() => handleCtxAction("openFile")}
+    >
+      <span class="ctx-label">{$t("contextMenu.openFile")}</span>
+      <kbd class="ctx-shortcut">Enter</kbd>
+    </button>
+
+    <!-- Open Folder -->
+    <button
+      class="ctx-item"
+      role="menuitem"
+      on:click={() => handleCtxAction("reveal")}
+    >
+      <span class="ctx-label">{$t("contextMenu.openFolder")}</span>
+      <kbd class="ctx-shortcut">Ctrl+O</kbd>
+    </button>
+
+    <div class="ctx-sep" role="separator"></div>
+
+    <!-- Resume -->
+    <button
+      class="ctx-item"
+      role="menuitem"
+      disabled={!allowResume}
+      on:click={() => handleCtxAction("resume")}
+    >
+      <span class="ctx-label">{$t("contextMenu.resume")}</span>
+    </button>
+
+    <!-- Pause -->
+    <button
+      class="ctx-item"
+      role="menuitem"
+      disabled={!allowPause}
+      on:click={() => handleCtxAction("pause")}
+    >
+      <span class="ctx-label">{$t("contextMenu.pause")}</span>
+    </button>
+
+    <!-- Retry -->
+    {#if isFailed}
+      <button
+        class="ctx-item"
+        role="menuitem"
+        on:click={() => handleCtxAction("retry")}
+      >
+        <span class="ctx-label">{$t("contextMenu.retry")}</span>
+      </button>
+    {/if}
+
+    <div class="ctx-sep" role="separator"></div>
+
+    <!-- Delete... -->
+    <button
+      class="ctx-item"
+      role="menuitem"
+      on:click={() => handleCtxAction("delete", { id: contextMenuTask.id, deleteFiles: false })}
+    >
+      <span class="ctx-label">{$t("contextMenu.delete")}</span>
+      <kbd class="ctx-shortcut">Del</kbd>
+    </button>
+
+    <!-- Delete with file... -->
+    <button
+      class="ctx-item"
+      role="menuitem"
+      on:click={() => handleCtxAction("delete", { id: contextMenuTask.id, deleteFiles: true })}
+    >
+      <span class="ctx-label">{$t("contextMenu.deleteWithFile")}</span>
+      <kbd class="ctx-shortcut">Shift+Del</kbd>
+    </button>
+
+    <div class="ctx-sep" role="separator"></div>
+
+    <!-- Copy URL -->
+    <button
+      class="ctx-item"
+      role="menuitem"
+      on:click={() => handleCtxAction("copyUrl")}
+    >
+      <span class="ctx-label">{$t("contextMenu.copyUrl")}</span>
+      <kbd class="ctx-shortcut">Ctrl+C</kbd>
+    </button>
+
+    <!-- Properties -->
+    <button
+      class="ctx-item"
+      role="menuitem"
+      on:click={() => handleCtxAction("properties")}
+    >
+      <span class="ctx-label">{$t("contextMenu.properties")}</span>
+      <kbd class="ctx-shortcut">Alt+Enter</kbd>
+    </button>
+  </div>
+{/if}
+
 <style>
   .table-container {
     width: 100%;
-    overflow-x: auto;
-    background-color: var(--color-bg-card);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-sm);
+    height: 100%;
+    overflow: auto;
+    background: #ffffff;
+    border: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  :global([data-theme="dark"]) .table-container {
+    background: #070f2e;
+    color: #e2e8f0;
   }
 
   .tasks-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.825rem;
+    font-size: 13px;
+    font-family: var(--font-system, "Segoe UI Variable Text", "Segoe UI", Tahoma, Arial, sans-serif);
+    table-layout: fixed;
     text-align: start;
   }
 
-  thead {
-    background-color: var(--color-bg-alt);
-    border-bottom: 1px solid var(--color-border);
-  }
-
-  th {
-    padding: 0.65rem 0.85rem;
-    font-weight: 700;
-    color: var(--color-text-muted);
-    white-space: nowrap;
-    text-align: start;
-  }
-
-  td {
-    padding: 0.65rem 0.85rem;
-    border-bottom: 1px solid var(--color-border);
-    vertical-align: middle;
-  }
-
-  .task-row {
-    transition: background-color var(--transition-normal);
-    cursor: pointer;
-  }
-
-  .task-row:hover {
-    background-color: var(--color-bg-card-hover);
-  }
-
-  .task-row.selected {
-    background-color: var(--color-accent-light) !important;
-  }
-
-  .task-row:focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: -2px;
-  }
-
-  .col-name {
-    min-width: 190px;
-    max-width: 300px;
-  }
-
-  .file-name {
-    display: block;
+  .grid-header th {
+    background: #f4f5f7;
+    border-bottom: 1px solid #d2d6dc;
+    border-inline-end: 1px solid #e1e4e8;
+    padding: 3px 6px;
     font-weight: 600;
-    color: var(--color-text);
+    color: #374151;
+    height: 28px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    white-space: nowrap;
+    user-select: none;
+    cursor: default;
+  }
+
+  :global([data-theme="dark"]) .grid-header th {
+    background: #0b1a4e;
+    border-bottom-color: #1e3a8a;
+    border-inline-end-color: #162b6e;
+    color: #cbd5e1;
+  }
+
+  .grid-header th:hover {
+    background: #eaecef;
+  }
+
+  :global([data-theme="dark"]) .grid-header th:hover {
+    background: #102361;
+  }
+
+  .th-content {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  /* Friendly error inside table */
-  .friendly-error-block {
-    margin-top: 0.35rem;
-    padding: 0.35rem 0.5rem;
-    background-color: var(--color-danger-light);
-    border-radius: var(--radius-sm);
-    font-size: 0.75rem;
+  .sort-arrow {
+    font-size: 9px;
+    color: #00b6bd;
   }
 
-  .err-text-row {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
+  .col-resizer {
+    position: absolute;
+    top: 0;
+    inset-inline-end: 0;
+    width: 5px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 11;
   }
 
-  .err-title {
-    font-weight: 700;
-    color: var(--color-danger);
+  .col-resizer:hover {
+    background: #00b6bd;
   }
 
-  .err-hint {
-    color: var(--color-text-muted);
-    line-height: 1.35;
+  .grid-row {
+    height: 26px;
+    border-bottom: 1px solid #f0f2f5;
+    cursor: default;
   }
 
-  .err-details {
-    margin-top: 0.35rem;
-    cursor: pointer;
+  :global([data-theme="dark"]) .grid-row {
+    border-bottom-color: #0f1f4d;
   }
 
-  .err-summary {
-    font-size: 0.725rem;
-    font-weight: 700;
-    color: var(--color-text-muted);
-    user-select: none;
+  .grid-row:nth-child(even) {
+    background: #fdfdfe;
   }
 
-  .err-summary:hover {
-    color: var(--color-text);
+  :global([data-theme="dark"]) .grid-row:nth-child(even) {
+    background: #081236;
   }
 
-  .err-raw {
-    margin-top: 0.3rem;
-    padding: 0.35rem 0.5rem;
-    background-color: rgba(0, 0, 0, 0.08);
-    border-radius: 4px;
-    font-family: monospace;
-    font-size: 0.7rem;
-    white-space: pre-wrap;
-    word-break: break-all;
-    max-height: 5rem;
-    overflow-y: auto;
-    color: var(--color-text);
+  .grid-row:hover {
+    background: #f2f7fc;
   }
 
-  :global([data-theme="dark"]) .err-raw {
-    background-color: rgba(0, 0, 0, 0.35);
+  :global([data-theme="dark"]) .grid-row:hover {
+    background: #102361;
   }
 
-  .col-size {
-    min-width: 85px;
+  .grid-row.selected {
+    background: #cce8ff !important;
+    color: #0b1a4e !important;
+  }
+
+  :global([data-theme="dark"]) .grid-row.selected {
+    background: #1b3a7a !important;
+    color: #ffffff !important;
+  }
+
+  .grid-row td {
+    padding: 2px 6px;
+    border-inline-end: 1px solid #f0f2f5;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+    font-size: 12.5px;
   }
 
-  .col-status {
-    min-width: 105px;
+  :global([data-theme="dark"]) .grid-row td {
+    border-inline-end-color: #0f1f4d;
   }
 
-  .col-progress {
-    min-width: 150px;
-  }
-
-  .progress-wrapper {
+  .col-filename {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-  }
-
-  .progress-track {
-    flex: 1;
-    height: 7px;
-    background-color: var(--color-bg-alt);
-    border-radius: var(--radius-full);
+    gap: 6px;
     overflow: hidden;
   }
 
-  .progress-fill {
+  .file-icon {
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .file-name-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+  }
+
+  .inline-error {
+    font-size: 11px;
+    color: #dc2626;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  :global([data-theme="dark"]) .inline-error {
+    color: #f87171;
+  }
+
+  /* Inline cell progress bar */
+  .cell-progress-bar {
+    width: 100%;
+    height: 15px;
+    background: #eef1f5;
+    border-radius: 2px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid #d8dde6;
+  }
+
+  :global([data-theme="dark"]) .cell-progress-bar {
+    background: #0f1f4d;
+    border-color: #1e3a8a;
+  }
+
+  .cell-progress-fill {
     height: 100%;
-    background: var(--progress-gradient, var(--color-accent-gradient));
-    border-radius: var(--radius-full);
-    transition: width 200ms ease;
+    background: #00b6bd;
+    transition: width 0.15s ease-out;
   }
 
-  .progress-fill.completed {
-    background: var(--state-completed, #16a34a) !important;
+  .paused-fill {
+    background: #d97706;
   }
 
-  .progress-fill.indeterminate {
-    width: 30% !important;
-    animation: indeterminate-bar 1.5s infinite linear;
-  }
-
-  .percent-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--color-text-muted);
-    min-width: 2.75rem;
-    text-align: end;
-  }
-
-  .col-speed,
-  .col-eta {
-    min-width: 90px;
-    white-space: nowrap;
-    color: var(--color-text-muted);
-  }
-
-  .col-date {
-    min-width: 125px;
-    white-space: nowrap;
-    color: var(--color-text-muted);
-    font-size: 0.775rem;
-  }
-
-  .col-actions {
-    min-width: 110px;
-  }
-
-  .action-buttons {
+  .cell-progress-text {
+    position: absolute;
+    inset: 0;
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    gap: 0.25rem;
+    justify-content: center;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #0b1a4e;
+    text-shadow: 0 0 2px rgba(255, 255, 255, 0.9);
+    pointer-events: none;
+    white-space: nowrap;
+    overflow: hidden;
   }
 
-  .action-btn {
+  :global([data-theme="dark"]) .cell-progress-text {
+    color: #ffffff;
+    text-shadow: 0 0 2px rgba(0, 0, 0, 0.9);
+  }
+
+  .state-badge {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    width: 1.75rem;
-    height: 1.75rem;
-    border-radius: var(--radius-sm);
-    color: var(--color-text-muted);
+    gap: 4px;
+    font-weight: 600;
+    font-size: 11.5px;
+  }
+
+  .state-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #6b7280;
+  }
+
+  .state-completed {
+    color: #16a34a;
+  }
+
+  .state-completed .state-dot {
+    background: #16a34a;
+  }
+
+  .state-paused {
+    color: #d97706;
+  }
+
+  .state-paused .state-dot {
+    background: #d97706;
+  }
+
+  .state-failed {
+    color: #dc2626;
+  }
+
+  .state-failed .state-dot {
+    background: #dc2626;
+  }
+
+  .state-queued {
+    color: #6366f1;
+  }
+
+  .state-queued .state-dot {
+    background: #6366f1;
+  }
+
+  .desc-text {
+    color: #6b7280;
+    font-size: 12px;
+  }
+
+  :global([data-theme="dark"]) .desc-text {
+    color: #94a3b8;
+  }
+
+  /* Desktop Context Menu */
+  .context-menu-popup {
+    position: fixed;
+    background: #ffffff;
+    border: 1px solid #c9c9c9;
+    border-radius: 4px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.08);
+    width: 230px;
+    padding: 3px 0;
+    font-size: 12.5px;
+    z-index: 500;
+    user-select: none;
+  }
+
+  :global([data-theme="dark"]) .context-menu-popup {
+    background: #0b1a4e;
+    border-color: #1e3a8a;
+    color: #f1f5f9;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+
+  .ctx-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 12px;
+    color: inherit;
     background: transparent;
-    transition: background-color var(--transition-normal), color var(--transition-normal);
+    border: none;
+    font-size: 12.5px;
+    font-family: inherit;
+    cursor: default;
+    text-align: start;
   }
 
-  .action-btn:hover {
-    background-color: var(--color-bg-alt);
-    color: var(--color-text);
+  .ctx-item:hover:not(:disabled) {
+    background: #e9ecf1;
+    color: #0b1a4e;
   }
 
-  .action-btn-accent:hover {
-    background-color: var(--color-accent-light);
-    color: var(--color-accent);
+  :global([data-theme="dark"]) .ctx-item:hover:not(:disabled) {
+    background: #162b6e;
+    color: #ffffff;
   }
 
-  .action-btn-retry:hover {
-    background-color: var(--color-accent-light);
-    color: var(--color-accent);
+  .ctx-item:disabled {
+    opacity: 0.42;
+    cursor: default;
   }
 
-  .action-btn-danger:hover {
-    background-color: var(--color-danger-light);
-    color: var(--color-danger);
+  .ctx-label {
+    flex: 1;
   }
 
-  @keyframes indeterminate-bar {
-    0% {
-      transform: translateX(-100%);
-    }
-    100% {
-      transform: translateX(350%);
-    }
+  .ctx-shortcut {
+    font-size: 11px;
+    color: #6b7280;
+    background: transparent;
+    border: none;
+    padding: 0;
+    font-family: inherit;
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .progress-fill {
-      transition: none !important;
-      animation: none !important;
-    }
-    .task-row,
-    .action-btn {
-      transition: none !important;
-    }
+  :global([data-theme="dark"]) .ctx-shortcut {
+    color: #94a3b8;
+  }
+
+  .ctx-sep {
+    height: 1px;
+    background: #e5e7eb;
+    margin: 3px 0;
+  }
+
+  :global([data-theme="dark"]) .ctx-sep {
+    background: #1e3a8a;
   }
 </style>

@@ -1,8 +1,6 @@
 <script>
-  import { t } from "./i18n.js";
+  import { t, currentLang } from "./i18n.js";
   import { createEventDispatcher } from "svelte";
-  import logoFull from "../assets/logo-full.svg";
-  import logoWhite from "../assets/logo-white.svg";
 
   export let collapsed = false;
   export let selectedCategory = "all";
@@ -12,31 +10,28 @@
 
   const dispatch = createEventDispatcher();
 
-  // Requirement 2: exact order: الكل، مضغوطة، مستندات، صوتيات، فيديو، برامج، أخرى
-  const SIDEBAR_CATEGORIES = [
-    { id: "all", colorClass: "cat-all" },
-    { id: "compressed", colorClass: "cat-compressed" },
-    { id: "documents", colorClass: "cat-documents" },
-    { id: "audio", colorClass: "cat-audio" },
-    { id: "video", colorClass: "cat-video" },
-    { id: "programs", colorClass: "cat-programs" },
-    { id: "other", colorClass: "cat-other" },
-  ];
+  let statusBranchExpanded = true;
+  let categoriesBranchExpanded = true;
 
-  // Requirement 2: Status section: جارية (active), مكتملة (completed), متوقفة (paused), فشلت (failed)
-  const STATUS_ITEMS = [
-    { id: "active", colorClass: "stat-active" },
-    { id: "completed", colorClass: "stat-completed" },
-    { id: "paused", colorClass: "stat-paused" },
-    { id: "failed", colorClass: "stat-failed" },
-  ];
-
-  function handleSelectCategory(id) {
-    dispatch("select", id);
+  function handleSelectAll() {
+    selectedCategory = "all";
+    selectedStateFilter = "all";
+    dispatch("select", "all");
+    dispatch("selectState", "all");
   }
 
-  function handleSelectState(id) {
-    dispatch("selectState", id);
+  function handleSelectStatus(statusId) {
+    selectedCategory = "all";
+    selectedStateFilter = statusId;
+    dispatch("select", "all");
+    dispatch("selectState", statusId);
+  }
+
+  function handleSelectCategory(catId) {
+    selectedCategory = catId;
+    selectedStateFilter = "all";
+    dispatch("select", catId);
+    dispatch("selectState", "all");
   }
 
   function toggleCollapse() {
@@ -45,439 +40,424 @@
   }
 </script>
 
-<aside class="sidebar" class:collapsed aria-label={$t("sidebar.title")}>
-  <div class="sidebar-header">
-    {#if !collapsed}
-      <div class="brand">
-        <div class="brand-logo" aria-hidden="true">
-          <img src={logoFull} alt="SAYL" class="logo-img logo-light" />
-          <img src={logoWhite} alt="SAYL" class="logo-img logo-dark" />
-        </div>
-        <span class="brand-name">{$t("app.name")}</span>
-      </div>
-    {/if}
-
-    <button
-      class="collapse-btn"
-      title={collapsed ? $t("sidebar.expand") : $t("sidebar.collapse")}
-      aria-label={collapsed ? $t("sidebar.expand") : $t("sidebar.collapse")}
-      on:click={toggleCollapse}
+<aside class="sidebar-tree" class:collapsed id="tour-category-tree" aria-label={$t("tree.all")}>
+  {#if !collapsed}
+    <!-- Root node: الكل (All Downloads) -->
+    <div
+      class="tree-node tree-root"
+      class:active={selectedCategory === "all" && selectedStateFilter === "all"}
+      role="button"
+      tabindex="0"
+      on:click={handleSelectAll}
+      on:keydown={(e) => e.key === "Enter" && handleSelectAll()}
     >
-      <svg
-        viewBox="0 0 20 20"
-        fill="currentColor"
-        width="18"
-        height="18"
-        class="collapse-icon"
-        class:flipped={collapsed}
-        aria-hidden="true"
-      >
-        <path
-          fill-rule="evenodd"
-          d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-          clip-rule="evenodd"
-        />
-      </svg>
-    </button>
-  </div>
-
-  <nav class="sidebar-nav" aria-label={$t("sidebar.title")}>
-    <!-- Category list -->
-    <ul class="nav-list">
-      {#each SIDEBAR_CATEGORIES as cat (cat.id)}
-        {@const count = categoryCounts[cat.id] || 0}
-        {@const isSelected = selectedCategory === cat.id}
-        <li class="nav-item">
-          <button
-            class="nav-btn category-btn"
-            class:active={isSelected}
-            title="{$t('categories.' + cat.id)} ({count})"
-            aria-label="{$t('categories.' + cat.id)} ({count})"
-            aria-current={isSelected ? "true" : undefined}
-            on:click={() => handleSelectCategory(cat.id)}
-          >
-            <span class="icon-wrap {cat.colorClass}" aria-hidden="true">
-              {#if cat.id === 'all'}
-                <!-- All: Layer Stack -->
-                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-                  <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
-                </svg>
-              {:else if cat.id === 'compressed'}
-                <!-- Compressed: Archive / Zip -->
-                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-                  <path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" />
-                  <path fill-rule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clip-rule="evenodd" />
-                </svg>
-              {:else if cat.id === 'documents'}
-                <!-- Documents: Document -->
-                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-                  <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd" />
-                </svg>
-              {:else if cat.id === 'audio'}
-                <!-- Audio: Musical Note -->
-                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-                  <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" />
-                </svg>
-              {:else if cat.id === 'video'}
-                <!-- Video: Camera / Film -->
-                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-                  <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0013 8v4a1 1 0 001.553.894l3 2A1 1 0 0019 14V6a1 1 0 00-1.447-.894l-3 2z" />
-                </svg>
-              {:else if cat.id === 'programs'}
-                <!-- Programs: Application Window -->
-                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-                  <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm1 4a1 1 0 00-1 1v7a1 1 0 001 1h12a1 1 0 001-1V9a1 1 0 00-1-1H4zm3 3a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1z" clip-rule="evenodd" />
-                </svg>
-              {:else}
-                <!-- Other: Tag -->
-                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-                  <path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
-                </svg>
-              {/if}
-            </span>
-
-            {#if !collapsed}
-              <span class="nav-label">{$t("categories." + cat.id)}</span>
-              <span class="nav-badge" class:has-items={count > 0}><bdi>{count}</bdi></span>
-            {/if}
-          </button>
-        </li>
-      {/each}
-    </ul>
-
-    <!-- Status section (Req 2) -->
-    <div class="sidebar-section-divider" aria-hidden="true"></div>
-
-    {#if !collapsed}
-      <div class="sidebar-section-header">
-        <span class="section-title">{$t("sidebar.statusTitle")}</span>
+      <div class="node-icon root-icon" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+          <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+        </svg>
       </div>
-    {/if}
+      <span class="node-title">{$t("tree.all")}</span>
+      <span class="node-badge"><bdi dir="ltr">{statusCounts.all || categoryCounts.all || 0}</bdi></span>
+    </div>
 
-    <ul class="nav-list status-list">
-      {#each STATUS_ITEMS as stat (stat.id)}
-        {@const count = statusCounts[stat.id] || 0}
-        {@const isSelected = selectedStateFilter === stat.id}
-        <li class="nav-item">
-          <button
-            class="nav-btn status-btn"
-            class:active={isSelected}
-            title="{$t('sidebar.' + stat.id)} ({count})"
-            aria-label="{$t('sidebar.' + stat.id)} ({count})"
-            aria-current={isSelected ? "true" : undefined}
-            on:click={() => handleSelectState(stat.id)}
+    <!-- 1. فرع الحالة (Status Branch) -->
+    <div class="tree-branch">
+      <div
+        class="tree-section-header"
+        role="button"
+        tabindex="0"
+        on:click={() => (statusBranchExpanded = !statusBranchExpanded)}
+        on:keydown={(e) => e.key === "Enter" && (statusBranchExpanded = !statusBranchExpanded)}
+      >
+        <span class="branch-arrow" class:expanded={statusBranchExpanded} aria-hidden="true">
+          {statusBranchExpanded ? "▼" : "▶"}
+        </span>
+        <span class="branch-header-title">{$t("tree.status")}</span>
+      </div>
+
+      {#if statusBranchExpanded}
+        <div class="branch-items">
+          <!-- غير مكتمل (Incomplete) -->
+          <div
+            class="tree-node tree-subnode"
+            class:active={selectedStateFilter === "incomplete"}
+            role="button"
+            tabindex="0"
+            on:click={() => handleSelectStatus("incomplete")}
+            on:keydown={(e) => e.key === "Enter" && handleSelectStatus("incomplete")}
           >
-            <span class="icon-wrap {stat.colorClass}" aria-hidden="true">
-              <span class="status-indicator-dot"></span>
-            </span>
+            <div class="node-icon status-icon-incomplete" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <span class="node-title">{$t("tree.incomplete")}</span>
+            <span class="node-badge"><bdi dir="ltr">{statusCounts.incomplete || 0}</bdi></span>
+          </div>
 
-            {#if !collapsed}
-              <span class="nav-label">{$t("sidebar." + stat.id)}</span>
-              <span class="nav-badge" class:has-items={count > 0}><bdi>{count}</bdi></span>
-            {/if}
-          </button>
-        </li>
-      {/each}
-    </ul>
-  </nav>
+          <!-- مكتمل (Completed) -->
+          <div
+            class="tree-node tree-subnode"
+            class:active={selectedStateFilter === "completed"}
+            role="button"
+            tabindex="0"
+            on:click={() => handleSelectStatus("completed")}
+            on:keydown={(e) => e.key === "Enter" && handleSelectStatus("completed")}
+          >
+            <div class="node-icon status-icon-completed" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <span class="node-title">{$t("tree.completed")}</span>
+            <span class="node-badge"><bdi dir="ltr">{statusCounts.completed || 0}</bdi></span>
+          </div>
+
+          <!-- قائمة الانتظار (Queue) -->
+          <div
+            class="tree-node tree-subnode"
+            class:active={selectedStateFilter === "queue"}
+            role="button"
+            tabindex="0"
+            on:click={() => handleSelectStatus("queue")}
+            on:keydown={(e) => e.key === "Enter" && handleSelectStatus("queue")}
+          >
+            <div class="node-icon status-icon-queue" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
+                <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <span class="node-title">{$t("tree.queue")}</span>
+            <span class="node-badge"><bdi dir="ltr">{statusCounts.queue || 0}</bdi></span>
+          </div>
+        </div>
+      {/if}
+    </div>
+
+    <!-- 2. فرع التصنيفات (Categories Branch) -->
+    <div class="tree-branch">
+      <div
+        class="tree-section-header"
+        role="button"
+        tabindex="0"
+        on:click={() => (categoriesBranchExpanded = !categoriesBranchExpanded)}
+        on:keydown={(e) => e.key === "Enter" && (categoriesBranchExpanded = !categoriesBranchExpanded)}
+      >
+        <span class="branch-arrow" class:expanded={categoriesBranchExpanded} aria-hidden="true">
+          {categoriesBranchExpanded ? "▼" : "▶"}
+        </span>
+        <span class="branch-header-title">{$t("tree.categories")}</span>
+      </div>
+
+      {#if categoriesBranchExpanded}
+        <div class="branch-items">
+          <!-- فيديو (Video) -->
+          <div
+            class="tree-node tree-subnode"
+            class:active={selectedCategory === "video" && selectedStateFilter === "all"}
+            role="button"
+            tabindex="0"
+            on:click={() => handleSelectCategory("video")}
+            on:keydown={(e) => e.key === "Enter" && handleSelectCategory("video")}
+          >
+            <div class="node-icon cat-icon-video" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
+                <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+              </svg>
+            </div>
+            <span class="node-title">{$t("tree.video")}</span>
+            <span class="node-badge"><bdi dir="ltr">{categoryCounts.video || 0}</bdi></span>
+          </div>
+
+          <!-- صوت (Audio) -->
+          <div
+            class="tree-node tree-subnode"
+            class:active={selectedCategory === "audio" && selectedStateFilter === "all"}
+            role="button"
+            tabindex="0"
+            on:click={() => handleSelectCategory("audio")}
+            on:keydown={(e) => e.key === "Enter" && handleSelectCategory("audio")}
+          >
+            <div class="node-icon cat-icon-audio" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
+                <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" />
+              </svg>
+            </div>
+            <span class="node-title">{$t("tree.audio")}</span>
+            <span class="node-badge"><bdi dir="ltr">{categoryCounts.audio || 0}</bdi></span>
+          </div>
+
+          <!-- مستندات (Documents) -->
+          <div
+            class="tree-node tree-subnode"
+            class:active={selectedCategory === "documents" && selectedStateFilter === "all"}
+            role="button"
+            tabindex="0"
+            on:click={() => handleSelectCategory("documents")}
+            on:keydown={(e) => e.key === "Enter" && handleSelectCategory("documents")}
+          >
+            <div class="node-icon cat-icon-docs" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
+                <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <span class="node-title">{$t("tree.documents")}</span>
+            <span class="node-badge"><bdi dir="ltr">{categoryCounts.documents || 0}</bdi></span>
+          </div>
+
+          <!-- برامج (Programs) -->
+          <div
+            class="tree-node tree-subnode"
+            class:active={selectedCategory === "programs" && selectedStateFilter === "all"}
+            role="button"
+            tabindex="0"
+            on:click={() => handleSelectCategory("programs")}
+            on:keydown={(e) => e.key === "Enter" && handleSelectCategory("programs")}
+          >
+            <div class="node-icon cat-icon-programs" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
+                <path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <span class="node-title">{$t("tree.programs")}</span>
+            <span class="node-badge"><bdi dir="ltr">{categoryCounts.programs || 0}</bdi></span>
+          </div>
+
+          <!-- مضغوطة (Compressed) -->
+          <div
+            class="tree-node tree-subnode"
+            class:active={selectedCategory === "compressed" && selectedStateFilter === "all"}
+            role="button"
+            tabindex="0"
+            on:click={() => handleSelectCategory("compressed")}
+            on:keydown={(e) => e.key === "Enter" && handleSelectCategory("compressed")}
+          >
+            <div class="node-icon cat-icon-compressed" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
+                <path fill-rule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2 5a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1zm0 3a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <span class="node-title">{$t("tree.compressed")}</span>
+            <span class="node-badge"><bdi dir="ltr">{categoryCounts.compressed || 0}</bdi></span>
+          </div>
+
+          <!-- أخرى (Other) -->
+          <div
+            class="tree-node tree-subnode"
+            class:active={selectedCategory === "other" && selectedStateFilter === "all"}
+            role="button"
+            tabindex="0"
+            on:click={() => handleSelectCategory("other")}
+            on:keydown={(e) => e.key === "Enter" && handleSelectCategory("other")}
+          >
+            <div class="node-icon cat-icon-other" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
+                <path fill-rule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zM9 9a1 1 0 012 0v5a1 1 0 11-2 0V9zm1-4a1 1 0 100 2 1 1 0 000-2z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <span class="node-title">{$t("tree.other")}</span>
+            <span class="node-badge"><bdi dir="ltr">{categoryCounts.other || 0}</bdi></span>
+          </div>
+        </div>
+      {/if}
+    </div>
+  {/if}
 </aside>
 
 <style>
-  .sidebar {
-    width: 220px;
-    background-color: var(--color-bg-card);
-    border-inline-end: 1px solid var(--color-border);
+  .sidebar-tree {
+    width: 230px;
+    background: #fafafb;
+    border-inline-end: 1px solid #dcdcdc;
     display: flex;
     flex-direction: column;
-    flex-shrink: 0;
-    transition: width var(--transition-normal);
-    overflow: hidden;
+    overflow-y: auto;
+    font-size: 12.5px;
     user-select: none;
-  }
-
-  .sidebar.collapsed {
-    width: 60px;
-  }
-
-  .sidebar-header {
-    height: 4.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 0.85rem;
-    border-bottom: 1px solid var(--color-border);
+    -webkit-user-select: none;
     flex-shrink: 0;
-    gap: 0.5rem;
+    padding: 6px 0;
   }
 
-  .collapsed .sidebar-header {
-    justify-content: center;
-    padding: 0;
+  :global([data-theme="dark"]) .sidebar-tree {
+    background: #09143c;
+    border-inline-end-color: #162b6e;
+    color: #e2e8f0;
   }
 
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 0.625rem;
-    overflow: hidden;
-  }
-
-  .brand-logo {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.85rem;
-    height: 1.85rem;
-    flex-shrink: 0;
-  }
-
-  .logo-img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-  }
-
-  .logo-dark {
+  .sidebar-tree.collapsed {
     display: none;
   }
-  .logo-light {
-    display: block;
-  }
 
-  :global([data-theme="dark"]) .logo-dark {
-    display: block !important;
-  }
-  :global([data-theme="dark"]) .logo-light {
-    display: none !important;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :global(:root:not([data-theme="light"])) .logo-dark {
-      display: block;
-    }
-    :global(:root:not([data-theme="light"])) .logo-light {
-      display: none;
-    }
-  }
-
-  .brand-name {
-    font-size: 1.15rem;
-    font-weight: 800;
-    color: var(--color-text);
-    letter-spacing: -0.02em;
-    white-space: nowrap;
-  }
-
-  .collapse-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 2rem;
-    height: 2rem;
-    border-radius: var(--radius-sm);
-    color: var(--color-text-muted);
-    background: transparent;
-    transition: background-color var(--transition-normal), color var(--transition-normal);
-    flex-shrink: 0;
-  }
-
-  .collapse-btn:hover {
-    background-color: var(--color-bg-alt);
-    color: var(--color-text);
-  }
-
-  .collapse-icon {
-    transition: transform var(--transition-normal);
-  }
-
-  :global(body[dir="rtl"]) .collapse-icon.flipped {
-    transform: rotate(180deg);
-  }
-
-  :global(body:not([dir="rtl"])) .collapse-icon {
-    transform: rotate(180deg);
-  }
-
-  :global(body:not([dir="rtl"])) .collapse-icon.flipped {
-    transform: rotate(0deg);
-  }
-
-  .sidebar-nav {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0.75rem 0.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-  }
-
-  .nav-list {
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    margin: 0;
-    padding: 0;
-  }
-
-  .nav-item {
-    margin: 0;
-    padding: 0;
-  }
-
-  .nav-btn {
-    width: 100%;
+  .tree-node {
     display: flex;
     align-items: center;
-    gap: 0.65rem;
-    padding: 0.55rem 0.75rem;
-    border-radius: var(--radius-sm);
-    font-size: 0.85rem;
+    padding: 5px 12px;
+    gap: 7px;
+    cursor: default;
+    color: #2b3340;
+    border-inline-start: 3px solid transparent;
+    transition: background-color 0.1s;
+    height: 28px;
+  }
+
+  :global([data-theme="dark"]) .tree-node {
+    color: #cbd5e1;
+  }
+
+  .tree-node:hover {
+    background: #f0f2f5;
+  }
+
+  :global([data-theme="dark"]) .tree-node:hover {
+    background: #142866;
+    color: #ffffff;
+  }
+
+  .tree-node.active {
+    background: #e6f8f8;
+    color: #0b1a4e;
     font-weight: 600;
-    color: var(--color-text-muted);
-    background: transparent;
-    transition: background-color var(--transition-normal), color var(--transition-normal);
-    text-align: start;
-    white-space: nowrap;
-    cursor: pointer;
+    border-inline-start-color: #00b6bd;
   }
 
-  .collapsed .nav-btn {
-    justify-content: center;
-    padding: 0.55rem 0;
+  :global([data-theme="dark"]) .tree-node.active {
+    background: rgba(0, 182, 189, 0.22);
+    color: #ffffff;
+    border-inline-start-color: #00b6bd;
   }
 
-  .nav-btn:hover {
-    background-color: var(--color-bg-alt);
-    color: var(--color-text);
+  .tree-root {
+    font-weight: 600;
+    margin-bottom: 4px;
+    border-bottom: 1px solid #f0f0f2;
+    padding-bottom: 8px;
+    height: 32px;
   }
 
-  .nav-btn.active {
-    background-color: var(--color-accent-light);
-    color: var(--color-accent);
+  :global([data-theme="dark"]) .tree-root {
+    border-bottom-color: #162b6e;
   }
 
-  .icon-wrap {
+  .tree-branch {
+    margin-top: 4px;
+  }
+
+  .tree-section-header {
     display: flex;
     align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    width: 1.25rem;
-    height: 1.25rem;
+    padding: 6px 10px 4px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #6b7280;
+    letter-spacing: 0.02em;
+    cursor: default;
+    gap: 6px;
   }
 
-  /* Vibrant distinct category colours (Req 2) */
-  .cat-all {
-    color: #00b6bd;
-  }
-  .cat-compressed {
-    color: #d97706;
-  }
-  .cat-documents {
-    color: #2563eb;
-  }
-  .cat-audio {
-    color: #e11d48;
-  }
-  .cat-video {
-    color: #7c3aed;
-  }
-  .cat-programs {
-    color: #059669;
-  }
-  .cat-other {
-    color: #64748b;
-  }
-
-  :global([data-theme="dark"]) .cat-all {
-    color: #22d3ee;
-  }
-  :global([data-theme="dark"]) .cat-compressed {
-    color: #fbbf24;
-  }
-  :global([data-theme="dark"]) .cat-documents {
-    color: #60a5fa;
-  }
-  :global([data-theme="dark"]) .cat-audio {
-    color: #fb7185;
-  }
-  :global([data-theme="dark"]) .cat-video {
-    color: #a78bfa;
-  }
-  :global([data-theme="dark"]) .cat-programs {
-    color: #34d399;
-  }
-  :global([data-theme="dark"]) .cat-other {
+  :global([data-theme="dark"]) .tree-section-header {
     color: #94a3b8;
   }
 
-  .nav-label {
+  .branch-arrow {
+    font-size: 8px;
+    width: 10px;
+    color: #9ca3af;
+    display: inline-block;
+  }
+
+  .branch-header-title {
     flex: 1;
+  }
+
+  .tree-subnode {
+    padding-inline-start: 26px;
+  }
+
+  .node-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6b7280;
+  }
+
+  :global([data-theme="dark"]) .node-icon {
+    color: #94a3b8;
+  }
+
+  .root-icon {
+    color: #008f95;
+  }
+
+  .status-icon-incomplete {
+    color: #d97706;
+  }
+
+  .status-icon-completed {
+    color: #16a34a;
+  }
+
+  .status-icon-queue {
+    color: #6366f1;
+  }
+
+  .cat-icon-video {
+    color: #8b5cf6;
+  }
+
+  .cat-icon-audio {
+    color: #ec4899;
+  }
+
+  .cat-icon-docs {
+    color: #3b82f6;
+  }
+
+  .cat-icon-programs {
+    color: #10b981;
+  }
+
+  .cat-icon-compressed {
+    color: #f59e0b;
+  }
+
+  .cat-icon-other {
+    color: #6b7280;
+  }
+
+  .node-title {
+    flex: 1;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  .nav-badge {
-    font-size: 0.725rem;
-    font-weight: 700;
-    padding: 0.1rem 0.45rem;
-    border-radius: var(--radius-full);
-    background-color: var(--color-bg-alt);
-    color: var(--color-text-subtle);
-    flex-shrink: 0;
+  .node-badge {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7280;
+    background: #eef0f4;
+    padding: 1px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
   }
 
-  .nav-btn.active .nav-badge {
-    background-color: var(--color-accent);
+  :global([data-theme="dark"]) .node-badge {
+    background: #142866;
+    color: #cbd5e1;
+  }
+
+  .tree-node.active .node-badge {
+    background: rgba(0, 182, 189, 0.22);
+    color: #0b1a4e;
+  }
+
+  :global([data-theme="dark"]) .tree-node.active .node-badge {
+    background: rgba(0, 182, 189, 0.4);
     color: #ffffff;
-  }
-
-  /* Section divider */
-  .sidebar-section-divider {
-    height: 1px;
-    background-color: var(--color-border);
-    margin: 0.5rem 0.25rem;
-  }
-
-  .sidebar-section-header {
-    padding: 0.25rem 0.75rem;
-  }
-
-  .section-title {
-    font-size: 0.725rem;
-    font-weight: 700;
-    color: var(--color-text-subtle);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  /* Status indicator dots */
-  .status-indicator-dot {
-    width: 0.6rem;
-    height: 0.6rem;
-    border-radius: 50%;
-    background-color: currentColor;
-  }
-
-  .stat-active {
-    color: var(--state-running, #00b6bd);
-  }
-  .stat-completed {
-    color: var(--state-completed, #16a34a);
-  }
-  .stat-paused {
-    color: var(--state-paused, #d97706);
-  }
-  .stat-failed {
-    color: var(--state-failed, #dc2626);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .sidebar {
-      transition: none !important;
-    }
-    .collapse-icon {
-      transition: none !important;
-    }
   }
 </style>

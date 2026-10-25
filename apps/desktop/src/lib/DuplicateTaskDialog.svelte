@@ -83,7 +83,7 @@
           <div class="task-meta">
             <StatusPill state={existingTask.state} />
             {#if existingTask.total_size}
-              <span class="task-size"><bdi>{formatBytes(existingTask.total_size, $currentLang)}</bdi></span>
+              <span class="task-size"><bdi dir="ltr">{formatBytes(existingTask.total_size, $currentLang)}</bdi></span>
             {/if}
           </div>
         </div>

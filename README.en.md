@@ -17,7 +17,7 @@
 
 <br>
 
-<img src="docs/ui-mockups/03-main-light-en.png" alt="SAYL Main Desktop Interface" width="880">
+<img src="docs/screenshots/main-window-en.png" alt="SAYL Main Desktop Interface" width="880">
 
 </div>
 

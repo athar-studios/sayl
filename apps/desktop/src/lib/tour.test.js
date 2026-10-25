@@ -15,11 +15,11 @@ describe("tour.js pure logic", () => {
   it("defines exactly 6 tour steps with titles and descriptions", () => {
     expect(TOUR_STEPS).toHaveLength(6);
     expect(TOUR_STEPS.map((s) => s.id)).toEqual([
-      "add_download",
-      "categories_sidebar",
-      "search_filter",
-      "task_progress",
-      "settings_button",
+      "menu_bar",
+      "toolbar",
+      "category_tree",
+      "data_grid",
+      "status_bar",
       "browser_extension",
     ]);
 

@@ -7,6 +7,7 @@
     formatPercent,
     canPauseTask,
     canResumeTask,
+    canCancel,
   } from "./format.js";
   import { friendlyError } from "./errors.js";
   import { classifyFile } from "./classify.js";
@@ -17,22 +18,6 @@
   export let selected = false;
 
   const dispatch = createEventDispatcher();
-
-  let confirmingCancel = false;
-  let confirmTimeout = null;
-
-  function handleCancelClick() {
-    if (confirmingCancel) {
-      if (confirmTimeout) clearTimeout(confirmTimeout);
-      confirmingCancel = false;
-      dispatch("cancel", task.id);
-    } else {
-      confirmingCancel = true;
-      confirmTimeout = setTimeout(() => {
-        confirmingCancel = false;
-      }, 3500);
-    }
-  }
 
   $: fileCategory = classifyFile(task.filename, task.mime);
   $: writtenFormatted = formatBytes(task.written, $currentLang);
@@ -57,8 +42,8 @@
 <div
   class="task-card"
   class:selected
-  on:click={() => dispatch("select", task.id)}
-  on:keydown={(e) => { if (e.key === 'Enter') dispatch('select', task.id); }}
+  on:click={(e) => dispatch("select", { id: task.id, ctrlKey: e.ctrlKey || e.metaKey, shiftKey: e.shiftKey })}
+  on:keydown={(e) => { if (e.key === 'Enter') dispatch('select', { id: task.id, ctrlKey: e.ctrlKey || e.metaKey, shiftKey: e.shiftKey }); }}
   role="button"
   tabindex="0"
   aria-label="{task.filename || 'Task'}"
@@ -171,24 +156,36 @@
           </button>
         {/if}
 
-        <button
-          class="icon-btn icon-btn-danger"
-          class:confirming={confirmingCancel}
-          title={confirmingCancel ? $t("task.confirmCancel") : $t("toolbar.delete")}
-          aria-label="{confirmingCancel ? $t('task.confirmCancel') : $t('toolbar.delete')}: {task.filename}"
-          on:click|stopPropagation={handleCancelClick}
-        >
-          {#if confirmingCancel}
-            <span class="confirm-text">{$t("task.confirmCancel")}</span>
-          {:else}
+        {#if canCancel(task.state) && !isFailed}
+          <button
+            class="icon-btn icon-btn-cancel"
+            title={$t("task.cancel")}
+            aria-label="{$t('task.cancel')}: {task.filename}"
+            on:click|stopPropagation={() => dispatch("cancel", task.id)}
+          >
             <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true">
               <path
                 fill-rule="evenodd"
-                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
                 clip-rule="evenodd"
               />
             </svg>
-          {/if}
+          </button>
+        {/if}
+
+        <button
+          class="icon-btn icon-btn-danger"
+          title={$t("toolbar.delete")}
+          aria-label="{$t('toolbar.delete')}: {task.filename}"
+          on:click|stopPropagation={() => dispatch("delete", task.id)}
+        >
+          <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true">
+            <path
+              fill-rule="evenodd"
+              d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+              clip-rule="evenodd"
+            />
+          </svg>
         </button>
 
         {#if !isCompleted}
@@ -219,17 +216,17 @@
   <div class="card-footer">
     <div class="metrics">
       <span class="size-metric">
-        <bdi>{writtenFormatted}</bdi> / <bdi>{totalFormatted}</bdi>
+        <bdi dir="ltr">{writtenFormatted}</bdi> / <bdi dir="ltr">{totalFormatted}</bdi>
         {#if percentFormatted}
-          <span class="percent-badge"><bdi>{percentFormatted}</bdi></span>
+          <span class="percent-badge"><bdi dir="ltr">{percentFormatted}</bdi></span>
         {/if}
       </span>
 
       {#if isDownloading}
         <span class="dot-separator">•</span>
-        <span class="speed-metric"><bdi>{speedFormatted}</bdi></span>
+        <span class="speed-metric"><bdi dir="ltr">{speedFormatted}</bdi></span>
         <span class="dot-separator">•</span>
-        <span class="eta-metric"><bdi>{etaFormatted}</bdi></span>
+        <span class="eta-metric"><bdi dir="ltr">{etaFormatted}</bdi></span>
       {/if}
     </div>
 
@@ -429,6 +426,11 @@
   }
   .icon-btn-danger:hover {
     background-color: rgba(220, 38, 38, 0.12);
+  }
+
+  .icon-btn-cancel:hover {
+    background-color: rgba(220, 38, 38, 0.12);
+    color: var(--state-failed, #dc2626) !important;
   }
 
   .icon-btn-danger.confirming {

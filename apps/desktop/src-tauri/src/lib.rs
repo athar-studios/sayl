@@ -5,6 +5,7 @@
 
 pub mod autostart;
 pub mod browsers;
+pub mod delete;
 pub mod duplicates;
 pub mod native_host;
 pub mod perf;
@@ -13,6 +14,7 @@ pub mod shutdown;
 pub mod tray;
 
 pub use browsers::{BrowserStatus, SUPPORTED_BROWSERS};
+pub use delete::{execute_delete_tasks, send_to_recycle_bin};
 pub use duplicates::{find_duplicate, normalize_url_for_compare};
 pub use native_host::{NativeHostPing, NativeHostStatus, RegisteredStatus};
 pub use power::{should_inhibit, SleepInhibitor};
@@ -587,6 +589,65 @@ pub mod commands {
     }
 
     #[tauri::command]
+    pub async fn delete_tasks(
+        app_handle: tauri::AppHandle,
+        state: State<'_, AppState>,
+        ids: Vec<String>,
+        delete_files: Option<bool>,
+    ) -> Result<Vec<String>, String> {
+        let task_ids: Vec<TaskId> = ids
+            .iter()
+            .map(|s| s.parse::<TaskId>().map_err(|e| format!("Invalid task ID '{s}': {e}")))
+            .collect::<Result<_, _>>()?;
+
+        let should_delete_files = delete_files.unwrap_or(false);
+
+        let deleted = crate::delete::execute_delete_tasks(
+            &state.engine,
+            &task_ids,
+            should_delete_files,
+        )
+        .await?;
+
+        if let Ok(mut stats) = state.live_stats.lock() {
+            for id in &deleted {
+                stats.remove(id);
+            }
+        }
+        if let Ok(mut cache) = state.parts_cache.write() {
+            for id in &deleted {
+                cache.remove(id);
+            }
+        }
+
+        let active = state.active_count.load(Ordering::Relaxed);
+        update_sleep_inhibition_with_count(&state.settings, &state.sleep_inhibitor, active);
+
+        let deleted_str_ids: Vec<String> = deleted.into_iter().map(|id| id.to_string()).collect();
+
+        let payload = TasksChangedPayload {
+            revision: 0,
+            full: false,
+            upsert: Vec::new(),
+            removed: deleted_str_ids.clone(),
+        };
+        let _ = app_handle.emit("sayl://tasks-changed", &payload);
+
+        Ok(deleted_str_ids)
+    }
+
+    #[tauri::command]
+    pub async fn delete_task(
+        app_handle: tauri::AppHandle,
+        state: State<'_, AppState>,
+        id: String,
+        delete_files: Option<bool>,
+    ) -> Result<(), String> {
+        delete_tasks(app_handle, state, vec![id], delete_files).await?;
+        Ok(())
+    }
+
+    #[tauri::command]
     pub async fn list_tasks(state: State<'_, AppState>) -> Result<Vec<TaskView>, String> {
         let engine = state.engine.clone();
         let live_stats = Arc::clone(&state.live_stats);
@@ -912,6 +973,8 @@ pub fn run() {
             commands::start_task,
             commands::pause_task,
             commands::cancel_task,
+            commands::delete_tasks,
+            commands::delete_task,
             commands::list_tasks,
             commands::get_settings,
             commands::set_settings,

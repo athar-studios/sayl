@@ -2,7 +2,7 @@ import { resolveTranslation } from "./i18n.js";
 
 /**
  * Formats a raw byte count into human-readable string with units.
- * Arabic units use standard Arabic transliterated units: جيجا, ميجا, كيلو, بايت.
+ * Uses standard units (B, KB, MB, GB, TB) with strict LTR isolation.
  */
 export function formatBytes(bytes, lang = "ar") {
   if (bytes === null || bytes === undefined || isNaN(bytes)) {
@@ -22,7 +22,7 @@ export function formatBytes(bytes, lang = "ar") {
 
 /**
  * Formats transfer speed in bytes per second.
- * Arabic units use ميجا/ث, كيلو/ث, جيجا/ث, بايت/ث.
+ * Uses standard units (B/s, KB/s, MB/s, GB/s) with strict LTR isolation.
  */
 export function formatSpeed(bytesPerSec, lang = "ar") {
   if (!bytesPerSec || bytesPerSec <= 0) {
@@ -38,8 +38,8 @@ export function formatSpeed(bytesPerSec, lang = "ar") {
 }
 
 /**
- * Formats percentage with correct bidi and Arabic percent symbol (٪).
- * No parentheses, rendered cleanly as e.g. "52.5٪".
+ * Formats percentage with standard % symbol and no parentheses.
+ * e.g. "52.5%".
  */
 export function formatPercent(percent, lang = "ar") {
   if (percent === null || percent === undefined || isNaN(percent)) {
@@ -49,9 +49,6 @@ export function formatPercent(percent, lang = "ar") {
   const clamped = Math.min(100, Math.max(0, p));
   const formatted = Number.isInteger(clamped) ? clamped.toString() : clamped.toFixed(1);
 
-  if (lang === "ar") {
-    return `${formatted}٪`;
-  }
   return `${formatted}%`;
 }
 
@@ -116,6 +113,15 @@ export function formatEta(seconds, lang = "ar") {
 export function formatBidi(str) {
   if (str === null || str === undefined || str === "") return "";
   return `\u2068${str}\u2069`;
+}
+
+/**
+ * Wraps text in Left-to-Right Isolate (U+2066) and Pop Directional Isolate (U+2069)
+ * to strictly enforce LTR ordering in RTL contexts.
+ */
+export function formatLtr(str) {
+  if (str === null || str === undefined || str === "") return "";
+  return `\u2066${str}\u2069`;
 }
 
 /**

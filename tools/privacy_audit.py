@@ -106,7 +106,7 @@ ALLOWED_URL_HOST_PATTERNS = [
     r"^http://ipc\.localhost(?:/.*)?$",
     r"^https?://github\.com(?:/.*)?$",
     r"^https?://raw\.githubusercontent\.com(?:/.*)?$",
-    r"^http://www\.w3\.org/2000/svg$",
+    r"^http://www\.w3\.org/(?:2000/svg|1999/xlink)$",
     r"^https?://(?:[a-zA-Z0-9_\-]+\.)*example\.(?:com|org)(?::\d+)?(?:/.*)?$",
     r"^https?://releases\.ubuntu\.com(?:/.*)?$",
     r"^https?://(?:[a-zA-Z0-9_\-]+\.)*public-cdn\.com(?:/.*)?$",
@@ -115,6 +115,14 @@ ALLOWED_URL_HOST_PATTERNS = [
     r"^https?://(?:a|origin1|cdn\.other)\.com(?:/.*)?$",
     # Official project support page (no tracking parameters, not application telemetry).
     r"^https?://ko-fi\.com/athar_studio(?:/.*)?$",
+    # Official project website, sister app, metadata schemas, and open-source license references
+    r"^https?://(?:[a-zA-Z0-9_\-]+\.)*sayl\.site(?:/.*)?$",
+    r"^https?://atharapp\.download(?:/.*)?$",
+    r"^https?://schema\.org(?:/.*)?$",
+    r"^https?://(?:www\.)?apache\.org/licenses/LICENSE-2\.0(?:/.*)?$",
+    # Competitor and comparison reference sites
+    r"^https?://(?:www\.)?(?:internetdownloadmanager|freedownloadmanager)\.com(?:/.*)?$",
+    r"^https?://aria2\.github\.io(?:/.*)?$",
 ]
 
 # A URL template whose host is filled in at runtime from a bound socket address,
@@ -310,12 +318,22 @@ def run_audit(root_dir: Path) -> dict:
                                 reason = "Localhost/fixture server address"
                             elif runtime_template:
                                 reason = "Runtime-filled loopback host template (benchmark harness only)"
-                            elif "github.com" in cleaned_url:
+                            elif "github.com" in cleaned_url or "raw.githubusercontent.com" in cleaned_url:
                                 reason = "Documentation/repository link"
                             elif "w3.org" in cleaned_url:
                                 reason = "Standard XML/SVG namespace"
                             elif "example." in cleaned_url or "ubuntu." in cleaned_url:
                                 reason = "Documentation/mock placeholder address"
+                            elif "sayl.site" in cleaned_url:
+                                reason = "Official project website link"
+                            elif "atharapp.download" in cleaned_url:
+                                reason = "Sister application link"
+                            elif "schema.org" in cleaned_url:
+                                reason = "Standard metadata schema context"
+                            elif "apache.org" in cleaned_url:
+                                reason = "Open source license reference"
+                            elif "ko-fi.com" in cleaned_url:
+                                reason = "Donation/support link"
                             else:
                                 reason = "Permitted reference"
                             results["outbound_urls"]["allowances"].append({
