@@ -201,8 +201,25 @@ if ($DryRun) {
 } else {
     Push-Location $DesktopDir
     try {
-        Write-Host "Executing: $TauriBuildCmd"
-        & cmd.exe /c "npm run tauri -- build"
+        # Guard: Validate overlay and staged resources exist before invoking Tauri build
+        $DesktopOverlayPath = Join-Path $DesktopDir "installer\tauri.bundle-resources.json"
+        if (-not (Test-Path -LiteralPath $DesktopOverlayPath)) {
+            throw "Release configuration overlay missing at: $DesktopOverlayPath"
+        }
+
+        $RequiredStagedFiles = @(
+            (Join-Path $DesktopDir "src-tauri\resources\host\sayl-bridge.exe"),
+            (Join-Path $DesktopDir "src-tauri\resources\host\com.sayl.downloader.json"),
+            (Join-Path $DesktopDir "src-tauri\resources\extensions\browser\chromium")
+        )
+        foreach ($staged in $RequiredStagedFiles) {
+            if (-not (Test-Path -LiteralPath $staged)) {
+                throw "Required staged release resource missing before Tauri build: $staged"
+            }
+        }
+
+        Write-Host "Executing: $TauriBuildCmd in $DesktopDir"
+        & cmd.exe /c $TauriBuildCmd
         $code = $LASTEXITCODE
         Write-Host "Command: $TauriBuildCmd | ExitCode: $code" -ForegroundColor DarkGray
         if ($code -ne 0) { throw "Tauri build failed with exit code $code" }
