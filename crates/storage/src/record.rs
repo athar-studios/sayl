@@ -42,6 +42,9 @@ pub struct TaskRecord {
     pub updated_at: DateTime<Utc>,
     /// Last error message if in `Failed` state.
     pub error: Option<String>,
+    /// Classification kind of the error (e.g. "http_429", "too_many_redirects").
+    #[serde(default)]
+    pub error_kind: Option<String>,
 }
 
 impl TaskRecord {
@@ -67,6 +70,7 @@ impl TaskRecord {
             created_at: now,
             updated_at: now,
             error: None,
+            error_kind: None,
         }
     }
 
@@ -93,6 +97,7 @@ impl TaskRecord {
             created_at: now,
             updated_at: now,
             error: None,
+            error_kind: None,
         }
     }
 }

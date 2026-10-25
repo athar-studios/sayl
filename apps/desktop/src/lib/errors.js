@@ -18,8 +18,25 @@ export const SUPPORTED_ERROR_KINDS = [
   "disk",
   "integrity",
   "canceled",
+  "http_429",
+  "http_503",
+  "http_5xx",
+  "http_4xx",
+  "too_many_redirects",
+  "timeout",
+  "invalid_url",
+  "cancelled",
   "unknown",
 ];
+
+/** Maps backend error_kind strings to the canonical translation key. */
+const KIND_ALIASES = {
+  http_429: "rate_limited",
+  http_503: "service_unavailable",
+  http_5xx: "service_unavailable",
+  http_4xx: "forbidden",
+  cancelled: "canceled",
+};
 
 /**
  * Returns a friendly { title, hint } object for a task's error.
@@ -35,8 +52,9 @@ export function friendlyError(task, lang = "ar") {
       ? rawKind
       : "unknown";
 
-  const title = resolveTranslation(lang, `errors.${kind}.title`);
-  const hint = resolveTranslation(lang, `errors.${kind}.hint`);
+  const canonical = KIND_ALIASES[kind] || kind;
+  const title = resolveTranslation(lang, `errors.${canonical}.title`);
+  const hint = resolveTranslation(lang, `errors.${canonical}.hint`);
 
   return { title, hint };
 }
