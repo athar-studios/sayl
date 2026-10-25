@@ -56,49 +56,101 @@ pub fn app_install_dir() -> PathBuf {
 }
 
 /// Resolves the absolute path to `sayl-bridge.exe`.
+///
+/// Probes in order:
+/// 1. `SAYL_BRIDGE_EXE` (direct file path or directory containing `host/sayl-bridge.exe`)
+/// 2. `<install_dir>\host\sayl-bridge.exe`
+/// 3. `<install_dir>\sayl-bridge.exe`
+/// 4. `<install_dir>\resources\host\sayl-bridge.exe`
+/// 5. `<exe_dir>\host\sayl-bridge.exe`
+/// 6. `<exe_dir>\sayl-bridge.exe`
+/// 7. `<exe_dir>\..\sayl-bridge.exe`
+/// 8. Dev target paths (`target/debug` and `target/release`)
 pub fn resolve_bridge_exe() -> Result<PathBuf, String> {
+    // 1. Probe SAYL_BRIDGE_EXE env override
     if let Some(custom) = std::env::var_os("SAYL_BRIDGE_EXE") {
         let p = PathBuf::from(custom);
-        if p.exists() {
+        if p.is_file() {
             return Ok(p);
+        }
+        let in_host = p.join("host").join("sayl-bridge.exe");
+        if in_host.is_file() {
+            return Ok(in_host);
+        }
+        let in_root = p.join("sayl-bridge.exe");
+        if in_root.is_file() {
+            return Ok(in_root);
         }
     }
 
     let install_dir = app_install_dir();
-    let candidate = install_dir.join("sayl-bridge.exe");
-    if candidate.exists() {
-        return Ok(candidate);
+    let has_install_dir_override = std::env::var_os("SAYL_INSTALL_DIR").is_some();
+
+    // 2. <install_dir>\host\sayl-bridge.exe
+    let cand_install_host = install_dir.join("host").join("sayl-bridge.exe");
+    if cand_install_host.is_file() {
+        return Ok(cand_install_host);
     }
 
-    if let Ok(current_exe) = std::env::current_exe() {
-        if let Some(parent) = current_exe.parent() {
-            let candidate_exe_dir = parent.join("sayl-bridge.exe");
-            if candidate_exe_dir.exists() {
-                return Ok(candidate_exe_dir);
-            }
-            if let Some(target_dir) = parent.parent() {
-                let candidate_target = target_dir.join("sayl-bridge.exe");
-                if candidate_target.exists() {
-                    return Ok(candidate_target);
+    // 3. <install_dir>\sayl-bridge.exe
+    let cand_install = install_dir.join("sayl-bridge.exe");
+    if cand_install.is_file() {
+        return Ok(cand_install);
+    }
+
+    // 4. <install_dir>\resources\host\sayl-bridge.exe
+    let cand_install_resources = install_dir
+        .join("resources")
+        .join("host")
+        .join("sayl-bridge.exe");
+    if cand_install_resources.is_file() {
+        return Ok(cand_install_resources);
+    }
+
+    // Probes 5-8: only if install_dir was not explicitly set via SAYL_INSTALL_DIR
+    if !has_install_dir_override {
+        if let Ok(current_exe) = std::env::current_exe() {
+            if let Some(exe_dir) = current_exe.parent() {
+                // 5. <exe_dir>\host\sayl-bridge.exe
+                let cand_exe_host = exe_dir.join("host").join("sayl-bridge.exe");
+                if cand_exe_host.is_file() {
+                    return Ok(cand_exe_host);
+                }
+
+                // 6. <exe_dir>\sayl-bridge.exe
+                let cand_exe = exe_dir.join("sayl-bridge.exe");
+                if cand_exe.is_file() {
+                    return Ok(cand_exe);
+                }
+
+                // 7. <exe_dir>\..\sayl-bridge.exe
+                if let Some(parent) = exe_dir.parent() {
+                    let cand_parent = parent.join("sayl-bridge.exe");
+                    if cand_parent.is_file() {
+                        return Ok(cand_parent);
+                    }
                 }
             }
         }
+
+        // 8. Existing dev target paths
+        let dev_debug =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../target/debug/sayl-bridge.exe");
+        if dev_debug.is_file() {
+            return Ok(dev_debug);
+        }
+
+        let dev_release =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../target/release/sayl-bridge.exe");
+        if dev_release.is_file() {
+            return Ok(dev_release);
+        }
     }
 
-    let dev_debug =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../target/debug/sayl-bridge.exe");
-    if dev_debug.exists() {
-        return Ok(dev_debug);
-    }
-
-    let dev_release =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../target/release/sayl-bridge.exe");
-    if dev_release.exists() {
-        return Ok(dev_release);
-    }
-
-    // Default to the install directory candidate even if not yet created on disk.
-    Ok(candidate)
+    Err(format!(
+        "sayl-bridge.exe not found in install dir ({}), host subdir, resources, or dev target paths",
+        install_dir.display()
+    ))
 }
 
 /// Locates the packaged extension source directory.
@@ -179,8 +231,7 @@ pub fn stage_extension() -> Result<String, String> {
 /// Computes the native messaging host status report.
 pub fn get_native_host_status<R: RegistryOperations>(registry: &R) -> NativeHostStatus {
     let install_dir = app_install_dir();
-    let bridge_exe = resolve_bridge_exe().unwrap_or_else(|_| install_dir.join("sayl-bridge.exe"));
-    let bridge_present = bridge_exe.exists();
+    let bridge_present = resolve_bridge_exe().is_ok();
 
     let ext_dir = chromium_extension_dir();
     let ext_ff_dir = firefox_extension_dir();
@@ -230,7 +281,8 @@ pub fn register_native_host_with_ops<R: RegistryOperations>(
         None => None,
     };
 
-    let bridge_exe = resolve_bridge_exe()?;
+    let bridge_exe =
+        resolve_bridge_exe().map_err(|e| format!("Cannot register native host: {e}"))?;
     let abs_bridge_exe = if bridge_exe.is_absolute() {
         bridge_exe
     } else {
@@ -238,6 +290,13 @@ pub fn register_native_host_with_ops<R: RegistryOperations>(
             .map_err(|e| format!("Failed to get current dir: {e}"))?
             .join(bridge_exe)
     };
+
+    if !abs_bridge_exe.exists() {
+        return Err(format!(
+            "Cannot register native host: bridge executable does not exist at {}",
+            abs_bridge_exe.display()
+        ));
+    }
 
     register_host(registry, &abs_bridge_exe, valid_id.as_deref())?;
     Ok(())
@@ -382,10 +441,13 @@ pub async fn cmd_browser_status() -> Vec<crate::browsers::BrowserStatus> {
     let reg = WindowsRegistry;
     let probe = crate::browsers::SystemBrowserProbe;
 
-    let bridge_exe = resolve_bridge_exe().unwrap_or_else(|_| PathBuf::from("sayl-bridge.exe"));
-    let ping = run_bridge_ping(&bridge_exe).await;
+    let ping_ok = if let Ok(bridge_exe) = resolve_bridge_exe() {
+        run_bridge_ping(&bridge_exe).await.ok
+    } else {
+        false
+    };
 
-    crate::browsers::collect_browser_statuses(&probe, &reg, ping.ok)
+    crate::browsers::collect_browser_statuses(&probe, &reg, ping_ok)
 }
 
 pub fn cmd_prepare_extension() -> Result<String, String> {
@@ -403,7 +465,16 @@ pub fn cmd_unregister_native_host() -> Result<(), String> {
 }
 
 pub async fn cmd_test_native_host() -> Result<NativeHostPing, String> {
-    let bridge_exe = resolve_bridge_exe()?;
+    let bridge_exe = match resolve_bridge_exe() {
+        Ok(p) => p,
+        Err(e) => {
+            return Ok(NativeHostPing {
+                ok: false,
+                roundtrip_ms: 0,
+                message: e,
+            });
+        }
+    };
     Ok(run_bridge_ping(&bridge_exe).await)
 }
 
@@ -591,5 +662,64 @@ mod tests {
         std::env::remove_var("SAYL_LOCALAPPDATA");
         std::env::remove_var("SAYL_EXTENSION_SOURCE_DIR");
         std::env::remove_var("SAYL_BRIDGE_EXE");
+    }
+
+    #[test]
+    fn test_resolve_bridge_exe_in_installed_host_subdir() {
+        let _lock = TEST_ENV_LOCK.lock().unwrap();
+        let temp_base = make_test_temp_dir();
+        let install_dir = temp_base.join("install");
+        let host_dir = install_dir.join("host");
+        fs::create_dir_all(&host_dir).unwrap();
+        let bridge_exe = host_dir.join("sayl-bridge.exe");
+        fs::write(&bridge_exe, b"dummy bridge binary in host subdir").unwrap();
+
+        // 1. Via SAYL_INSTALL_DIR
+        std::env::set_var("SAYL_INSTALL_DIR", &install_dir);
+        std::env::remove_var("SAYL_BRIDGE_EXE");
+        let resolved = resolve_bridge_exe().expect("resolves bridge in host subdir");
+        assert_eq!(resolved, bridge_exe);
+        std::env::remove_var("SAYL_INSTALL_DIR");
+
+        // 2. Via SAYL_BRIDGE_EXE pointing to temp dir
+        std::env::set_var("SAYL_BRIDGE_EXE", &install_dir);
+        let resolved_via_env =
+            resolve_bridge_exe().expect("resolves bridge via SAYL_BRIDGE_EXE dir");
+        assert_eq!(resolved_via_env, bridge_exe);
+        std::env::remove_var("SAYL_BRIDGE_EXE");
+    }
+
+    #[test]
+    fn test_register_native_host_missing_bridge_returns_error() {
+        let _lock = TEST_ENV_LOCK.lock().unwrap();
+        let temp_base = make_test_temp_dir();
+        let local_app_data = temp_base.join("localappdata");
+        let fixture_src = temp_base.join("fixture_extension");
+        let empty_install = temp_base.join("empty_install");
+
+        fs::create_dir_all(&local_app_data).unwrap();
+        fs::create_dir_all(&fixture_src).unwrap();
+        fs::create_dir_all(&empty_install).unwrap();
+        fs::write(fixture_src.join("manifest.json"), b"{}").unwrap();
+
+        std::env::set_var("SAYL_LOCALAPPDATA", &local_app_data);
+        std::env::set_var("SAYL_EXTENSION_SOURCE_DIR", &fixture_src);
+        std::env::set_var("SAYL_INSTALL_DIR", &empty_install);
+        std::env::remove_var("SAYL_BRIDGE_EXE");
+
+        let mut mock_reg = MockRegistry::default();
+        let err = register_native_host_with_ops(&mut mock_reg, None).unwrap_err();
+        assert!(
+            err.contains("sayl-bridge.exe not found")
+                || err.contains("Cannot register native host"),
+            "Expected missing bridge error, got: {err}"
+        );
+
+        let status = get_native_host_status(&mock_reg);
+        assert!(!status.bridge_present);
+
+        std::env::remove_var("SAYL_LOCALAPPDATA");
+        std::env::remove_var("SAYL_EXTENSION_SOURCE_DIR");
+        std::env::remove_var("SAYL_INSTALL_DIR");
     }
 }
