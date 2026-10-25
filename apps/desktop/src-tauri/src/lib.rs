@@ -597,17 +597,17 @@ pub mod commands {
     ) -> Result<Vec<String>, String> {
         let task_ids: Vec<TaskId> = ids
             .iter()
-            .map(|s| s.parse::<TaskId>().map_err(|e| format!("Invalid task ID '{s}': {e}")))
+            .map(|s| {
+                s.parse::<TaskId>()
+                    .map_err(|e| format!("Invalid task ID '{s}': {e}"))
+            })
             .collect::<Result<_, _>>()?;
 
         let should_delete_files = delete_files.unwrap_or(false);
 
-        let deleted = crate::delete::execute_delete_tasks(
-            &state.engine,
-            &task_ids,
-            should_delete_files,
-        )
-        .await?;
+        let deleted =
+            crate::delete::execute_delete_tasks(&state.engine, &task_ids, should_delete_files)
+                .await?;
 
         if let Ok(mut stats) = state.live_stats.lock() {
             for id in &deleted {

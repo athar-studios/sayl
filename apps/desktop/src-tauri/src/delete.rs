@@ -3,12 +3,13 @@
 //! Provides permanent task removal from store and write-ahead journal (`journal.jsonl`),
 //! and optional file removal to the Windows Recycle Bin using `SHFileOperationW`.
 
-use std::path::Path;
 use sayl_core::id::TaskId;
+use std::path::Path;
 
 #[cfg(windows)]
 #[repr(C)]
 #[derive(Clone, Copy)]
+#[allow(clippy::upper_case_acronyms)]
 struct SHFILEOPSTRUCTW {
     hwnd: *mut std::ffi::c_void,
     w_func: u32,
@@ -200,7 +201,8 @@ mod tests {
         dl_dir: &Path,
         state: DownloadState,
     ) -> TaskRecord {
-        let mut record = TaskRecord::with_id(id, "http://example.com/testfile.bin", dl_dir, filename);
+        let mut record =
+            TaskRecord::with_id(id, "http://example.com/testfile.bin", dl_dir, filename);
         record.state = state;
         store.upsert_task(&record).expect("upsert test task");
         record
@@ -221,8 +223,16 @@ mod tests {
         }
 
         let store = Arc::new(Store::open(store_temp.path()).unwrap());
-        insert_test_task(&store, task_id, filename, dl_temp.path(), DownloadState::Paused);
-        let engine = Engine::with_store(dl_temp.path(), Arc::clone(&store), EngineConfig::default()).unwrap();
+        insert_test_task(
+            &store,
+            task_id,
+            filename,
+            dl_temp.path(),
+            DownloadState::Paused,
+        );
+        let engine =
+            Engine::with_store(dl_temp.path(), Arc::clone(&store), EngineConfig::default())
+                .unwrap();
 
         // Delete with delete_files = false
         let deleted = execute_delete_tasks(&engine, &[task_id], false)
@@ -244,7 +254,10 @@ mod tests {
         );
 
         // 3. File remains untouched on disk
-        assert!(file_path.exists(), "File must remain untouched when delete_files is false");
+        assert!(
+            file_path.exists(),
+            "File must remain untouched when delete_files is false"
+        );
     }
 
     // Scenario 2: remove+file (delete_files: true): task removed from store & journal, file and .part file sent to recycler.
@@ -265,24 +278,31 @@ mod tests {
         }
 
         let store = Arc::new(Store::open(store_temp.path()).unwrap());
-        insert_test_task(&store, task_id, filename, dl_temp.path(), DownloadState::Paused);
-        let engine = Engine::with_store(dl_temp.path(), Arc::clone(&store), EngineConfig::default()).unwrap();
+        insert_test_task(
+            &store,
+            task_id,
+            filename,
+            dl_temp.path(),
+            DownloadState::Paused,
+        );
+        let engine =
+            Engine::with_store(dl_temp.path(), Arc::clone(&store), EngineConfig::default())
+                .unwrap();
 
         let mut recycled_paths = Vec::new();
-        let deleted = execute_delete_tasks_with_recycler(
-            &engine,
-            &[task_id],
-            true,
-            |path| {
-                recycled_paths.push(path.to_path_buf());
-                send_to_recycle_bin(path)
-            },
-        )
+        let deleted = execute_delete_tasks_with_recycler(&engine, &[task_id], true, |path| {
+            recycled_paths.push(path.to_path_buf());
+            send_to_recycle_bin(path)
+        })
         .await
         .expect("delete execution should succeed");
 
         assert_eq!(deleted, vec![task_id]);
-        assert_eq!(recycled_paths.len(), 2, "Both final and .part files should be sent to recycler");
+        assert_eq!(
+            recycled_paths.len(),
+            2,
+            "Both final and .part files should be sent to recycler"
+        );
         assert!(recycled_paths.contains(&final_path));
         assert!(recycled_paths.contains(&part_path));
 
@@ -313,8 +333,16 @@ mod tests {
         }
 
         let store = Arc::new(Store::open(store_temp.path()).unwrap());
-        insert_test_task(&store, task_id, filename, dl_temp.path(), DownloadState::Downloading);
-        let engine = Engine::with_store(dl_temp.path(), Arc::clone(&store), EngineConfig::default()).unwrap();
+        insert_test_task(
+            &store,
+            task_id,
+            filename,
+            dl_temp.path(),
+            DownloadState::Downloading,
+        );
+        let engine =
+            Engine::with_store(dl_temp.path(), Arc::clone(&store), EngineConfig::default())
+                .unwrap();
 
         // Delete with delete_files = true
         let deleted = execute_delete_tasks(&engine, &[task_id], true)
@@ -323,11 +351,17 @@ mod tests {
 
         assert_eq!(deleted, vec![task_id]);
         assert!(!part_path.exists(), "Part file must be removed");
-        assert!(engine.get_task(task_id).unwrap().is_none(), "Task removed from store");
+        assert!(
+            engine.get_task(task_id).unwrap().is_none(),
+            "Task removed from store"
+        );
         drop(engine);
         drop(store);
         let reopened_store = Store::open(store_temp.path()).unwrap();
-        assert!(reopened_store.get_task(task_id).unwrap().is_none(), "Task removed from journal");
+        assert!(
+            reopened_store.get_task(task_id).unwrap().is_none(),
+            "Task removed from journal"
+        );
     }
 
     // Scenario 4: completed task: completed download removed from store, completed file recycled.
@@ -345,8 +379,16 @@ mod tests {
         }
 
         let store = Arc::new(Store::open(store_temp.path()).unwrap());
-        insert_test_task(&store, task_id, filename, dl_temp.path(), DownloadState::Completed);
-        let engine = Engine::with_store(dl_temp.path(), Arc::clone(&store), EngineConfig::default()).unwrap();
+        insert_test_task(
+            &store,
+            task_id,
+            filename,
+            dl_temp.path(),
+            DownloadState::Completed,
+        );
+        let engine =
+            Engine::with_store(dl_temp.path(), Arc::clone(&store), EngineConfig::default())
+                .unwrap();
 
         let deleted = execute_delete_tasks(&engine, &[task_id], true)
             .await
@@ -375,8 +417,16 @@ mod tests {
         assert!(!part_path.exists());
 
         let store = Arc::new(Store::open(store_temp.path()).unwrap());
-        insert_test_task(&store, task_id, filename, dl_temp.path(), DownloadState::Failed);
-        let engine = Engine::with_store(dl_temp.path(), Arc::clone(&store), EngineConfig::default()).unwrap();
+        insert_test_task(
+            &store,
+            task_id,
+            filename,
+            dl_temp.path(),
+            DownloadState::Failed,
+        );
+        let engine =
+            Engine::with_store(dl_temp.path(), Arc::clone(&store), EngineConfig::default())
+                .unwrap();
 
         let res = execute_delete_tasks(&engine, &[task_id], true).await;
         assert!(res.is_ok(), "Missing file deletion must succeed cleanly");
