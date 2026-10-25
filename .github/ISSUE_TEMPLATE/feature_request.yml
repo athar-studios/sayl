@@ -1,5 +1,5 @@
-name: Feature Request
-description: Suggest a new feature or enhancement for SAYL
+name: Feature Request / اقتراح ميزة
+description: Suggest a new feature or improvement for SAYL / اقتراح ميزة جديدة أو تحسين لبرنامج سيل
 title: "[FEAT] "
 labels: ["enhancement"]
 body:

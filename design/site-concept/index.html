@@ -1,0 +1,52 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>سيل — مدير تنزيلات مفتوح المصدر لويندوز</title><link rel="stylesheet" href="style.css"></head><body>
+<canvas id="flow" aria-hidden="true"></canvas>
+<div class="wrap">
+<header><img class="mark" src="icon.svg" alt="سيل"><nav><a href="#features" class="hide">المميزات</a><a href="#ext" class="hide">إضافة المتصفح</a><a href="docs.html">الدليل</a><a href="https://github.com/ashrymahrm/sayl">GitHub</a></nav><button class="lang">English</button></header>
+<section class="hero">
+ <div>
+  <div class="logo-anim"><canvas id="logo" role="img" aria-label="سيل"></canvas></div>
+  <h1>التنزيل يتدفّق<br>كالسيل.</h1>
+  <p class="lead">يقسّم سيل الملف على عدة اتصالات في وقت واحد، وإذا انقطع الإنترنت أو أغلقت الجهاز أكمل من حيث توقّف.</p>
+  <div class="cta"><a class="btn pri" href="https://github.com/ashrymahrm/sayl/releases/latest">نزِّل لويندوز</a><a class="btn sec" href="https://github.com/ashrymahrm/sayl">الكود على GitHub</a></div>
+  <div class="meta">الإصدار 0.1.0 · ويندوز 10 و11 · مجاني ومفتوح المصدر (Apache-2.0)</div>
+ </div>
+ <div class="dl" aria-label="مثال لتنزيل شغال">
+  <div class="row"><span>قيد التنزيل</span><span>8 اتصالات</span></div>
+  <div class="name">ubuntu-24.04-desktop-amd64.iso</div>
+  <div class="segs"></div>
+  <div class="big" id="pct">٠٪</div><small id="spd">٤٢ م.ب/ث · المتبقي ٣د ٢٠ث</small>
+ </div>
+</section>
+<section class="band" id="features"><h2>ما يقدّمه من اليوم الأول</h2><p class="sub">بلا إعلانات ولا حساب. ألصق الرابط واترك الباقي لسيل.</p>
+<div class="feat">
+ <div><h3>تنزيل أسرع</h3><p>يُقسَم الملف أجزاءً، ويُنزَّل كل جزء عبر اتصال مستقل في الوقت نفسه.</p></div>
+ <div><h3>استئناف من حيث توقّف</h3><p>أغلقت البرنامج أو انقطع الاتصال؟ يكمل سيل من آخر بايت وصل.</p></div>
+ <div><h3>عربي وإنجليزي</h3><p>واجهة تُقرأ من اليمين إلى اليسار، بوضعين فاتح وداكن.</p></div>
+ <div><h3>اسحب وأفلت</h3><p>اسحب أي رابط إلى النافذة ليبدأ التنزيل فورًا.</p></div>
+ <div><h3>اختر مكان الحفظ</h3><p>حدّد مجلدًا لكل تنزيل، أو مجلدًا واحدًا للجميع.</p></div>
+ <div><h3>سطر أوامر</h3><p>أمر <span dir="ltr">sayl</span> لمن يفضّل العمل من الطرفية.</p></div>
+</div></section>
+<section class="band split" id="ext"><div><h2>من المتصفح إلى سيل مباشرة</h2><p class="sub">ثبّت الإضافة على Chrome أو Edge، فينتقل إلى سيل كل تنزيل يبدأ في المتصفح. وإن أردت الاختيار بنفسك، فانقر بزر الفأرة الأيمن على الرابط واختر «التحميل باستخدام سيل».</p><a class="btn sec" href="docs.html#ext">طريقة التثبيت</a></div>
+<div class="term"><b>PS&gt;</b> sayl get https://example.org/big.zip -c 8<br>connections 8 · 1.2 GB<br>████████████░░░░░░  64%  41.8 MB/s<br><b>PS&gt;</b> sayl resume 3<br>resumed from 768 MB</div></section>
+<section class="band"><div class="next"><div><div class="tag">قادم في 0.2.0</div><h2 style="margin:6px 0">تنزيل الفيديو بالجودة التي تختارها</h2><p style="margin:0;color:#b9c8e6">زر صغير يظهر فوق الفيديو، تختار منه الجودة أو الصوت وحده.</p></div><a class="btn sec" href="https://github.com/ashrymahrm/sayl">تابع على GitHub</a></div></section>
+<footer><span>سيل · sayl.site</span><span><a href="docs.html">الدليل</a> · <a href="https://github.com/ashrymahrm/sayl">GitHub</a> · Apache-2.0</span></footer>
+</div>
+<script src="flow.js"></script>
+<script>
+// still logo, colors flow inside (right-to-left, 3.5s loop)
+(function(){const c=document.getElementById('logo'),x=c.getContext('2d'),im=new Image();im.src='icon.svg';
+const red=matchMedia('(prefers-reduced-motion: reduce)').matches;
+im.onload=()=>{const W=1024,H=Math.round(W*im.naturalHeight/im.naturalWidth);c.width=W;c.height=H;
+ const t0=performance.now();(function f(now){const p=((now-t0)/3500)%1;x.globalCompositeOperation='source-over';x.clearRect(0,0,W,H);x.drawImage(im,0,0,W,H);
+  x.globalCompositeOperation='source-atop';const L=W*1.2,o=p*L;
+  for(let k=-1;k<2;k++){const b=W-o+k*L;const g=x.createLinearGradient(b-L,0,b,0);
+   g.addColorStop(0,'rgba(11,26,78,0)');g.addColorStop(.25,'rgba(11,26,78,.75)');g.addColorStop(.42,'rgba(0,182,189,.6)');
+   g.addColorStop(.5,'rgba(127,240,242,.95)');g.addColorStop(.54,'rgba(230,255,255,.9)');g.addColorStop(.62,'rgba(0,182,189,.6)');g.addColorStop(.8,'rgba(11,26,78,.7)');g.addColorStop(1,'rgba(11,26,78,0)');
+   x.fillStyle=g;x.fillRect(b-L,0,L,H);}
+  if(!red)requestAnimationFrame(f)})(t0)};})();
+</script>
+<script>
+const s=document.querySelector('.segs'),ar=n=>n.toLocaleString('ar-EG');
+for(let i=0;i<8;i++){const d=document.createElement('div');d.className='seg';d.innerHTML=`<i style="animation-duration:${5+Math.random()*5}s;animation-delay:${Math.random()*.8}s"></i>`;s.appendChild(d)}
+const t0=performance.now();(function u(){const p=Math.min(100,Math.round((performance.now()-t0)/80));document.getElementById('pct').textContent=ar(p)+'٪';if(p<100)requestAnimationFrame(u)})();
+</script></body></html>

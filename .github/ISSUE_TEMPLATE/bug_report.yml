@@ -1,5 +1,5 @@
-name: Bug Report
-description: Report a reproducible bug in SAYL
+name: Bug Report / إبلاغ عن مشكلة
+description: Report a bug or defect in SAYL / الإبلاغ عن خطأ أو خلل في برنامج سيل
 title: "[BUG] "
 labels: ["bug"]
 body:

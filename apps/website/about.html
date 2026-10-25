@@ -1,80 +1,84 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="سيل (SAYL) — مدير تنزيل Windows مستقل، مفتوح المصدر، يحترم خصوصيتك. تنزيل قابل للاستئناف، متعدد الأجزاء، بواجهة عربية أولاً وبدون خوادم وسيطة.">
-    <meta name="theme-color" content="#070F2E">
-    <title>من نحن — سيل SAYL</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
-    <link rel="apple-touch-icon" sizes="128x128" href="icon-128.png">
-    <meta property="og:title" content="سيل (SAYL) — مدير تنزيل مستقل لـ Windows">
-    <meta property="og:description" content="مدير تنزيل Windows مستقل، مفتوح المصدر، يحترم خصوصيتك. تنزيل قابل للاستئناف، متعدد الأجزاء، بواجهة عربية أولاً.">
-    <meta property="og:type" content="website">
-    <meta property="og:image" content="og-image.svg">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-ar="من نحن — أثر ستوديو وسيل" data-en="About Us — Athar Studio & Sayl">من نحن — أثر ستوديو وسيل</title>
+  <meta name="description" content="عن أثر ستوديو ومشروع سيل: أدوات برمجية مستقلة تحترم خصوصية المستخدم وبالعربية أولًا.">
+  <meta name="theme-color" content="#070F2E">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
+  <link rel="apple-touch-icon" sizes="128x128" href="icon-128.png">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <a href="#main-content" class="skip-link" data-ar="تجاوز إلى المحتوى الرئيسي" data-en="Skip to main content">تجاوز إلى المحتوى الرئيسي</a>
+  <canvas id="flow" aria-hidden="true" style="opacity:0.35"></canvas>
 
-    <header class="site-header">
-        <div class="container">
-            <div class="header-content">
-                <div class="brand">
-                    <img src="favicon.svg" alt="" width="36" height="25" class="brand-logo-img" aria-hidden="true">
-                    <span class="brand-name">سيل</span>
-                    <span class="brand-tag" aria-label="SAYL">SAYL</span>
-                </div>
-
-                <nav id="main-nav" class="main-nav" aria-label="التنقل الرئيسي">
-                    <ul class="nav-links"><li><a href="index.html" data-ar="الرئيسية" data-en="Home">الرئيسية</a></li>
-<li><a href="docs.html" data-ar="الدليل" data-en="Docs">الدليل</a></li>
-<li><a href="about.html" data-ar="من نحن" data-en="About">من نحن</a></li>
-<li><a href="support.html" data-ar="ادعمنا" data-en="Support">ادعمنا</a></li>
-<li><a href="privacy.html" data-ar="الخصوصية" data-en="Privacy">الخصوصية</a></li></ul>
-                </nav>
-
-                <div class="header-actions">
-                    <button id="lang-toggle" type="button" class="lang-toggle" aria-label="تبديل اللغة إلى الإنجليزية" aria-pressed="false">
-                        <span class="lang-current" aria-hidden="true">EN</span>
-                        <span class="sr-only">English</span>
-                    </button>
-
-                    <button id="menu-toggle" type="button" class="menu-toggle" aria-expanded="false" aria-controls="main-nav" aria-label="فتح القائمة" data-ar-label="فتح القائمة" data-en-label="Open menu">
-                        <svg class="menu-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <line x1="3" y1="6" x2="21" y2="6" class="bar-top"></line>
-                            <line x1="3" y1="12" x2="21" y2="12" class="bar-mid"></line>
-                            <line x1="3" y1="18" x2="21" y2="18" class="bar-bot"></line>
-                        </svg>
-                        <span class="sr-only" data-ar="القائمة" data-en="Menu">القائمة</span>
-                    </button>
-                </div>
-            </div>
-        </div>
+  <div class="wrap">
+    <header>
+      <a href="index.html" class="brand-link" aria-label="العودة للرئيسية">
+        <img class="mark" src="icon.svg" alt="سيل" width="42" height="29">
+      </a>
+      <nav aria-label="التنقل الرئيسي">
+        <a href="index.html" data-ar="الرئيسية" data-en="Home">الرئيسية</a>
+        <a href="docs.html" data-ar="الدليل" data-en="Docs">الدليل</a>
+        <a href="about.html" class="active hide-mobile" data-ar="عن الاستوديو" data-en="About">عن الاستوديو</a>
+        <a href="support.html" class="hide-mobile" data-ar="ادعمنا" data-en="Support">ادعمنا</a>
+        <a href="https://github.com/athar-studios/sayl/releases/latest" class="hide-mobile" data-ar="التنزيل" data-en="Download">التنزيل</a>
+        <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </nav>
+      <div class="header-actions">
+        <button type="button" class="lang-btn" aria-label="Switch to English">English</button>
+      </div>
     </header>
 
-    <main id="main-content" class="doc-page"><div class="container doc-container"><h1 data-ar="من نحن" data-en="About us">من نحن</h1><section class="doc-section"><h2 data-ar="أثر ستوديو" data-en="Athar Studio">أثر ستوديو</h2><p data-ar="نحن استوديو صغير مستقل نصنع أدوات بسيطة تحترم مستخدميها: بلا إعلانات، وبلا تتبّع، وبالعربية أولًا." data-en="We are a small independent studio making simple tools that respect their users: no ads, no tracking, Arabic first.">نحن استوديو صغير مستقل نصنع أدوات بسيطة تحترم مستخدميها: بلا إعلانات، وبلا تتبّع، وبالعربية أولًا.</p><p data-ar="بدأنا بتطبيق «أثر» للأذكار والمحتوى الإسلامي، ثم جاء سيل." data-en="We started with the ATHAR app for adhkar and Islamic content, then came Sayl.">بدأنا بتطبيق «أثر» للأذكار والمحتوى الإسلامي، ثم جاء سيل.</p></section><section class="doc-section"><h2 data-ar="لماذا سيل؟" data-en="Why Sayl?">لماذا سيل؟</h2><p data-ar="أردنا مدير تنزيل سريعًا يكمل ما انقطع، بواجهة عربية أنيقة، ودون أن يطلب منك حسابًا أو يرسل بياناتك لأحد. لم نجد ما يرضينا، فبنيناه وجعلنا كوده مفتوحًا للجميع." data-en="We wanted a fast download manager that resumes what was cut off, with a clean Arabic interface, and without asking for an account or sending your data anywhere. We didn’t find one we liked, so we built it and opened the code.">أردنا مدير تنزيل سريعًا يكمل ما انقطع، بواجهة عربية أنيقة، ودون أن يطلب منك حسابًا أو يرسل بياناتك لأحد. لم نجد ما يرضينا، فبنيناه وجعلنا كوده مفتوحًا للجميع.</p></section><section class="doc-section"><h2 data-ar="ما القادم" data-en="What’s next">ما القادم</h2><li data-ar="تنزيل الفيديو والصوت، وإضافة للمتصفح." data-en="Video and audio downloads, plus a browser extension.">تنزيل الفيديو والصوت، وإضافة للمتصفح.</li><li data-ar="قوائم انتظار وجدولة وحدود للسرعة." data-en="Queues, scheduling and speed limits.">قوائم انتظار وجدولة وحدود للسرعة.</li><li data-ar="توقيع رقمي للبرنامج ونسخة على متجر مايكروسوفت." data-en="Code signing and a Microsoft Store version.">توقيع رقمي للبرنامج ونسخة على متجر مايكروسوفت.</li></section><section class="doc-section"><h2 data-ar="مشاريعنا" data-en="Our projects">مشاريعنا</h2><li data-ar="تطبيق أثر: atharapp.download" data-en="ATHAR app: atharapp.download">تطبيق أثر: atharapp.download</li><li data-ar="سيل: sayl.site" data-en="Sayl: sayl.site">سيل: sayl.site</li></section></div></main>
+    <main class="page-shell">
+      <div class="page-card">
+        <h1 data-ar="من نحن" data-en="About Us">من نحن</h1>
+        <p class="lead" data-ar="نصنع أدوات رقمية بسيطة، سريعة، وتحترم مستخدميها من اللحظة الأولى." data-en="We craft simple, fast software tools that respect users from day one.">نصنع أدوات رقمية بسيطة، سريعة، وتحترم مستخدميها من اللحظة الأولى.</p>
 
-    <footer class="site-footer">
-        <div class="container">
-            <div class="footer-content">
-                <div class="footer-brand">
-                    <img src="favicon.svg" alt="" width="28" height="19" class="footer-logo-img" aria-hidden="true">
-                    <span class="brand-name">سيل</span>
-                    <span class="brand-tag">SAYL</span>
-                </div>
-                <nav class="footer-nav" aria-label="روابط ذيل الصفحة"><a href="docs.html" data-ar="الدليل" data-en="Docs">الدليل</a>
-<a href="about.html" data-ar="من نحن" data-en="About">من نحن</a>
-<a href="support.html" data-ar="ادعمنا" data-en="Support">ادعمنا</a>
-<a href="privacy.html" data-ar="الخصوصية" data-en="Privacy">الخصوصية</a>
-<a href="terms.html" data-ar="شروط الاستخدام" data-en="Terms">شروط الاستخدام</a>
-<a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a></nav>
-                <p class="footer-meta" id="footer-meta"></p>
-            </div>
+        <h2 data-ar="أثر ستوديو (Athar Studio)" data-en="Athar Studio">أثر ستوديو (Athar Studio)</h2>
+        <p data-ar="نحن استوديو تطوير مستقل وصغير، نؤمن بأن البرمجيات الجيدة لا تحتاج إلى إعلانات متسللة، ولا تتبّع خفي، ولا جمع بيانات. نبني أدواتنا بالعربية أولًا وبأعلى المعايير الهندسية والتصميمية الحديثة." data-en="We are a small independent studio believing that good software does not need invasive ads, hidden tracking, or data harvesting. We build Arabic-first tools with modern engineering rigor.">نحن استوديو تطوير مستقل وصغير، نؤمن بأن البرمجيات الجيدة لا تحتاج إلى إعلانات متسللة، ولا تتبّع خفي، ولا جمع بيانات. نبني أدواتنا بالعربية أولًا وبأعلى المعايير الهندسية والتصميمية الحديثة.</p>
+        <p data-ar="بدأت مسيرتنا بتطبيق <strong>«أثر»</strong> للأذكار والمحتوى الهادئ، ثم جاء سيل استجابة لحاجة حقيقية في عالم التنزيل وإدارة الملفات." data-en="Our journey began with the <strong>ATHAR</strong> app for adhkar, followed by Sayl to answer real everyday download management needs.">بدأت مسيرتنا بتطبيق <strong>«أثر»</strong> للأذكار والمحتوى الهادئ، ثم جاء سيل استجابة لحاجة حقيقية في عالم التنزيل وإدارة الملفات.</p>
+
+        <h2 data-ar="لماذا صنعنا سيل؟" data-en="Why We Built Sayl">لماذا صنعنا سيل؟</h2>
+        <p data-ar="على مدار سنوات طويلة، اعتاد مستخدمو Windows على مديري تنزيل ممتلئين بالإعلانات المزعجة، أو برمجيات قديمة لم تُحدّث منذ عقود، أو أدوات تفرض إنشاء حسابات وإرسال إحصاءات استخدام عن كل رابط تنزله. أردنا مدير تنزيل سريعًا يبدأ فورًا، يكمل ما انقطع دون إتلاف الملفات، بواجهة عربية راقية وبسيطة، ودون أن يغادر أي بايت جهازك. عندما لم نجد ما يرضينا، قررنا بناءه بلغة Rust وجعل كوده متاحًا ومفتوحًا للجميع." data-en="For years, Windows users tolerated adware-bloated download managers, dated 90s interfaces, or tools requiring cloud accounts. We wanted a blazing-fast manager that resumes reliably, features an elegant native Arabic interface, and keeps 100% of data local. We couldn't find one, so we engineered Sayl in Rust and made it open source.">على مدار سنوات طويلة، اعتاد مستخدمو Windows على مديري تنزيل ممتلئين بالإعلانات المزعجة، أو برمجيات قديمة لم تُحدّث منذ عقود، أو أدوات تفرض إنشاء حسابات وإرسال إحصاءات استخدام عن كل رابط تنزله. أردنا مدير تنزيل سريعًا يبدأ فورًا، يكمل ما انقطع دون إتلاف الملفات، بواجهة عربية راقية وبسيطة، ودون أن يغادر أي بايت جهازك. عندما لم نجد ما يرضينا، قررنا بناءه بلغة Rust وجعل كوده متاحًا ومفتوحًا للجميع.</p>
+
+        <h2 data-ar="مشاريعنا" data-en="Our Projects">مشاريعنا</h2>
+        <ul>
+          <li><strong data-ar="سيل (SAYL):" data-en="Sayl (SAYL):">سيل (SAYL):</strong> <a href="https://sayl.site">sayl.site</a> — <span data-ar="مدير التنزيلات مفتوح المصدر لويندوز." data-en="Open-source download manager for Windows.">مدير التنزيلات مفتوح المصدر لويندوز.</span></li>
+          <li><strong data-ar="تطبيق أثر (ATHAR):" data-en="ATHAR App:">تطبيق أثر (ATHAR):</strong> <a href="https://atharapp.download" target="_blank" rel="noopener noreferrer">atharapp.download</a> — <span data-ar="تطبيق الأذكار وتدبر القرآن بلا إعلانات." data-en="Ad-free adhkar and Quran reflections app.">تطبيق الأذكار وتدبر القرآن بلا إعلانات.</span></li>
+        </ul>
+
+        <h2 data-ar="ما القادم في خطتنا؟" data-en="What's Next?">ما القادم في خطتنا؟</h2>
+        <ul>
+          <li data-ar="تنزيل الفيديو واستخراج الصوت بالجودة التي تختارها (إصدار 0.2.0)." data-en="Video downloads with stream quality selection (v0.2.0).">تنزيل الفيديو واستخراج الصوت بالجودة التي تختارها (إصدار 0.2.0).</li>
+          <li data-ar="جدولة المواعيد وقوائم الانتظار الذكية وتحديد سقف السرعة." data-en="Scheduling queues, priorities, and bandwidth speed caps.">جدولة المواعيد وقوائم الانتظار الذكية وتحديد سقف السرعة.</li>
+          <li data-ar="شهادة التوقيع الرقمي EV وتوفير التطبيق عبر متجر مايكروسوفت (Microsoft Store)." data-en="EV Code signing and distribution via Microsoft Store.">شهادة التوقيع الرقمي EV وتوفير التطبيق عبر متجر مايكروسوفت (Microsoft Store).</li>
+        </ul>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+      <div class="footer-wrap">
+        <div class="footer-brand">
+          <img src="favicon.svg" alt="سيل" width="28" height="20">
+          <span><strong>سيل · SAYL</strong></span>
         </div>
+        <div class="footer-links">
+          <a href="index.html" data-ar="الرئيسية" data-en="Home">الرئيسية</a>
+          <a href="docs.html" data-ar="الدليل" data-en="Docs">الدليل</a>
+          <a href="support.html" data-ar="ادعمنا" data-en="Support">ادعمنا</a>
+          <a href="privacy.html" data-ar="الخصوصية" data-en="Privacy">الخصوصية</a>
+          <a href="terms.html" data-ar="الشروط" data-en="Terms">الشروط</a>
+          <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </div>
+      </div>
     </footer>
+  </div>
 
-    <script src="app.js"></script>
+  <script src="flow.js"></script>
+  <script src="site.js"></script>
 </body>
 </html>
