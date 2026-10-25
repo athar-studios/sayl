@@ -260,7 +260,7 @@ header nav a.active {
 .meta-note {
   margin-top: 20px;
   font-size: var(--fs-s);
-  color: var(--silt);
+  color: #a6bce6;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -273,9 +273,9 @@ header nav a.active {
 
 /* Live Download Card */
 .dl {
-  background: var(--navy-card);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(11, 26, 78, 0.58);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border);
   border-radius: 22px;
   padding: 26px;
@@ -333,13 +333,7 @@ html[dir="ltr"] .dl .name {
   height: 100%;
   background: linear-gradient(90deg, #00B6BD, #7fe9ec);
   width: 0;
-  animation: fill linear forwards;
-}
-
-@keyframes fill {
-  to {
-    width: 100%;
-  }
+  transition: width 0.08s linear;
 }
 
 .dl .stats-row {
@@ -402,7 +396,9 @@ html[dir="ltr"] .dl .name {
 }
 
 .mockup-frame {
-  background: rgba(11, 26, 78, 0.5);
+  background: rgba(11, 26, 78, 0.40);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--border);
   border-radius: 18px;
   padding: 16px;
@@ -492,7 +488,9 @@ section.band {
 .term {
   direction: ltr;
   text-align: left;
-  background: #050b22;
+  background: rgba(5, 11, 34, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 24px 26px;
@@ -512,7 +510,7 @@ section.band {
 }
 
 .term .dim {
-  color: #556c9a;
+  color: #829bcd;
 }
 
 /* Next / Upcoming Banner */
@@ -542,7 +540,9 @@ footer {
   color: var(--silt);
   font-size: var(--fs-s);
   border-top: 1px solid var(--border);
-  background: rgba(7, 15, 46, 0.85);
+  background: rgba(7, 15, 46, 0.45);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   position: relative;
   z-index: 1;
 }
@@ -603,7 +603,9 @@ footer .footer-links a:hover {
 
 .docs-search {
   width: 100%;
-  background: #0b1a4e;
+  background: rgba(11, 26, 78, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid #23336b;
   border-radius: 10px;
   color: var(--foam);
@@ -648,7 +650,7 @@ footer .footer-links a:hover {
   color: var(--teal);
   border-color: var(--teal);
   font-weight: 600;
-  background: rgba(0, 182, 189, 0.06);
+  background: rgba(0, 182, 189, 0.08);
   border-radius: 0 6px 6px 0;
 }
 
@@ -657,8 +659,10 @@ html[dir="rtl"] .docs aside a.on {
 }
 
 .docs article {
-  background: rgba(7, 15, 46, 0.88);
-  border: 1px solid var(--border);
+  background: rgba(11, 26, 78, 0.58);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(29, 46, 102, 0.75);
   border-radius: 24px;
   padding: 48px 56px;
   max-width: 860px;
@@ -792,7 +796,9 @@ table.doc-table {
 }
 
 table.doc-table th {
-  background: #0b1a4e;
+  background: rgba(11, 26, 78, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   color: var(--foam);
   padding: 12px 16px;
   border: 1px solid var(--border);
@@ -876,7 +882,9 @@ details p {
 }
 
 .lang-modal-card {
-  background: #0b1a4e;
+  background: rgba(11, 26, 78, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--teal);
   border-radius: 24px;
   padding: 32px 28px;
@@ -954,8 +962,10 @@ details p {
 }
 
 .page-card {
-  background: rgba(7, 15, 46, 0.88);
-  border: 1px solid var(--border);
+  background: rgba(11, 26, 78, 0.58);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(29, 46, 102, 0.75);
   border-radius: 24px;
   padding: 48px 56px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
@@ -1028,7 +1038,9 @@ details p {
   .docs-nav-links.mobile-open {
     display: block;
     margin-top: 14px;
-    background: #0b1a4e;
+    background: rgba(11, 26, 78, 0.85);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     padding: 16px;
     border-radius: 12px;
     border: 1px solid var(--border);
@@ -1038,7 +1050,9 @@ details p {
     align-items: center;
     justify-content: space-between;
     width: 100%;
-    background: #0b1a4e;
+    background: rgba(11, 26, 78, 0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     border: 1px solid var(--border-hover);
     color: var(--foam);
     padding: 10px 16px;

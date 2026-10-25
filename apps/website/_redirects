@@ -1,0 +1,24 @@
+# Clean URL rewrites for Cloudflare Pages
+/docs               /docs.html              200
+/about              /about.html             200
+/support            /support.html           200
+/privacy            /privacy.html           200
+/terms              /terms.html             200
+/faq                /faq.html               200
+/compare            /compare.html           200
+/free-download-manager-windows /free-download-manager-windows.html 200
+/idm-alternative    /idm-alternative.html   200
+/plugins            /plugins.html           200
+/themes             /themes.html            200
+
+/en/docs            /en/docs.html           200
+/en/about           /en/about.html          200
+/en/support         /en/support.html        200
+/en/privacy         /en/privacy.html        200
+/en/terms           /en/terms.html          200
+/en/faq             /en/faq.html            200
+/en/compare         /en/compare.html        200
+/en/free-download-manager-windows /en/free-download-manager-windows.html 200
+/en/idm-alternative /en/idm-alternative.html 200
+/en/plugins         /en/plugins.html        200
+/en/themes          /en/themes.html         200

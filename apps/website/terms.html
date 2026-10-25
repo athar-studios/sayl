@@ -1,81 +1,139 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title data-ar="شروط الاستخدام — سيل SAYL" data-en="Terms of Use — SAYL">شروط الاستخدام — سيل SAYL</title>
-  <meta name="description" content="سيل برنامج مجاني ومفتوح المصدر بترخيص Apache-2.0. تعرف على شروط واستخدامات البرنامج.">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>شروط الاستخدام ورخصة Apache-2.0 · سيل</title>
+  <meta name="description" content="شروط استخدام سيل المنشور تحت رخصة Apache-2.0 مفتوحة المصدر؛ حرية الاستخدام والتعديل وإعادة التوزيع.">
   <meta name="theme-color" content="#070F2E">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
-  <link rel="apple-touch-icon" sizes="128x128" href="icon-128.png">
+  <link rel="canonical" href="https://sayl.site/terms.html">
+  <link rel="alternate" hreflang="ar" href="https://sayl.site/terms.html">
+  <link rel="alternate" hreflang="en" href="https://sayl.site/en/terms.html">
+  <link rel="alternate" hreflang="x-default" href="https://sayl.site/terms.html">
+
+  <!-- Favicons & App Icons (?v=2) -->
+  <link rel="icon" href="favicon.ico?v=2" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2">
+  <link rel="manifest" href="site.webmanifest">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:site_name" content="سيل · SAYL">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sayl.site/terms.html">
+  <meta property="og:title" content="شروط الاستخدام ورخصة Apache-2.0 · سيل">
+  <meta property="og:description" content="شروط استخدام سيل المنشور تحت رخصة Apache-2.0 مفتوحة المصدر؛ حرية الاستخدام والتعديل وإعادة التوزيع.">
+  <meta property="og:image" content="https://sayl.site/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="شروط الاستخدام ورخصة Apache-2.0 · سيل">
+  <meta name="twitter:description" content="شروط استخدام سيل المنشور تحت رخصة Apache-2.0 مفتوحة المصدر؛ حرية الاستخدام والتعديل وإعادة التوزيع.">
+  <meta name="twitter:image" content="https://sayl.site/og-image.png">
+
+  <!-- Preload Fonts & Stylesheet -->
+  <link rel="preload" href="fonts/IBMPlexSansArabic-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/IBMPlexSansArabic-Bold.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Athar Studio",
+    "url": "https://sayl.site",
+    "logo": "https://sayl.site/icon-512.png",
+    "sameAs": [
+      "https://github.com/athar-studios",
+      "https://ko-fi.com/athar_studio"
+    ]
+  }
+  </script>
 </head>
 <body>
-  <canvas id="flow" aria-hidden="true" style="opacity:0.35"></canvas>
-
+  <canvas id="flow"></canvas>
+  <div class="lang-modal-overlay" id="lang-modal" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
+    <div class="lang-modal-card">
+      <img src="favicon.svg?v=2" alt="شعار سيل" width="56" height="38" style="margin-bottom:12px">
+      <h2 id="lang-modal-title">اختر لغة الموقع · Choose Language</h2>
+      <p>يمكنك تغيير اللغة في أي وقت من زر التبديل بأعلى الصفحة.</p>
+      <div class="lang-choices">
+        <button type="button" class="lang-choice-btn primary" data-choose-lang="ar">
+          <strong>العربية</strong>
+          <small>اللغة الأساسية والواجهة الافتراضية</small>
+        </button>
+        <button type="button" class="lang-choice-btn" data-choose-lang="en">
+          <strong>English</strong>
+          <small>English LTR Interface</small>
+        </button>
+      </div>
+    </div>
+  </div>
   <div class="wrap">
     <header>
-      <a href="index.html" class="brand-link" aria-label="العودة للرئيسية">
-        <img class="mark" src="icon.svg" alt="سيل" width="42" height="29">
+      <a href="index.html" class="brand" aria-label="سيل - الصفحة الرئيسية">
+        <img src="favicon.svg?v=2" alt="شعار سيل" width="34" height="24">
+        <span>سيل</span>
       </a>
       <nav aria-label="التنقل الرئيسي">
-        <a href="index.html" data-ar="الرئيسية" data-en="Home">الرئيسية</a>
-        <a href="docs.html" data-ar="الدليل" data-en="Docs">الدليل</a>
-        <a href="about.html" class="hide-mobile" data-ar="عن الاستوديو" data-en="About">عن الاستوديو</a>
-        <a href="support.html" class="hide-mobile" data-ar="ادعمنا" data-en="Support">ادعمنا</a>
-        <a href="https://github.com/athar-studios/sayl/releases/latest" class="hide-mobile" data-ar="التنزيل" data-en="Download">التنزيل</a>
-        <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="docs.html">التوثيق</a>
+        <a href="index.html#features" class="hide-mobile">المميزات</a>
+        <a href="faq.html">الأسئلة الشائعة</a>
+        <a href="compare.html">مقارنة</a>
+        <a href="plugins.html">الإضافات</a>
+        <a href="support.html">ادعمنا</a>
       </nav>
       <div class="header-actions">
-        <button type="button" class="lang-btn" aria-label="Switch to English">English</button>
+        <a href="en/terms.html" class="lang-btn" aria-label="Switch to English">English</a>
       </div>
     </header>
-
     <main class="page-shell">
-      <div class="page-card">
-        <h1 data-ar="شروط الاستخدام والترخيص" data-en="Terms of Use & License">شروط الاستخدام والترخيص</h1>
-        <p class="lead" data-ar="سيل مشروع برمجيات حرة ومفتوحة المصدر مرخص بموجب رخصة أباتشي (Apache License 2.0)." data-en="Sayl is free, open-source software distributed under the Apache License, Version 2.0.">سيل مشروع برمجيات حرة ومفتوحة المصدر مرخص بموجب رخصة أباتشي (Apache License 2.0).</p>
+      <article class="page-card">
+        <h1>شروط الاستخدام والترخيص</h1>
+        <p class="lead" style="color:#b9c8e6;font-size:1.15rem;margin-bottom:28px">سيل مشروع برمجيات حرة ومفتوحة المصدر مرخص بموجب رخصة أباتشي (Apache License 2.0).</p>
 
-        <h2 data-ar="الترخيص المفتوح (Apache-2.0)" data-en="The Apache-2.0 License">الترخيص المفتوح (Apache-2.0)</h2>
-        <p data-ar="يمكنك استخدام سيل مجانًا للأغراض الشخصية أو التجارية، كما يحق لك دراسة كود المصدر وتعديله وإعادة توزيعه، طالما التزمت بشروط رخصة <strong>Apache-2.0</strong>، والتي تشمل الاحتفاظ بإشعارات حقوق النشر وبيان الترخيص الأصلي." data-en="You may freely use, modify, and redistribute Sayl for personal or commercial purposes under the terms of the <strong>Apache-2.0</strong> license, provided copyright and attribution notices are preserved.">يمكنك استخدام سيل مجانًا للأغراض الشخصية أو التجارية، كما يحق لك دراسة كود المصدر وتعديله وإعادة توزيعه، طالما التزمت بشروط رخصة <strong>Apache-2.0</strong>، والتي تشمل الاحتفاظ بإشعارات حقوق النشر وبيان الترخيص الأصلي.</p>
-        <p data-ar="نص الرخصة الكامل متاح في ملف <a href='https://github.com/athar-studios/sayl/blob/master/LICENSE' target='_blank'>LICENSE</a> داخل مستودع المشروع." data-en="The full license text is available in the <a href='https://github.com/athar-studios/sayl/blob/master/LICENSE' target='_blank'>LICENSE</a> file in our repository.">نص الرخصة الكامل متاح في ملف <a href="https://github.com/athar-studios/sayl/blob/master/LICENSE" target="_blank">LICENSE</a> داخل مستودع المشروع.</p>
+        <h2>الترخيص المفتوح (Apache-2.0)</h2>
+        <p>يمكنك استخدام سيل مجاناً للأغراض الشخصية أو التجارية، كما يحق لك دراسة كود المصدر وتعديله وإعادة توزيعه، طالما التزمت بشروط رخصة <strong>Apache-2.0</strong>، والتي تشمل الاحتفاظ بإشعارات حقوق النشر وبيان الترخيص الأصلي.</p>
+        <p>نص الرخصة الكامل متاح في ملف <a href="https://github.com/athar-studios/sayl/blob/master/LICENSE" target="_blank" rel="noopener noreferrer">LICENSE</a> داخل مستودع المشروع.</p>
 
-        <h2 data-ar="مسؤولية الاستخدام" data-en="Acceptable Use & Responsibility">مسؤولية الاستخدام</h2>
-        <p data-ar="سيل مجرد أداة تقنية لنقل الملفات. تقع على عاتق المستخدم كامل المسؤولية القانونية والأخلاقية عن الروابط والمحتوى الذي يختار تنزيله. يُحظر استخدام سيل لتنزيل أي محتوى ينتهك حقوق الملكية الفكرية، أو يخالف القوانين السارية، أو يتم دون إذن صريح من صاحب المحتوى." data-en="Sayl is a general-purpose transfer client. Users bear sole responsibility for the URLs and content they retrieve. Do not use Sayl for infringing copyright or unauthorized data access.">سيل مجرد أداة تقنية لنقل الملفات. تقع على عاتق المستخدم كامل المسؤولية القانونية والأخلاقية عن الروابط والمحتوى الذي يختار تنزيله. يُحظر استخدام سيل لتنزيل أي محتوى ينتهك حقوق الملكية الفكرية، أو يخالف القوانين السارية، أو يتم دون إذن صريح من صاحب المحتوى.</p>
+        <h2>مسؤولية الاستخدام</h2>
+        <p>سيل مجرد أداة تقنية لنقل الملفات. تقع على عاتق المستخدم كامل المسؤولية القانونية والأخلاقية عن الروابط والمحتوى الذي يختار تنزيله. يُحظر استخدام سيل لتنزيل أي محتوى ينتهك حقوق الملكية الفكرية، أو يخالف القوانين السارية، أو يتم دون إذن صريح من صاحب المحتوى.</p>
 
-        <h2 data-ar="إخلاء المسؤولية وبلا ضمان (No Warranty)" data-en="Disclaimer of Warranty">إخلاء المسؤولية وبلا ضمان (No Warranty)</h2>
-        <p data-ar="يُقدَّم هذا البرنامج «كما هو» (AS IS)، وبحسب المتاح، دون أي ضمانات صريحة أو ضمنية من أي نوع، بما في ذلك ضمانات الصلاحية لغرض معين أو عدم الانقطاع. نحن نبذل قصارى جهدنا الهندسي لضمان استقرار سيل وسلامة الملفات المنزلة، لكننا لا نتحمل أي مسؤولية عن أي فقدان للبيانات أو أضرار مباشرة أو غير مباشرة ناتجة عن استخدام البرنامج." data-en="The software is provided 'AS IS', without warranties of any kind, express or implied. While we take pride in rigorous engineering, contributors and Athar Studio disclaim liability for any damages or data loss resulting from its use.">يُقدَّم هذا البرنامج «كما هو» (AS IS)، وبحسب المتاح، دون أي ضمانات صريحة أو ضمنية من أي نوع، بما في ذلك ضمانات الصلاحية لغرض معين أو عدم الانقطاع. نحن نبذل قصارى جهدنا الهندسي لضمان استقرار سيل وسلامة الملفات المنزلة، لكننا لا نتحمل أي مسؤولية عن أي فقدان للبيانات أو أضرار مباشرة أو غير مباشرة ناتجة عن استخدام البرنامج.</p>
+        <h2>إخلاء المسؤولية وبلا ضمان (No Warranty)</h2>
+        <p>يُقدَّم هذا البرنامج «كما هو» (AS IS)، وبحسب المتاح، دون أي ضمانات صريحة أو ضمنية من أي نوع، بما في ذلك ضمانات الصلاحية لغرض معين أو عدم الانقطاع. نحن نبذل قصارى جهدنا الهندسي لضمان استقرار سيل وسلامة الملفات المنزلة، لكننا لا نتحمل أي مسؤولية عن أي فقدان للبيانات أو أضرار ناتجة عن استخدام البرنامج.</p>
 
-        <h2 data-ar="الإصدارات التجريبية (Preview Releases)" data-en="Preview Releases">الإصدارات التجريبية (Preview Releases)</h2>
-        <p data-ar="الإصدارات التي تحمل وسم Preview أو Beta هي إصدارات قيد التطوير والاختبار، وقد تحتوي على أخطاء غير مكتشفة. نرحب بملاحظاتكم عليها لتحسين الاستقرار العام." data-en="Builds marked as Preview or Beta are experimental and intended for testing. We welcome your bug reports to help stabilize future production builds.">الإصدارات التي تحمل وسم Preview أو Beta هي إصدارات قيد التطوير والاختبار، وقد تحتوي على أخطاء غير مكتشفة. نرحب بملاحظاتكم عليها لتحسين الاستقرار العام.</p>
-
-        <h2 data-ar="التعديلات والتحديثات" data-en="Modifications to Terms">التعديلات والتحديثات</h2>
-        <p data-ar="قد نحدّث هذه الشروط من حين لآخر مع تطور المشروع، وسيتم نشر أي تعديل على هذه الصفحة مباشرة مع توضيح تاريخ التحديث." data-en="We may revise these terms as the project evolves, posting updates directly to this page.">قد نحدّث هذه الشروط من حين لآخر مع تطور المشروع، وسيتم نشر أي تعديل على هذه الصفحة مباشرة مع توضيح تاريخ التحديث.</p>
-        <p style="color: var(--silt); font-size: 0.9rem;" data-ar="آخر تحديث: أكتوبر 2026." data-en="Last updated: October 2026.">آخر تحديث: أكتوبر 2026.</p>
-      </div>
+        <p style="color:var(--silt);font-size:0.9rem;margin-top:32px">آخر تحديث: أكتوبر 2026.</p>
+      </article>
     </main>
-
-    <!-- Footer -->
     <footer>
       <div class="footer-wrap">
         <div class="footer-brand">
-          <img src="favicon.svg" alt="سيل" width="28" height="20">
+          <img src="favicon.svg?v=2" alt="سيل" width="28" height="20">
           <span><strong>سيل · SAYL</strong></span>
         </div>
         <div class="footer-links">
-          <a href="index.html" data-ar="الرئيسية" data-en="Home">الرئيسية</a>
-          <a href="docs.html" data-ar="الدليل" data-en="Docs">الدليل</a>
-          <a href="about.html" data-ar="عن الاستوديو" data-en="About">عن الاستوديو</a>
-          <a href="support.html" data-ar="ادعمنا" data-en="Support">ادعمنا</a>
-          <a href="privacy.html" data-ar="الخصوصية" data-en="Privacy">الخصوصية</a>
+          <a href="docs.html">التوثيق</a>
+          <a href="faq.html">الأسئلة الشائعة</a>
+          <a href="compare.html">مقارنة البرامج</a>
+          <a href="idm-alternative.html">بديل IDM</a>
+          <a href="free-download-manager-windows.html">تحميل لويندوز</a>
+          <a href="plugins.html">الإضافات</a>
+          <a href="themes.html">السمات</a>
+          <a href="about.html">عن الاستوديو</a>
+          <a href="support.html">ادعمنا</a>
+          <a href="privacy.html">الخصوصية</a>
+          <a href="terms.html">الشروط</a>
           <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
         </div>
+      </div>
+      <div style="margin-top:20px;text-align:center;color:#6b80ad;font-size:0.85rem">
+        استوديو أثر · مرخّص بموجب رخصة Apache-2.0 مفتوحة المصدر · بدون إعلانات ولا تتبّع
       </div>
     </footer>
   </div>
 
-  <script src="flow.js"></script>
-  <script src="site.js"></script>
+  <script src="flow.js" defer></script>
+  <script src="site.js" defer></script>
 </body>
 </html>

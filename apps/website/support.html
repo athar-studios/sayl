@@ -1,81 +1,146 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title data-ar="ادعم سيل — ساهم في استمرار المشروع" data-en="Support Sayl — Help Keep It Growing">ادعم سيل — ساهم في استمرار المشروع</title>
-  <meta name="description" content="سيل مجاني وسيبقى مجانيًا ومفتوح المصدر. دعمك بأي مبلغ على كوفي يساعدنا على الاستمرار في تطويره.">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ادعم تطوير سيل على Ko-fi · SAYL</title>
+  <meta name="description" content="ادعم استمرار وتطوير سيل بمساهمة اختيارية بأي مبلغ عبر Ko-fi لمساعدتنا في استخراج شهادات التوقيع وتغطية النفقات.">
   <meta name="theme-color" content="#070F2E">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
-  <link rel="apple-touch-icon" sizes="128x128" href="icon-128.png">
+  <link rel="canonical" href="https://sayl.site/support.html">
+  <link rel="alternate" hreflang="ar" href="https://sayl.site/support.html">
+  <link rel="alternate" hreflang="en" href="https://sayl.site/en/support.html">
+  <link rel="alternate" hreflang="x-default" href="https://sayl.site/support.html">
+
+  <!-- Favicons & App Icons (?v=2) -->
+  <link rel="icon" href="favicon.ico?v=2" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2">
+  <link rel="manifest" href="site.webmanifest">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:site_name" content="سيل · SAYL">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sayl.site/support.html">
+  <meta property="og:title" content="ادعم تطوير سيل على Ko-fi · SAYL">
+  <meta property="og:description" content="ادعم استمرار وتطوير سيل بمساهمة اختيارية بأي مبلغ عبر Ko-fi لمساعدتنا في استخراج شهادات التوقيع وتغطية النفقات.">
+  <meta property="og:image" content="https://sayl.site/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="ادعم تطوير سيل على Ko-fi · SAYL">
+  <meta name="twitter:description" content="ادعم استمرار وتطوير سيل بمساهمة اختيارية بأي مبلغ عبر Ko-fi لمساعدتنا في استخراج شهادات التوقيع وتغطية النفقات.">
+  <meta name="twitter:image" content="https://sayl.site/og-image.png">
+
+  <!-- Preload Fonts & Stylesheet -->
+  <link rel="preload" href="fonts/IBMPlexSansArabic-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/IBMPlexSansArabic-Bold.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Athar Studio",
+    "url": "https://sayl.site",
+    "logo": "https://sayl.site/icon-512.png",
+    "sameAs": [
+      "https://github.com/athar-studios",
+      "https://ko-fi.com/athar_studio"
+    ]
+  }
+  </script>
 </head>
 <body>
-  <canvas id="flow" aria-hidden="true" style="opacity:0.35"></canvas>
-
+  <canvas id="flow"></canvas>
+  <div class="lang-modal-overlay" id="lang-modal" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
+    <div class="lang-modal-card">
+      <img src="favicon.svg?v=2" alt="شعار سيل" width="56" height="38" style="margin-bottom:12px">
+      <h2 id="lang-modal-title">اختر لغة الموقع · Choose Language</h2>
+      <p>يمكنك تغيير اللغة في أي وقت من زر التبديل بأعلى الصفحة.</p>
+      <div class="lang-choices">
+        <button type="button" class="lang-choice-btn primary" data-choose-lang="ar">
+          <strong>العربية</strong>
+          <small>اللغة الأساسية والواجهة الافتراضية</small>
+        </button>
+        <button type="button" class="lang-choice-btn" data-choose-lang="en">
+          <strong>English</strong>
+          <small>English LTR Interface</small>
+        </button>
+      </div>
+    </div>
+  </div>
   <div class="wrap">
     <header>
-      <a href="index.html" class="brand-link" aria-label="العودة للرئيسية">
-        <img class="mark" src="icon.svg" alt="سيل" width="42" height="29">
+      <a href="index.html" class="brand" aria-label="سيل - الصفحة الرئيسية">
+        <img src="favicon.svg?v=2" alt="شعار سيل" width="34" height="24">
+        <span>سيل</span>
       </a>
       <nav aria-label="التنقل الرئيسي">
-        <a href="index.html" data-ar="الرئيسية" data-en="Home">الرئيسية</a>
-        <a href="docs.html" data-ar="الدليل" data-en="Docs">الدليل</a>
-        <a href="about.html" class="hide-mobile" data-ar="عن الاستوديو" data-en="About">عن الاستوديو</a>
-        <a href="support.html" class="active hide-mobile" data-ar="ادعمنا" data-en="Support">ادعمنا</a>
-        <a href="https://github.com/athar-studios/sayl/releases/latest" class="hide-mobile" data-ar="التنزيل" data-en="Download">التنزيل</a>
-        <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="docs.html">التوثيق</a>
+        <a href="index.html#features" class="hide-mobile">المميزات</a>
+        <a href="faq.html">الأسئلة الشائعة</a>
+        <a href="compare.html">مقارنة</a>
+        <a href="plugins.html">الإضافات</a>
+        <a href="support.html" class="active">ادعمنا</a>
       </nav>
       <div class="header-actions">
-        <button type="button" class="lang-btn" aria-label="Switch to English">English</button>
+        <a href="en/support.html" class="lang-btn" aria-label="Switch to English">English</a>
       </div>
     </header>
-
     <main class="page-shell">
-      <div class="page-card">
-        <h1 data-ar="ادعم مشروع سيل" data-en="Support Project Sayl">ادعم مشروع سيل</h1>
-        <p class="lead" data-ar="سيل برنامج مجاني، مفتوح المصدر، وسيبقى دائمًا كذلك. لا اشتراكات ولا ميزات مدفوعة." data-en="Sayl is free, open source, and will always remain so. No subscriptions, no locked tiers.">سيل برنامج مجاني، مفتوح المصدر، وسيبقى دائمًا كذلك. لا اشتراكات ولا ميزات مدفوعة.</p>
+      <article class="page-card">
+        <h1>ادعم استمرار وتطوير سيل</h1>
+        <p class="lead" style="color:#b9c8e6;font-size:1.15rem;margin-bottom:28px">سيل برنامج مجاني، ومفتوح المصدر، وسيبقى دائماً كذلك بلا أي ميزات مدفوعة ولا اشتراكات.</p>
 
-        <h2 data-ar="الدعم المالي بأي مبلغ (Ko-fi)" data-en="Financial Support on Ko-fi">الدعم المالي بأي مبلغ (Ko-fi)</h2>
-        <p data-ar="تطوير البرمجيات المستقلة وصيانتها واختبارها وتوفير شهادات التوقيع الرقمي واستضافة المواقع يتطلب وقتًا وتكاليف مستمرة. دعمك بأي مبلغ يساعدنا على مواصلة العمل بكامل طاقتنا وتحسين سيل وإضافة الميزات الجديدة." data-en="Developing independent software, maintaining continuous integration, acquiring signing certificates, and hosting involves real ongoing time and cost. Supporting us with any amount directly fuels Sayl's future.">تطوير البرمجيات المستقلة وصيانتها واختبارها وتوفير شهادات التوقيع الرقمي واستضافة المواقع يتطلب وقتًا وتكاليف مستمرة. دعمك بأي مبلغ يساعدنا على مواصلة العمل بكامل طاقتنا وتحسين سيل وإضافة الميزات الجديدة.</p>
+        <h2>الدعم المالي بأي مبلغ عبر Ko-fi</h2>
+        <p>تطوير البرمجيات المستقلة وصيانتها واختبارها وتوفير شهادات التوقيع الرقمي (EV Code Signing) واستضافة البنية التحتية يتطلب وقتاً وتكاليف سنوية حقيقية. دعمك بأي مبلغ — مهما كان بسيطاً — يساعدنا على التفرغ لتحسين سيل وإضافة الميزات الجديدة ومكافحة شهادات التحذير الزرقاء.</p>
 
-        <div style="margin: 28px 0; text-align: center;">
-          <a class="btn pri" style="font-size: 1.15rem; padding: 15px 36px;" href="https://ko-fi.com/athar_studio" target="_blank" rel="noopener noreferrer" data-ar="ادعمنا على Ko-fi بأي مبلغ" data-en="Support us on Ko-fi">ادعمنا على Ko-fi بأي مبلغ</a>
-          <p style="margin-top: 12px; font-size: 0.9rem; color: var(--silt);">https://ko-fi.com/athar_studio</p>
+        <div style="margin:32px 0;text-align:center;background:rgba(0,182,189,0.06);border:1px solid rgba(0,182,189,0.3);border-radius:20px;padding:32px 24px">
+          <h3 style="margin-top:0;font-size:1.35rem;color:#ffffff">صفحة الدعم الرسمية على كوفي</h3>
+          <p style="color:#b9c8e6;margin-bottom:24px">يمكنك التبرع بأي مبلغ تختاره بنقرة واحدة عبر البطاقة البنكية أو PayPal:</p>
+          <a class="btn pri" style="font-size:1.15rem;padding:15px 36px" href="https://ko-fi.com/athar_studio" target="_blank" rel="noopener noreferrer">ادعمنا على Ko-fi بأي مبلغ</a>
+          <p style="margin-top:14px;font-size:0.9rem;color:var(--teal)"><a href="https://ko-fi.com/athar_studio" target="_blank" rel="noopener noreferrer" style="color:inherit">https://ko-fi.com/athar_studio</a></p>
         </div>
 
-        <h2 data-ar="طرق أخرى للمساهمة" data-en="Other Ways to Contribute">طرق أخرى للمساهمة</h2>
-        <p data-ar="الدعم لا يقتصر على التبرع المالي فحسب؛ هناك طرق كثيرة تصنع فارقًا كبيرًا معنا:" data-en="Financial donations are just one way to help. Other vital contributions include:">الدعم لا يقتصر على التبرع المالي فحسب؛ هناك طرق كثيرة تصنع فارقًا كبيرًا معنا:</p>
+        <h2>طرق أخرى للمساهمة ودعم المشروع</h2>
+        <p>المساهمة لا تقتصر على الدعم المادي فقط؛ هناك مساهمات تصنع فارقاً حقيقياً معنا:</p>
         <ul>
-          <li data-ar="<strong>جرّب البرنامج وبلّغ عن الأخطاء:</strong> تجربة البرنامج على أنواع مختلفة من الروابط والإبلاغ عن أي خلل عبر GitHub Issues يساعدنا على حل المشاكل فورًا." data-en="<strong>Test and Report Bugs:</strong> Running Sayl on diverse links and filing reports via GitHub Issues helps us fix bugs quickly."><strong>جرّب البرنامج وبلّغ عن الأخطاء:</strong> تجربة البرنامج على أنواع مختلفة من الروابط والإبلاغ عن أي خلل عبر GitHub Issues يساعدنا على حل المشاكل فورًا.</li>
-          <li data-ar="<strong>المساهمة البرمجية:</strong> إذا كنت مطورًا تتقن Rust أو Svelte أو TypeScript، يسعدنا استقبال مساهماتك البرمجية بعد مراجعة <code>CONTRIBUTING.md</code>." data-en="<strong>Contribute Code:</strong> If you build with Rust, Svelte, or TypeScript, pull requests are warmly welcomed per <code>CONTRIBUTING.md</code>."><strong>المساهمة البرمجية:</strong> إذا كنت مطورًا تتقن Rust أو Svelte أو TypeScript، يسعدنا استقبال مساهماتك البرمجية بعد مراجعة <code>CONTRIBUTING.md</code>.</li>
-          <li data-ar="<strong>تحسين الترجمة والنصوص:</strong> التدقيق اللغوي والمقترحات النصية تزيد من رقي تجربة المستخدم." data-en="<strong>Improve Translations:</strong> Reviewing phrasing and copy ensures an authentic user experience."><strong>تحسين الترجمة والنصوص:</strong> التدقيق اللغوي والمقترحات النصية تزيد من رقي تجربة المستخدم.</li>
-          <li data-ar="<strong>انشر الكلمة:</strong> شارك سيل مع أصدقائك أو زملائك ممن يبحثون عن مدير تنزيل سريع ونظيف لويندوز." data-en="<strong>Spread the Word:</strong> Share Sayl with friends and colleagues looking for a clean, fast Windows download manager."><strong>انشر الكلمة:</strong> شارك سيل مع أصدقائك أو زملائك ممن يبحثون عن مدير تنزيل سريع ونظيف لويندوز.</li>
+          <li><strong>جرّب البرنامج وبلّغ عن الأخطاء:</strong> تجربة البرنامج على أنواع مختلفة من الروابط والإبلاغ عن أي خلل عبر GitHub Issues يساعدنا على حل المشاكل فوراً.</li>
+          <li><strong>المساهمة البرمجية:</strong> إذا كنت مطوراً تتقن Rust أو Svelte أو TypeScript، يسعدنا استقبال مساهماتك البرمجية بعد مراجعة <code>CONTRIBUTING.md</code>.</li>
+          <li><strong>تحسين الترجمة والنصوص:</strong> التدقيق اللغوي والمقترحات النصية تزيد من رقي تجربة المستخدم.</li>
+          <li><strong>انشر الكلمة:</strong> شارك سيل مع أصدقائك أو زملائك ممن يبحثون عن مدير تنزيل سريع ونظيف لويندوز.</li>
         </ul>
-      </div>
+      </article>
     </main>
-
-    <!-- Footer -->
     <footer>
       <div class="footer-wrap">
         <div class="footer-brand">
-          <img src="favicon.svg" alt="سيل" width="28" height="20">
+          <img src="favicon.svg?v=2" alt="سيل" width="28" height="20">
           <span><strong>سيل · SAYL</strong></span>
         </div>
         <div class="footer-links">
-          <a href="index.html" data-ar="الرئيسية" data-en="Home">الرئيسية</a>
-          <a href="docs.html" data-ar="الدليل" data-en="Docs">الدليل</a>
-          <a href="about.html" data-ar="عن الاستوديو" data-en="About">عن الاستوديو</a>
-          <a href="privacy.html" data-ar="الخصوصية" data-en="Privacy">الخصوصية</a>
-          <a href="terms.html" data-ar="الشروط" data-en="Terms">الشروط</a>
+          <a href="docs.html">التوثيق</a>
+          <a href="faq.html">الأسئلة الشائعة</a>
+          <a href="compare.html">مقارنة البرامج</a>
+          <a href="idm-alternative.html">بديل IDM</a>
+          <a href="free-download-manager-windows.html">تحميل لويندوز</a>
+          <a href="plugins.html">الإضافات</a>
+          <a href="themes.html">السمات</a>
+          <a href="about.html">عن الاستوديو</a>
+          <a href="support.html">ادعمنا</a>
+          <a href="privacy.html">الخصوصية</a>
+          <a href="terms.html">الشروط</a>
           <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
         </div>
+      </div>
+      <div style="margin-top:20px;text-align:center;color:#6b80ad;font-size:0.85rem">
+        استوديو أثر · مرخّص بموجب رخصة Apache-2.0 مفتوحة المصدر · بدون إعلانات ولا تتبّع
       </div>
     </footer>
   </div>
 
-  <script src="flow.js"></script>
-  <script src="site.js"></script>
+  <script src="flow.js" defer></script>
+  <script src="site.js" defer></script>
 </body>
 </html>

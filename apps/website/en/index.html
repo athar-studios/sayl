@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sayl · Fast & Open Source Download Manager for Windows</title>
+  <meta name="description" content="Sayl is a fast, open-source download manager for Windows. Parallel segmented downloads, byte-accurate resume, and zero tracking.">
+  <meta name="theme-color" content="#070F2E">
+  <link rel="canonical" href="https://sayl.site/en/index.html">
+  <link rel="alternate" hreflang="ar" href="https://sayl.site/index.html">
+  <link rel="alternate" hreflang="en" href="https://sayl.site/en/index.html">
+  <link rel="alternate" hreflang="x-default" href="https://sayl.site/index.html">
+
+  <!-- Favicons & App Icons (?v=2) -->
+  <link rel="icon" href="../favicon.ico?v=2" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png?v=2">
+  <link rel="manifest" href="../site.webmanifest">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:site_name" content="سيل · SAYL">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sayl.site/en/index.html">
+  <meta property="og:title" content="Sayl · Fast & Open Source Download Manager for Windows">
+  <meta property="og:description" content="Sayl is a fast, open-source download manager for Windows. Parallel segmented downloads, byte-accurate resume, and zero tracking.">
+  <meta property="og:image" content="https://sayl.site/og-image-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Sayl · Fast & Open Source Download Manager for Windows">
+  <meta name="twitter:description" content="Sayl is a fast, open-source download manager for Windows. Parallel segmented downloads, byte-accurate resume, and zero tracking.">
+  <meta name="twitter:image" content="https://sayl.site/og-image-en.png">
+
+  <!-- Preload Fonts & Stylesheet -->
+  <link rel="preload" href="../fonts/IBMPlexSansArabic-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../fonts/IBMPlexSansArabic-Bold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Athar Studio",
+    "url": "https://sayl.site",
+    "logo": "https://sayl.site/icon-512.png",
+    "sameAs": [
+      "https://github.com/athar-studios",
+      "https://ko-fi.com/athar_studio"
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Sayl",
+    "operatingSystem": "Windows 10, Windows 11",
+    "applicationCategory": "UtilitiesApplication",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "license": "https://www.apache.org/licenses/LICENSE-2.0",
+    "downloadUrl": "https://github.com/athar-studios/sayl/releases/latest",
+    "softwareVersion": "0.1.0",
+    "screenshot": "https://sayl.site/assets/mockups/03-main-light-en.webp"
+  }
+  </script>
+</head>
+<body>
+  <canvas id="flow"></canvas>
+  <div class="lang-modal-overlay" id="lang-modal" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
+    <div class="lang-modal-card">
+      <img src="../favicon.svg?v=2" alt="Sayl logo" width="56" height="38" style="margin-bottom:12px">
+      <h2 id="lang-modal-title">Choose Language · اختر لغة الموقع</h2>
+      <p>You can toggle your preferred language anytime from the header button.</p>
+      <div class="lang-choices">
+        <button type="button" class="lang-choice-btn" data-choose-lang="ar">
+          <strong>العربية</strong>
+          <small>Arabic RTL Interface</small>
+        </button>
+        <button type="button" class="lang-choice-btn primary" data-choose-lang="en">
+          <strong>English</strong>
+          <small>Default English experience</small>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <header>
+      <a href="../index.html" class="brand" aria-label="Sayl - Home">
+        <img src="../favicon.svg?v=2" alt="Sayl logo" width="34" height="24">
+        <span>Sayl</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="../en/docs.html">Docs</a>
+        <a href="../en/index.html#features" class="hide-mobile">Features</a>
+        <a href="../en/faq.html">FAQ</a>
+        <a href="../en/compare.html">Compare</a>
+        <a href="../en/plugins.html">Plugins</a>
+        <a href="../en/support.html">Support</a>
+      </nav>
+      <div class="header-actions">
+        <a href="../index.html" class="lang-btn" aria-label="التبديل إلى العربية">العربية</a>
+      </div>
+    </header>
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="hero-content">
+        <div class="logo-anim" role="img" aria-label="Sayl Animated Logo">
+          <canvas id="logo" width="380" height="96"></canvas>
+        </div>
+        <h1>Downloads that flow<br>like a torrent.</h1>
+        <p class="lead">Sayl splits your file across multiple parallel connections at once. If your connection drops or your computer restarts, it resumes right from the last byte.</p>
+        <div class="cta">
+          <a class="btn pri" href="https://github.com/athar-studios/sayl/releases/latest">Download for Windows (Free)</a>
+          <a class="btn sec" href="docs.html">User Documentation</a>
+        </div>
+        <div class="meta-note">
+          <span>Version 0.1.0</span>
+          <span class="dot">·</span>
+          <span>Windows 10 & 11 (64-bit)</span>
+          <span class="dot">·</span>
+          <span>Free & Open Source (Apache-2.0)</span>
+        </div>
+      </div>
+
+      <!-- Live Multi-segment Download Demo Card -->
+      <div class="dl" role="region" aria-label="Live multi-part download simulation">
+        <div class="row">
+          <span class="state-badge">Downloading</span>
+          <span>8 concurrent connections</span>
+        </div>
+        <div class="name">ubuntu-24.04-desktop-amd64.iso</div>
+        <div class="segs" aria-hidden="true"></div>
+        <div class="stats-row">
+          <div class="big" id="pct">0%</div>
+          <small id="spd">42.4 MB/s · 3m 20s left</small>
+        </div>
+      </div>
+    </section>
+
+    <!-- Mockups Showcase Section -->
+    <section class="mockups-section" id="shots">
+      <h2>A calm interface focused on your work</h2>
+      <p class="sub">Zero popup ads, no surveillance telemetry, crafted Arabic-first with seamless English support and refined dark and light modes.</p>
+
+      <div class="mockups-tabs" role="tablist" aria-label="Sayl UI Showcase Tabs">
+        <button type="button" role="tab" aria-selected="true" class="mockup-tab-btn active" data-img="../assets/mockups/03-main-light-en.webp" data-title="Main Interface (English UI)" data-desc="Sayl main window with functional categories, quick search filter, and task controls.">Main (English)</button>
+        <button type="button" role="tab" aria-selected="false" class="mockup-tab-btn" data-img="../assets/mockups/02-main-dark-ar.webp" data-title="Main Interface (Dark Mode)" data-desc="Comfortable deep Abyss dark mode with crisp task state indicators.">Main (Dark)</button>
+        <button type="button" role="tab" aria-selected="false" class="mockup-tab-btn" data-img="../assets/mockups/05-progress-window.webp" data-title="Detailed Download Progress Window" data-desc="Dedicated progress window showing live per-connection chunks, speed, and ETA.">Progress Window</button>
+        <button type="button" role="tab" aria-selected="false" class="mockup-tab-btn" data-img="../assets/mockups/06-settings.webp" data-title="Settings & Keyboard Shortcuts" data-desc="Full control over save paths, connection limits, sleep prevention, and window behavior.">Settings</button>
+        <button type="button" role="tab" aria-selected="false" class="mockup-tab-btn" data-img="../assets/mockups/04-add-duplicate.webp" data-title="Duplicate URL Detection" data-desc="Sayl warns if a link already exists, offering to open the existing file or re-download.">Duplicate Alert</button>
+        <button type="button" role="tab" aria-selected="false" class="mockup-tab-btn" data-img="../assets/mockups/07-shutdown-countdown.webp" data-title="Auto-Shutdown Countdown" data-desc="Powers off your PC after downloads complete, with a 30s countdown to cancel anytime.">Auto Shutdown</button>
+        <button type="button" role="tab" aria-selected="false" class="mockup-tab-btn" data-img="../assets/mockups/01-main-light-ar.webp" data-title="Arabic Interface (RTL)" data-desc="Native Arabic RTL typography with custom styled fonts.">Arabic UI</button>
+      </div>
+
+      <div class="mockup-frame">
+        <img id="mockup-img" src="../assets/mockups/03-main-light-en.webp" alt="Screenshot of Sayl desktop application" width="1100" height="720" loading="lazy">
+        <div class="mockup-caption">
+          <strong id="mockup-caption-title">Main Interface (English UI)</strong>
+          <span id="mockup-caption-desc">Sayl main window with functional categories, quick search filter, and task controls.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="band" id="features">
+      <h2>Built for real everyday downloading</h2>
+      <p class="sub">Engineered to solve real Windows download headaches: maximum throughput, reliable resumption, and respect for your time.</p>
+
+      <div class="feat">
+        <div>
+          <h3>Faster Multi-Part Downloads</h3>
+          <p>Files are split into independent chunks downloaded concurrently, saturating your available broadband speed.</p>
+        </div>
+        <div>
+          <h3>Safe Resumption (.part)</h3>
+          <p>Connection dropped or PC restarted? Sayl records checkpoints in atomic .part files and resumes from the exact byte.</p>
+        </div>
+        <div>
+          <h3>Native Arabic & English</h3>
+          <p>Carefully designed Arabic RTL typography alongside an authentic English experience, switchable anytime.</p>
+        </div>
+        <div>
+          <h3>Auto Categories & Filter</h3>
+          <p>Automated grouping into programs, media, documents, and archives paired with instant fuzzy search.</p>
+        </div>
+        <div>
+          <h3>Developer CLI Tool</h3>
+          <p>Standalone CLI (<code>sayl.exe</code>) enables headless task automation, scripting, and CI pipelines with JSON outputs.</p>
+        </div>
+        <div>
+          <h3>Quiet System Tray</h3>
+          <p>Runs quietly in the background without stealing focus, featuring notifications and optional auto-shutdown.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Split Section (Extension + CLI) -->
+    <section class="band">
+      <div class="split">
+        <div>
+          <h2>Seamless Browser & Terminal Integration</h2>
+          <p style="color:#b9c8e6;line-height:1.75;font-size:1.05rem">
+            Capture downloads with a single click from Chrome, Edge, and Brave via our Manifest V3 extension, or control the download engine entirely from your terminal using the Rust CLI.
+          </p>
+          <div style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap">
+            <a class="btn sec" href="docs.html#ext">Browser Extension Setup</a>
+            <a class="btn sec" href="docs.html#cli">CLI Command Reference</a>
+          </div>
+        </div>
+
+        <div class="term" role="region" aria-label="Terminal commands preview">
+          <span class="dim"># Add a file with 8 parallel segmented connections</span><br>
+          <b>sayl</b> add https://example.com/file.zip --connections 8<br><br>
+          <span class="dim"># List active tasks as JSON for automation scripts</span><br>
+          <b>sayl</b> list --json<br><br>
+          <span class="dim"># Recover tasks interrupted by crash or restart</span><br>
+          <b>sayl</b> recover
+        </div>
+      </div>
+    </section>
+
+    <!-- Roadmap Banner -->
+    <section class="band">
+      <div class="next">
+        <div>
+          <div class="tag">Coming in v0.2.0</div>
+          <h2 style="margin:8px 0 6px">Video Extraction & Modular Plugin Architecture</h2>
+          <p style="margin:0;color:#b9c8e6">Native yt-dlp integration and modular site plugins to extract video streams in 4K resolution or audio-only formats.</p>
+        </div>
+        <a class="btn sec" href="plugins.html">Explore Planned Plugins</a>
+      </div>
+    </section>
+    <footer>
+      <div class="footer-wrap">
+        <div class="footer-brand">
+          <img src="../favicon.svg?v=2" alt="Sayl" width="28" height="20">
+          <span><strong>Sayl · سيل</strong></span>
+        </div>
+        <div class="footer-links">
+          <a href="../en/docs.html">Docs</a>
+          <a href="../en/faq.html">FAQ</a>
+          <a href="../en/compare.html">Comparison</a>
+          <a href="../en/idm-alternative.html">IDM Alternative</a>
+          <a href="../en/free-download-manager-windows.html">Windows FDM</a>
+          <a href="../en/plugins.html">Plugins</a>
+          <a href="../en/themes.html">Themes</a>
+          <a href="../en/about.html">About Studio</a>
+          <a href="../en/support.html">Support</a>
+          <a href="../en/privacy.html">Privacy</a>
+          <a href="../en/terms.html">Terms</a>
+          <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </div>
+      </div>
+      <div style="margin-top:20px;text-align:center;color:#6b80ad;font-size:0.85rem">
+        Athar Studio · Licensed under Apache-2.0 Open Source License · Zero tracking & zero telemetry
+      </div>
+    </footer>
+  </div>
+
+  <script src="../flow.js" defer></script>
+  <script src="../site.js" defer></script>
+</body>
+</html>

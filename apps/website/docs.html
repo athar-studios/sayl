@@ -1,56 +1,104 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title data-ar="دليل استخدام وتوثيق سيل — SAYL Docs" data-en="SAYL Documentation & User Guide">دليل استخدام وتوثيق سيل — SAYL Docs</title>
-  <meta name="description" content="التوثيق الشامل لبرنامج سيل لإدارة التنزيلات على ويندوز: التثبيت، سطر الأوامر، إضافة المتصفح، الإعدادات، واستكشاف الأخطاء.">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>التوثيق والدليل الشامل لبرنامج سيل · SAYL Docs</title>
+  <meta name="description" content="دليل استخدام سيل: التثبيت، تجاوز SmartScreen، إضافة المتصفح، الاستئناف، أوامر CLI، والإعدادات بالتفصيل.">
   <meta name="theme-color" content="#070F2E">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
-  <link rel="apple-touch-icon" sizes="128x128" href="icon-128.png">
+  <link rel="canonical" href="https://sayl.site/docs.html">
+  <link rel="alternate" hreflang="ar" href="https://sayl.site/docs.html">
+  <link rel="alternate" hreflang="en" href="https://sayl.site/en/docs.html">
+  <link rel="alternate" hreflang="x-default" href="https://sayl.site/docs.html">
+
+  <!-- Favicons & App Icons (?v=2) -->
+  <link rel="icon" href="favicon.ico?v=2" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2">
+  <link rel="manifest" href="site.webmanifest">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:site_name" content="سيل · SAYL">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sayl.site/docs.html">
+  <meta property="og:title" content="التوثيق والدليل الشامل لبرنامج سيل · SAYL Docs">
+  <meta property="og:description" content="دليل استخدام سيل: التثبيت، تجاوز SmartScreen، إضافة المتصفح، الاستئناف، أوامر CLI، والإعدادات بالتفصيل.">
+  <meta property="og:image" content="https://sayl.site/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="التوثيق والدليل الشامل لبرنامج سيل · SAYL Docs">
+  <meta name="twitter:description" content="دليل استخدام سيل: التثبيت، تجاوز SmartScreen، إضافة المتصفح، الاستئناف، أوامر CLI، والإعدادات بالتفصيل.">
+  <meta name="twitter:image" content="https://sayl.site/og-image.png">
+
+  <!-- Preload Fonts & Stylesheet -->
+  <link rel="preload" href="fonts/IBMPlexSansArabic-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/IBMPlexSansArabic-Bold.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Athar Studio",
+    "url": "https://sayl.site",
+    "logo": "https://sayl.site/icon-512.png",
+    "sameAs": [
+      "https://github.com/athar-studios",
+      "https://ko-fi.com/athar_studio"
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {"@type": "ListItem", "position": 1, "name": "الرئيسية", "item": "https://sayl.site/"},
+      {"@type": "ListItem", "position": 2, "name": "التوثيق", "item": "https://sayl.site/docs.html"}
+    ]
+  }
+  </script>
 </head>
 <body>
-  <canvas id="flow" aria-hidden="true" style="opacity:0.35"></canvas>
-
-  <!-- First-Visit Language Selection Modal -->
-  <div id="lang-modal" class="lang-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
+  <canvas id="flow"></canvas>
+  <div class="lang-modal-overlay" id="lang-modal" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
     <div class="lang-modal-card">
-      <h2 id="lang-modal-title">اختر لغة الموقع / Select Language</h2>
-      <p>يمكنك تغيير اللغة في أي وقت من أعلى الصفحة.<br>You can switch languages anytime from the top bar.</p>
+      <img src="favicon.svg?v=2" alt="شعار سيل" width="56" height="38" style="margin-bottom:12px">
+      <h2 id="lang-modal-title">اختر لغة الموقع · Choose Language</h2>
+      <p>يمكنك تغيير اللغة في أي وقت من زر التبديل بأعلى الصفحة.</p>
       <div class="lang-choices">
         <button type="button" class="lang-choice-btn primary" data-choose-lang="ar">
-          <span>العربية</span>
-          <small>Arabic (الافتراضية)</small>
+          <strong>العربية</strong>
+          <small>اللغة الأساسية والواجهة الافتراضية</small>
         </button>
         <button type="button" class="lang-choice-btn" data-choose-lang="en">
-          <span>English</span>
-          <small>الإنجليزية</small>
+          <strong>English</strong>
+          <small>English LTR Interface</small>
         </button>
       </div>
     </div>
   </div>
-
   <div class="wrap">
     <header>
-      <a href="index.html" class="brand-link" aria-label="العودة للرئيسية">
-        <img class="mark" src="icon.svg" alt="سيل" width="42" height="29">
+      <a href="index.html" class="brand" aria-label="سيل - الصفحة الرئيسية">
+        <img src="favicon.svg?v=2" alt="شعار سيل" width="34" height="24">
+        <span>سيل</span>
       </a>
       <nav aria-label="التنقل الرئيسي">
-        <a href="index.html" data-ar="الرئيسية" data-en="Home">الرئيسية</a>
-        <a href="docs.html" class="active" data-ar="الدليل" data-en="Docs">الدليل</a>
-        <a href="about.html" class="hide-mobile" data-ar="عن الاستوديو" data-en="About">عن الاستوديو</a>
-        <a href="support.html" class="hide-mobile" data-ar="ادعمنا" data-en="Support">ادعمنا</a>
-        <a href="https://github.com/athar-studios/sayl/releases/latest" class="hide-mobile" data-ar="التنزيل" data-en="Download">التنزيل</a>
-        <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="docs.html" class="active">التوثيق</a>
+        <a href="index.html#features" class="hide-mobile">المميزات</a>
+        <a href="faq.html">الأسئلة الشائعة</a>
+        <a href="compare.html">مقارنة</a>
+        <a href="plugins.html">الإضافات</a>
+        <a href="support.html">ادعمنا</a>
       </nav>
       <div class="header-actions">
-        <button type="button" class="lang-btn" aria-label="Switch to English">English</button>
+        <a href="en/docs.html" class="lang-btn" aria-label="Switch to English">English</a>
       </div>
     </header>
-
-    <div class="docs">
+<div class="docs">
       <!-- Sticky Sidebar -->
       <aside aria-label="فهرس الدليل">
         <input type="text" class="docs-search" placeholder="ابحث في أقسام الدليل..." data-ar-placeholder="ابحث في أقسام الدليل..." data-en-placeholder="Search sections..." aria-label="بحث في الدليل">
@@ -175,15 +223,27 @@
 
         <!-- 10. Browser Extension & Activation -->
         <h2 id="ext" data-ar="10. إضافة المتصفح وتفعيلها" data-en="10. Browser Extension & Setup">10. إضافة المتصفح وتفعيلها</h2>
-        <p data-ar="تتوفر إضافة متصفح مبنية بمعيار Manifest V3 لمتصفحات Chromium (Google Chrome وMicrosoft Edge وBrave):" data-en="A Manifest V3 extension connects Chromium-based browsers (Chrome, Edge, Brave) directly to Sayl:">تتوفر إضافة متصفح مبنية بمعيار Manifest V3 لمتصفحات Chromium (Google Chrome وMicrosoft Edge وBrave):</p>
+        <p data-ar="تتيح إضافة المتصفح لبرنامج سيل التقاط روابط التنزيل مباشرة من Google Chrome وMicrosoft Edge وBrave والمتصفحات المتوافقة:" data-en="The browser extension allows Sayl to capture download links directly from Google Chrome, Microsoft Edge, Brave, and compatible Chromium browsers:">تتيح إضافة المتصفح لبرنامج سيل التقاط روابط التنزيل مباشرة من Google Chrome وMicrosoft Edge وBrave والمتصفحات المتوافقة:</p>
         <ol class="steps">
-          <li data-ar="افتح صفحة الإضافات في متصفحك: <code>chrome://extensions</code> أو <code>edge://extensions</code>." data-en="Open extension settings in your browser: <code>chrome://extensions</code> or <code>edge://extensions</code>.">افتح صفحة الإضافات في متصفحك: <code>chrome://extensions</code> أو <code>edge://extensions</code>.</li>
-          <li data-ar="فعّل «وضع مطوّر البرامج» (Developer mode) في أعلى الصفحة." data-en="Enable 'Developer mode' toggle in the top toolbar.">فعّل «وضع مطوّر البرامج» (Developer mode) في أعلى الصفحة.</li>
-          <li data-ar="اضغط «تحميل حزمة غير مضغوطة» (Load unpacked) واختر مجلد <code>extensions/browser/chromium</code> الموجود في ملفات سيل." data-en="Click 'Load unpacked' and select the <code>extensions/browser/chromium</code> folder.">اضغط «تحميل حزمة غير مضغوطة» (Load unpacked) واختر مجلد <code>extensions/browser/chromium</code> الموجود في ملفات سيل.</li>
-          <li data-ar="انسخ معرّف الإضافة (Extension ID) المخصص لها." data-en="Note the Extension ID assigned by your browser.">انسخ معرّف الإضافة (Extension ID) المخصص لها.</li>
-          <li data-ar="شغّل سكربت التسجيل في PowerShell ليرتبط مضيف الرسائل الأصلي (Native Messaging Host) بالمتصفح:<br><code>powershell -ExecutionPolicy Bypass -File tools/register-native-host.ps1 -ExtensionId &lt;معرف_الإضافة&gt;</code>" data-en="Run the registration script in PowerShell to link the Native Messaging Host:<br><code>powershell -ExecutionPolicy Bypass -File tools/register-native-host.ps1 -ExtensionId &lt;YOUR_EXTENSION_ID&gt;</code>">شغّل سكربت التسجيل في PowerShell ليرتبط مضيف الرسائل الأصلي (Native Messaging Host) بالمتصفح:<br><code>powershell -ExecutionPolicy Bypass -File tools/register-native-host.ps1 -ExtensionId &lt;معرف_الإضافة&gt;</code></li>
+          <li data-ar="افتح برنامج سيل، ثم انتقل إلى <strong>الإعدادات</strong> (رمز الترس أو <kbd>Ctrl+,</kbd>)." data-en="Open Sayl, then go to <strong>Settings</strong> (gear icon or <kbd>Ctrl+,</kbd>).">افتح برنامج سيل، ثم انتقل إلى <strong>الإعدادات</strong> (رمز الترس أو <kbd>Ctrl+,</kbd>).</li>
+          <li data-ar="انتقل إلى قسم <strong>إضافة المتصفح</strong> واضغط زر <strong>تفعيل</strong>." data-en="Navigate to the <strong>Browser Extension</strong> section and click <strong>Activate</strong>.">انتقل إلى قسم <strong>إضافة المتصفح</strong> واضغط زر <strong>تفعيل</strong>.</li>
+          <li data-ar="سيفتح متصفحك صفحة الإضافة في المتجر الرسمي؛ اضغط <strong>«إضافة إلى المتصفح»</strong> (Add to browser)." data-en="Your browser will open the official extension store page; click <strong>Add to browser</strong>.">سيفتح متصفحك صفحة الإضافة في المتجر الرسمي؛ اضغط <strong>«إضافة إلى المتصفح»</strong> (Add to browser).</li>
         </ol>
-        <p data-ar="بعد التفعيل، يمكنك النقر بزر الفأرة الأيمن على أي رابط واختيار <strong>«التحميل باستخدام سيل»</strong>، أو ترك الإضافة تلتقط التنزيلات المباشرة تلقائيًا." data-en="Once registered, right-click any web link and select <strong>'Download with Sayl'</strong>, or let it capture downloads automatically.">بعد التفعيل، يمكنك النقر بزر الفأرة الأيمن على أي رابط واختيار <strong>«التحميل باستخدام سيل»</strong>، أو ترك الإضافة تلتقط التنزيلات المباشرة تلقائيًا.</p>
+        <p data-ar="بعد التثبيت بنجاح، يلتقط سيل التنزيلات تلقائيًا بمجرد النقر على أي رابط تحميل، كما يمكنك النقر بزر الفأرة الأيمن على أي رابط واختيار <strong>«التحميل بواسطة سيل»</strong>." data-en="Once installed, Sayl captures downloads seamlessly, and you can right-click any link to choose <strong>'Download with Sayl'</strong>.">بعد التثبيت بنجاح، يلتقط سيل التنزيلات تلقائيًا بمجرد النقر على أي رابط تحميل، كما يمكنك النقر بزر الفأرة الأيمن على أي رابط واختيار <strong>«التحميل بواسطة سيل»</strong>.</p>
+
+        <details class="note">
+          <summary data-ar="طريقة التثبيت اليدوي للمطورين (Load unpacked)" data-en="Advanced: Manual Developer Installation (Load unpacked)">طريقة التثبيت اليدوي للمطورين (Load unpacked)</summary>
+          <div style="margin-top:14px">
+            <p data-ar="إذا كنت تبني سيل من المصدر أو تطوّر على كود الإضافة محليًا، يمكنك تثبيتها يدويًا عبر الخطوات التالية:" data-en="If you are building from source or developing the extension locally, you can load it unpacked:">إذا كنت تبني سيل من المصدر أو تطوّر على كود الإضافة محليًا، يمكنك تثبيتها يدويًا عبر الخطوات التالية:</p>
+            <ol class="steps">
+              <li data-ar="افتح صفحة الإضافات في متصفحك: <code>chrome://extensions</code> أو <code>edge://extensions</code>." data-en="Open extension settings in your browser: <code>chrome://extensions</code> or <code>edge://extensions</code>.">افتح صفحة الإضافات في متصفحك: <code>chrome://extensions</code> أو <code>edge://extensions</code>.</li>
+              <li data-ar="فعّل «وضع مطوّر البرامج» (Developer mode) في أعلى الصفحة." data-en="Enable 'Developer mode' in the top toolbar.">فعّل «وضع مطوّر البرامج» (Developer mode) في أعلى الصفحة.</li>
+              <li data-ar="اضغط «تحميل حزمة غير مضغوطة» (Load unpacked) واختر مجلد <code>extensions/browser/chromium</code> الموجود في ملفات سيل." data-en="Click 'Load unpacked' and select <code>extensions/browser/chromium</code>.">اضغط «تحميل حزمة غير مضغوطة» (Load unpacked) واختر مجلد <code>extensions/browser/chromium</code> الموجود في ملفات سيل.</li>
+              <li data-ar="انسخ معرّف الإضافة (Extension ID) المخصص لها." data-en="Copy the assigned Extension ID.">انسخ معرّف الإضافة (Extension ID) المخصص لها.</li>
+              <li data-ar="شغّل سكربت التسجيل في PowerShell ليرتبط مضيف الرسائل الأصلي (Native Messaging Host) بالمتصفح:<br><code>powershell -ExecutionPolicy Bypass -File tools/register-native-host.ps1 -ExtensionId &lt;معرف_الإضافة&gt;</code>" data-en="Run the registration script in PowerShell:<br><code>powershell -ExecutionPolicy Bypass -File tools/register-native-host.ps1 -ExtensionId &lt;EXTENSION_ID&gt;</code>">شغّل سكربت التسجيل في PowerShell ليرتبط مضيف الرسائل الأصلي (Native Messaging Host) بالمتصفح:<br><code>powershell -ExecutionPolicy Bypass -File tools/register-native-host.ps1 -ExtensionId &lt;معرف_الإضافة&gt;</code></li>
+            </ol>
+          </div>
+        </details>
 
         <!-- 11. Full CLI Reference -->
         <h2 id="cli" data-ar="11. سطر الأوامر (sayl CLI)" data-en="11. Command-Line Interface (sayl CLI)">11. سطر الأوامر (sayl CLI)</h2>
@@ -451,27 +511,34 @@
         </details>
       </article>
     </div>
-
-    <!-- Footer -->
     <footer>
       <div class="footer-wrap">
         <div class="footer-brand">
-          <img src="favicon.svg" alt="سيل" width="28" height="20">
+          <img src="favicon.svg?v=2" alt="سيل" width="28" height="20">
           <span><strong>سيل · SAYL</strong></span>
         </div>
         <div class="footer-links">
-          <a href="index.html" data-ar="الرئيسية" data-en="Home">الرئيسية</a>
-          <a href="about.html" data-ar="عن الاستوديو" data-en="About">عن الاستوديو</a>
-          <a href="support.html" data-ar="ادعمنا" data-en="Support">ادعمنا</a>
-          <a href="privacy.html" data-ar="الخصوصية" data-en="Privacy">الخصوصية</a>
-          <a href="terms.html" data-ar="الشروط" data-en="Terms">الشروط</a>
+          <a href="docs.html">التوثيق</a>
+          <a href="faq.html">الأسئلة الشائعة</a>
+          <a href="compare.html">مقارنة البرامج</a>
+          <a href="idm-alternative.html">بديل IDM</a>
+          <a href="free-download-manager-windows.html">تحميل لويندوز</a>
+          <a href="plugins.html">الإضافات</a>
+          <a href="themes.html">السمات</a>
+          <a href="about.html">عن الاستوديو</a>
+          <a href="support.html">ادعمنا</a>
+          <a href="privacy.html">الخصوصية</a>
+          <a href="terms.html">الشروط</a>
           <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
         </div>
+      </div>
+      <div style="margin-top:20px;text-align:center;color:#6b80ad;font-size:0.85rem">
+        استوديو أثر · مرخّص بموجب رخصة Apache-2.0 مفتوحة المصدر · بدون إعلانات ولا تتبّع
       </div>
     </footer>
   </div>
 
-  <script src="flow.js"></script>
-  <script src="site.js"></script>
+  <script src="flow.js" defer></script>
+  <script src="site.js" defer></script>
 </body>
 </html>

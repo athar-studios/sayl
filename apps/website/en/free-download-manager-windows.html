@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Free Download Manager for Windows 10 & 11 · Sayl</title>
+  <meta name="description" content="A fast, modern, and open-source download manager for Windows. Overcomes browser download limits with zero ads and zero telemetry.">
+  <meta name="theme-color" content="#070F2E">
+  <link rel="canonical" href="https://sayl.site/en/free-download-manager-windows.html">
+  <link rel="alternate" hreflang="ar" href="https://sayl.site/free-download-manager-windows.html">
+  <link rel="alternate" hreflang="en" href="https://sayl.site/en/free-download-manager-windows.html">
+  <link rel="alternate" hreflang="x-default" href="https://sayl.site/free-download-manager-windows.html">
+
+  <!-- Favicons & App Icons (?v=2) -->
+  <link rel="icon" href="../favicon.ico?v=2" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png?v=2">
+  <link rel="manifest" href="../site.webmanifest">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:site_name" content="سيل · SAYL">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sayl.site/en/free-download-manager-windows.html">
+  <meta property="og:title" content="Free Download Manager for Windows 10 & 11 · Sayl">
+  <meta property="og:description" content="A fast, modern, and open-source download manager for Windows. Overcomes browser download limits with zero ads and zero telemetry.">
+  <meta property="og:image" content="https://sayl.site/og-image-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Free Download Manager for Windows 10 & 11 · Sayl">
+  <meta name="twitter:description" content="A fast, modern, and open-source download manager for Windows. Overcomes browser download limits with zero ads and zero telemetry.">
+  <meta name="twitter:image" content="https://sayl.site/og-image-en.png">
+
+  <!-- Preload Fonts & Stylesheet -->
+  <link rel="preload" href="../fonts/IBMPlexSansArabic-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../fonts/IBMPlexSansArabic-Bold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Athar Studio",
+    "url": "https://sayl.site",
+    "logo": "https://sayl.site/icon-512.png",
+    "sameAs": [
+      "https://github.com/athar-studios",
+      "https://ko-fi.com/athar_studio"
+    ]
+  }
+  </script>
+</head>
+<body>
+  <canvas id="flow"></canvas>
+  <div class="lang-modal-overlay" id="lang-modal" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
+    <div class="lang-modal-card">
+      <img src="../favicon.svg?v=2" alt="Sayl logo" width="56" height="38" style="margin-bottom:12px">
+      <h2 id="lang-modal-title">Choose Language · اختر لغة الموقع</h2>
+      <p>You can toggle your preferred language anytime from the header button.</p>
+      <div class="lang-choices">
+        <button type="button" class="lang-choice-btn" data-choose-lang="ar">
+          <strong>العربية</strong>
+          <small>Arabic RTL Interface</small>
+        </button>
+        <button type="button" class="lang-choice-btn primary" data-choose-lang="en">
+          <strong>English</strong>
+          <small>Default English experience</small>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <header>
+      <a href="../index.html" class="brand" aria-label="Sayl - Home">
+        <img src="../favicon.svg?v=2" alt="Sayl logo" width="34" height="24">
+        <span>Sayl</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="../en/docs.html">Docs</a>
+        <a href="../en/index.html#features" class="hide-mobile">Features</a>
+        <a href="../en/faq.html">FAQ</a>
+        <a href="../en/compare.html">Compare</a>
+        <a href="../en/plugins.html">Plugins</a>
+        <a href="../en/support.html">Support</a>
+      </nav>
+      <div class="header-actions">
+        <a href="../free-download-manager-windows.html" class="lang-btn" aria-label="التبديل إلى العربية">العربية</a>
+      </div>
+    </header>
+    <main class="page-shell">
+      <article class="page-card">
+        <h1>Free Download Manager for Windows 10 & 11</h1>
+        <p class="lead" style="color:#b9c8e6;font-size:1.15rem;margin-bottom:28px">If you struggle with slow browser downloads or broken multi-gigabyte files, Sayl is engineered to be the modern, reliable solution for Windows.</p>
+
+        <h2>Why Browsers Struggle with Large Downloads</h2>
+        <p>Web browsers (like Chrome, Edge, and Firefox) handle transfers over a single baseline connection. This leads to:</p>
+        <ul>
+          <li><strong>Suboptimal throughput:</strong> Single connections rarely saturate modern broadband speeds.</li>
+          <li><strong>Corrupted transfers on dropouts:</strong> A brief Wi-Fi blip or system sleep often causes the browser to abort the entire file, forcing you to start from 0%.</li>
+          <li><strong>Bloated resource footprint:</strong> Heavy downloads run alongside dozens of browser tabs.</li>
+        </ul>
+
+        <h2>How Sayl Solves It</h2>
+        <p>Engineered from scratch in Rust, Sayl focuses entirely on fast, resilient downloading:</p>
+        <ol class="steps">
+          <li><strong>Parallel Segmented Acceleration:</strong> Files are split into concurrent streams, maximizing throughput up to the server's bandwidth limits.</li>
+          <li><strong>Atomic Resumption (.part):</strong> Progress checkpoints are recorded atomically. If your network interrupts, Sayl validates ETag headers and resumes from the exact byte.</li>
+          <li><strong>Ultra-lightweight Rust Footprint:</strong> Consuming under 35MB of RAM, Sayl runs quietly in the system tray without burdening your CPU.</li>
+          <li><strong>Sleep Prevention & Auto-Shutdown:</strong> Prevents Windows from sleeping during active tasks, and can shut down your PC with a 30-second cancellation safety window.</li>
+        </ol>
+
+        <h2>100% Free & Open Source</h2>
+        <p>Sayl is not trialware that demands license keys after 30 days, contains zero ads, and bundles no third-party junk. It is 100% free and open-source under <strong>Apache-2.0</strong>, crafted with care by Athar Studio.</p>
+
+        <div class="cta" style="margin-top:36px">
+          <a class="btn pri" href="https://github.com/athar-studios/sayl/releases/latest">Download Sayl for Windows</a>
+          <a class="btn sec" href="docs.html">Getting Started Guide</a>
+        </div>
+      </article>
+    </main>
+    <footer>
+      <div class="footer-wrap">
+        <div class="footer-brand">
+          <img src="../favicon.svg?v=2" alt="Sayl" width="28" height="20">
+          <span><strong>Sayl · سيل</strong></span>
+        </div>
+        <div class="footer-links">
+          <a href="../en/docs.html">Docs</a>
+          <a href="../en/faq.html">FAQ</a>
+          <a href="../en/compare.html">Comparison</a>
+          <a href="../en/idm-alternative.html">IDM Alternative</a>
+          <a href="../en/free-download-manager-windows.html">Windows FDM</a>
+          <a href="../en/plugins.html">Plugins</a>
+          <a href="../en/themes.html">Themes</a>
+          <a href="../en/about.html">About Studio</a>
+          <a href="../en/support.html">Support</a>
+          <a href="../en/privacy.html">Privacy</a>
+          <a href="../en/terms.html">Terms</a>
+          <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </div>
+      </div>
+      <div style="margin-top:20px;text-align:center;color:#6b80ad;font-size:0.85rem">
+        Athar Studio · Licensed under Apache-2.0 Open Source License · Zero tracking & zero telemetry
+      </div>
+    </footer>
+  </div>
+
+  <script src="../flow.js" defer></script>
+  <script src="../site.js" defer></script>
+</body>
+</html>

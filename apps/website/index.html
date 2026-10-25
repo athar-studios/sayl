@@ -1,169 +1,226 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title data-ar="سيل — مدير تنزيلات مفتوح المصدر لنظام Windows" data-en="Sayl — Open Source Download Manager for Windows">سيل — مدير تنزيلات مفتوح المصدر لنظام Windows</title>
-  <meta name="description" content="سيل مدير تنزيلات حديث وخفيف لويندوز، يقسم الملفات لعدة اتصالات، يستأنف بأمان، بلا إعلانات ولا تتبع.">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>سيل · مدير تنزيل لويندوز مفتوح المصدر وسريع</title>
+  <meta name="description" content="سيل برنامج تنزيل لويندوز مفتوح المصدر. يقسم الملف لاتصالات متوازية، ويستأنف بدقة من آخر بايت، وبلا إعلانات أو تتبع.">
   <meta name="theme-color" content="#070F2E">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
-  <link rel="apple-touch-icon" sizes="128x128" href="icon-128.png">
+  <link rel="canonical" href="https://sayl.site/index.html">
+  <link rel="alternate" hreflang="ar" href="https://sayl.site/index.html">
+  <link rel="alternate" hreflang="en" href="https://sayl.site/en/index.html">
+  <link rel="alternate" hreflang="x-default" href="https://sayl.site/index.html">
+
+  <!-- Favicons & App Icons (?v=2) -->
+  <link rel="icon" href="favicon.ico?v=2" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2">
+  <link rel="manifest" href="site.webmanifest">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:site_name" content="سيل · SAYL">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sayl.site/index.html">
+  <meta property="og:title" content="سيل · مدير تنزيل لويندوز مفتوح المصدر وسريع">
+  <meta property="og:description" content="سيل برنامج تنزيل لويندوز مفتوح المصدر. يقسم الملف لاتصالات متوازية، ويستأنف بدقة من آخر بايت، وبلا إعلانات أو تتبع.">
+  <meta property="og:image" content="https://sayl.site/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="سيل · مدير تنزيل لويندوز مفتوح المصدر وسريع">
+  <meta name="twitter:description" content="سيل برنامج تنزيل لويندوز مفتوح المصدر. يقسم الملف لاتصالات متوازية، ويستأنف بدقة من آخر بايت، وبلا إعلانات أو تتبع.">
+  <meta name="twitter:image" content="https://sayl.site/og-image.png">
+
+  <!-- Preload Fonts & Stylesheet -->
+  <link rel="preload" href="fonts/IBMPlexSansArabic-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/IBMPlexSansArabic-Bold.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Athar Studio",
+    "url": "https://sayl.site",
+    "logo": "https://sayl.site/icon-512.png",
+    "sameAs": [
+      "https://github.com/athar-studios",
+      "https://ko-fi.com/athar_studio"
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "سيل · SAYL",
+    "operatingSystem": "Windows 10, Windows 11",
+    "applicationCategory": "UtilitiesApplication",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "license": "https://www.apache.org/licenses/LICENSE-2.0",
+    "downloadUrl": "https://github.com/athar-studios/sayl/releases/latest",
+    "softwareVersion": "0.1.0",
+    "screenshot": "https://sayl.site/assets/mockups/01-main-light-ar.webp"
+  }
+  </script>
 </head>
 <body>
-  <canvas id="flow" aria-hidden="true"></canvas>
-
-  <!-- First-Visit Language Selection Modal -->
-  <div id="lang-modal" class="lang-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
+  <canvas id="flow"></canvas>
+  <div class="lang-modal-overlay" id="lang-modal" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
     <div class="lang-modal-card">
-      <h2 id="lang-modal-title">اختر لغة الموقع / Select Language</h2>
-      <p>يمكنك تغيير اللغة في أي وقت من أعلى الصفحة.<br>You can switch languages anytime from the top bar.</p>
+      <img src="favicon.svg?v=2" alt="شعار سيل" width="56" height="38" style="margin-bottom:12px">
+      <h2 id="lang-modal-title">اختر لغة الموقع · Choose Language</h2>
+      <p>يمكنك تغيير اللغة في أي وقت من زر التبديل بأعلى الصفحة.</p>
       <div class="lang-choices">
         <button type="button" class="lang-choice-btn primary" data-choose-lang="ar">
-          <span>العربية</span>
-          <small>Arabic (الافتراضية)</small>
+          <strong>العربية</strong>
+          <small>اللغة الأساسية والواجهة الافتراضية</small>
         </button>
         <button type="button" class="lang-choice-btn" data-choose-lang="en">
-          <span>English</span>
-          <small>الإنجليزية</small>
+          <strong>English</strong>
+          <small>English LTR Interface</small>
         </button>
       </div>
     </div>
   </div>
-
   <div class="wrap">
     <header>
-      <a href="index.html" class="brand-link" aria-label="سيل الرئيسية">
-        <img class="mark" src="icon.svg" alt="سيل" width="42" height="29">
+      <a href="index.html" class="brand" aria-label="سيل - الصفحة الرئيسية">
+        <img src="favicon.svg?v=2" alt="شعار سيل" width="34" height="24">
+        <span>سيل</span>
       </a>
       <nav aria-label="التنقل الرئيسي">
-        <a href="#features" class="hide-mobile" data-ar="المميزات" data-en="Features">المميزات</a>
-        <a href="#shots" class="hide-mobile" data-ar="واجهة البرنامج" data-en="Screenshots">واجهة البرنامج</a>
-        <a href="#ext" class="hide-mobile" data-ar="إضافة المتصفح" data-en="Extension">إضافة المتصفح</a>
-        <a href="docs.html" data-ar="الدليل" data-en="Docs">الدليل</a>
-        <a href="about.html" class="hide-mobile" data-ar="عن الاستوديو" data-en="About">عن الاستوديو</a>
-        <a href="support.html" class="hide-mobile" data-ar="ادعمنا" data-en="Support">ادعمنا</a>
-        <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="docs.html">التوثيق</a>
+        <a href="index.html#features" class="hide-mobile">المميزات</a>
+        <a href="faq.html">الأسئلة الشائعة</a>
+        <a href="compare.html">مقارنة</a>
+        <a href="plugins.html">الإضافات</a>
+        <a href="support.html">ادعمنا</a>
       </nav>
       <div class="header-actions">
-        <button type="button" class="lang-btn" aria-label="Switch to English">English</button>
+        <a href="en/index.html" class="lang-btn" aria-label="Switch to English">English</a>
       </div>
     </header>
-
     <!-- Hero Section -->
     <section class="hero">
       <div class="hero-content">
-        <div class="logo-anim">
-          <canvas id="logo" role="img" aria-label="شعار سيل"></canvas>
+        <div class="logo-anim" role="img" aria-label="شعار سيل المتحرك">
+          <canvas id="logo" width="380" height="96"></canvas>
         </div>
-        <h1 data-ar="التنزيل يتدفّق<br>كالسيل." data-en="Downloads that flow<br>like a torrent.">التنزيل يتدفّق<br>كالسيل.</h1>
-        <p class="lead" data-ar="يقسّم سيل الملف على عدة اتصالات متوازية في وقت واحد، وإذا انقطع الإنترنت أو أغلقت الجهاز، يكمل التنزيل بدقة من آخر بايت وصل." data-en="Sayl splits your file across multiple parallel connections at once. If your connection drops or your computer reboots, it resumes right from the last byte.">يقسّم سيل الملف على عدة اتصالات متوازية في وقت واحد، وإذا انقطع الإنترنت أو أغلقت الجهاز، يكمل التنزيل بدقة من آخر بايت وصل.</p>
+        <h1>التنزيل يتدفّق<br>كالسيل.</h1>
+        <p class="lead">يقسّم سيل الملف على عدة اتصالات متوازية في وقت واحد، وإذا انقطع الإنترنت أو أغلقت الجهاز، يكمل التنزيل بدقة من آخر بايت وصل.</p>
         <div class="cta">
-          <a class="btn pri" href="https://github.com/athar-studios/sayl/releases/latest" data-ar="نزِّل لويندوز (v0.1.0)" data-en="Download for Windows (v0.1.0)">نزِّل لويندوز (v0.1.0)</a>
-          <a class="btn sec" href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer" data-ar="الكود على GitHub" data-en="View on GitHub">الكود على GitHub</a>
+          <a class="btn pri" href="https://github.com/athar-studios/sayl/releases/latest">حمّل سيل لويندوز (مجاناً)</a>
+          <a class="btn sec" href="docs.html">التوثيق والدليل</a>
         </div>
         <div class="meta-note">
-          <span data-ar="الإصدار 0.1.0" data-en="Version 0.1.0">الإصدار 0.1.0</span>
+          <span>الإصدار 0.1.0</span>
           <span class="dot">·</span>
-          <span data-ar="ويندوز 10 و11 (64 بت)" data-en="Windows 10 & 11 (64-bit)">ويندوز 10 و11 (64 بت)</span>
+          <span>ويندوز 10 و 11 (64 بت)</span>
           <span class="dot">·</span>
-          <span data-ar="مجاني ومفتوح المصدر (Apache-2.0)" data-en="Free & Open Source (Apache-2.0)">مجاني ومفتوح المصدر (Apache-2.0)</span>
+          <span>مجاني ومفتوح المصدر (Apache-2.0)</span>
         </div>
       </div>
 
       <!-- Live Multi-segment Download Demo Card -->
-      <div class="dl" aria-label="معاينة حية لتنزيل متعدد الأجزاء">
+      <div class="dl" role="region" aria-label="معاينة حية لتنزيل متعدد الأجزاء">
         <div class="row">
-          <span class="state-badge" data-ar="قيد التنزيل" data-en="Downloading">قيد التنزيل</span>
-          <span data-ar="٨ اتصالات متزامنة" data-en="8 concurrent connections">٨ اتصالات متزامنة</span>
+          <span class="state-badge">قيد التنزيل</span>
+          <span>٨ اتصالات متزامنة</span>
         </div>
         <div class="name">ubuntu-24.04-desktop-amd64.iso</div>
         <div class="segs" aria-hidden="true"></div>
         <div class="stats-row">
           <div class="big" id="pct">٠٪</div>
-          <small id="spd" data-ar="٤٢.٤ م.ب/ث · المتبقي ٣د ٢٠ث" data-en="42.4 MB/s · 3m 20s left">٤٢.٤ م.ب/ث · المتبقي ٣د ٢٠ث</small>
+          <small id="spd">٤٢.٤ م.ب/ث · المتبقي ٣د ٢٠ث</small>
         </div>
       </div>
     </section>
 
     <!-- Mockups Showcase Section -->
     <section class="mockups-section" id="shots">
-      <h2 data-ar="واجهة هادئة تركز على إنجازك" data-en="A calm interface focused on your work">واجهة هادئة تركز على إنجازك</h2>
-      <p class="sub" data-ar="بلا نوافذ منبثقة مزعجة، وبلا إعلانات، وبالعربية أولًا مع دعم كامل للإنجليزية والوضعين الفاتح والداكن." data-en="No popup ads, zero tracking, designed Arabic-first with full English support and refined dark and light themes.">بلا نوافذ منبثقة مزعجة، وبلا إعلانات، وبالعربية أولًا مع دعم كامل للإنجليزية والوضعين الفاتح والداكن.</p>
+      <h2>واجهة هادئة تركز على إنجازك</h2>
+      <p class="sub">بلا نوافذ منبثقة مزعجة، وبلا إعلانات، وبالعربية أولاً مع دعم كامل للإنجليزية والوضعين الفاتح والداكن.</p>
 
       <div class="mockups-tabs" role="tablist" aria-label="أقسام واجهة سيل">
-        <button type="button" class="mockup-tab-btn active" data-img="assets/mockups/01-main-light-ar.png" data-ar-title="الواجهة الرئيسية (الوضع الفاتح)" data-en-title="Main Interface (Light Mode)" data-ar-desc="شاشة سيل الرئيسية مع تصنيفات الملفات وشريط البحث السريع والتحكم في المهام." data-en-desc="Sayl main window with functional categories, quick search filter, and task controls." data-ar="الرئيسية (فاتح)" data-en="Main (Light)">الرئيسية (فاتح)</button>
-        <button type="button" class="mockup-tab-btn" data-img="assets/mockups/02-main-dark-ar.png" data-ar-title="الواجهة الرئيسية (الوضع الداكن)" data-en-title="Main Interface (Dark Mode)" data-ar-desc="الوضع الداكن المريح للعين بلون Abyss الأزرق العميق مع تمييز دقيق لحالات التحميل." data-en-desc="Comfortable deep Abyss dark mode with crisp task state indicators." data-ar="الرئيسية (داكن)" data-en="Main (Dark)">الرئيسية (داكن)</button>
-        <button type="button" class="mockup-tab-btn" data-img="assets/mockups/05-progress-window.png" data-ar-title="نافذة التقدّم وتفاصيل الأجزاء" data-en-title="Detailed Download Progress Window" data-ar-desc="نافذة مخصصة لمتابعة تدفق البايتات في كل وصلة مستقلة مع سرعة النقل والوقت المتبقي." data-en-desc="Dedicated progress window showing live per-connection chunks, speed, and ETA." data-ar="نافذة التقدّم" data-en="Progress Window">نافذة التقدّم</button>
-        <button type="button" class="mockup-tab-btn" data-img="assets/mockups/06-settings.png" data-ar-title="خيارات الإعدادات واختصارات المفاتيح" data-en-title="Settings & Keyboard Shortcuts" data-ar-desc="تحكم كامل بمجلد الحفظ، وسقف الاتصالات، ومنع نوم الجهاز، وسلوك النوافذ." data-en-desc="Full control over save paths, connection limits, sleep prevention, and window behavior." data-ar="الإعدادات" data-en="Settings">الإعدادات</button>
-        <button type="button" class="mockup-tab-btn" data-img="assets/mockups/04-add-duplicate.png" data-ar-title="التعامل الذكي مع الروابط المكررة" data-en-title="Duplicate URL Detection" data-ar-desc="ينبهك سيل فورًا إذا كان الرابط موجودًا مسبقًا ويتيح فتح الملف الحالي أو تنزيله من جديد." data-en-desc="Sayl warns if a link already exists, offering to open the existing file or re-download." data-ar="كشف التكرار" data-en="Duplicate Alert">كشف التكرار</button>
-        <button type="button" class="mockup-tab-btn" data-img="assets/mockups/07-shutdown-countdown.png" data-ar-title="إيقاف تشغيل الجهاز التلقائي مع عداد الأمان" data-en-title="Auto-Shutdown Countdown" data-ar-desc="إيقاف تشغيل حاسوبك بأمان بعد إتمام كل الملفات، مع عد تنازلي يتيح التراجع بنقرة زر." data-en-desc="Powers off your PC after downloads complete, with a 30s countdown to cancel anytime." data-ar="إيقاف التشغيل" data-en="Auto Shutdown">إيقاف التشغيل</button>
-        <button type="button" class="mockup-tab-btn" data-img="assets/mockups/03-main-light-en.png" data-ar-title="الواجهة باللغة الإنجليزية" data-en-title="English LTR Interface" data-ar-desc="تبديل فوري كامل للغة والاتجاه من اليمين إلى اليسار أو العكس بضغطة زر واحدة." data-en-desc="Seamless single-click toggle between English LTR and Arabic RTL layouts." data-ar="English UI" data-en="English UI">English UI</button>
+        <button type="button" role="tab" aria-selected="true" class="mockup-tab-btn active" data-img="assets/mockups/01-main-light-ar.webp" data-title="الواجهة الرئيسية (الوضع الفاتح)" data-desc="شاشة سيل الرئيسية مع تصنيفات الملفات وشريط البحث السريع والتحكم في المهام.">الرئيسية (فاتح)</button>
+        <button type="button" role="tab" aria-selected="false" class="mockup-tab-btn" data-img="assets/mockups/02-main-dark-ar.webp" data-title="الواجهة الرئيسية (الوضع الداكن)" data-desc="الوضع الداكن المريح للعين بلون Abyss الأزرق العميق مع تمييز دقيق لحالات التحميل.">الرئيسية (داكن)</button>
+        <button type="button" role="tab" aria-selected="false" class="mockup-tab-btn" data-img="assets/mockups/05-progress-window.webp" data-title="نافذة التقدّم وتفاصيل الأجزاء" data-desc="نافذة مخصصة لمتابعة تدفق البايتات في كل وصلة مستقلة مع سرعة النقل والوقت المتبقي.">نافذة التقدّم</button>
+        <button type="button" role="tab" aria-selected="false" class="mockup-tab-btn" data-img="assets/mockups/06-settings.webp" data-title="خيارات الإعدادات واختصارات المفاتيح" data-desc="تحكم كامل بمجلد الحفظ، وسقف الاتصالات، ومنع نوم الجهاز، وسلوك النوافذ.">الإعدادات</button>
+        <button type="button" role="tab" aria-selected="false" class="mockup-tab-btn" data-img="assets/mockups/04-add-duplicate.webp" data-title="التعامل الذكي مع الروابط المكررة" data-desc="ينبهك سيل فوراً إذا كان الرابط موجوداً مسبقاً ويتيح فتح الملف الحالي أو تنزيله من جديد.">كشف التكرار</button>
+        <button type="button" role="tab" aria-selected="false" class="mockup-tab-btn" data-img="assets/mockups/07-shutdown-countdown.webp" data-title="إيقاف تشغيل الجهاز التلقائي مع عداد الأمان" data-desc="إيقاف تشغيل حاسوبك بأمان بعد إتمام كل الملفات، مع عد تنازلي يتيح التراجع بنقرة زر.">إيقاف التشغيل</button>
+        <button type="button" role="tab" aria-selected="false" class="mockup-tab-btn" data-img="assets/mockups/03-main-light-en.webp" data-title="الواجهة باللغة الإنجليزية" data-desc="تبديل فوري كامل للغة والاتجاه من اليمين إلى اليسار أو العكس بضغطة زر واحدة.">English UI</button>
       </div>
 
       <div class="mockup-frame">
-        <img id="mockup-img" src="assets/mockups/01-main-light-ar.png" alt="لقطة شاشة لبرنامج سيل" width="1100" height="720" loading="lazy">
+        <img id="mockup-img" src="assets/mockups/01-main-light-ar.webp" alt="لقطة شاشة لبرنامج سيل" width="1100" height="720" loading="lazy">
         <div class="mockup-caption">
-          <strong id="mockup-caption-title" data-ar="الواجهة الرئيسية (الوضع الفاتح)" data-en="Main Interface (Light Mode)">الواجهة الرئيسية (الوضع الفاتح)</strong>
-          <span id="mockup-caption-desc" data-ar="شاشة سيل الرئيسية مع تصنيفات الملفات وشريط البحث السريع والتحكم في المهام." data-en="Sayl main window with functional categories, quick search filter, and task controls.">شاشة سيل الرئيسية مع تصنيفات الملفات وشريط البحث السريع والتحكم في المهام.</span>
+          <strong id="mockup-caption-title">الواجهة الرئيسية (الوضع الفاتح)</strong>
+          <span id="mockup-caption-desc">شاشة سيل الرئيسية مع تصنيفات الملفات وشريط البحث السريع والتحكم في المهام.</span>
         </div>
       </div>
     </section>
 
     <!-- Features Section -->
     <section class="band" id="features">
-      <h2 data-ar="ما يقدّمه سيل من اليوم الأول" data-en="Built for real everyday downloading">ما يقدّمه سيل من اليوم الأول</h2>
-      <p class="sub" data-ar="صُمم ليحل مشكلات التنزيل الحقيقية على ويندوز: سرعة أعلى، استئناف موثوق، وتجربة تحترم وقتك وخصوصيتك." data-en="Engineered for real Windows download challenges: faster transfers, reliable resumption, and respect for your privacy.">صُمم ليحل مشكلات التنزيل الحقيقية على ويندوز: سرعة أعلى، استئناف موثوق، وتجربة تحترم وقتك وخصوصيتك.</p>
+      <h2>ما يقدّمه سيل من اليوم الأول</h2>
+      <p class="sub">صُمم ليحل مشكلات التنزيل الحقيقية على ويندوز: سرعة أعلى، استئناف موثوق، وتجربة تحترم وقتك وخصوصيتك.</p>
 
       <div class="feat">
         <div>
-          <h3 data-ar="تنزيل أسرع بالتقسيم" data-en="Faster Multi-Part Downloads">تنزيل أسرع بالتقسيم</h3>
-          <p data-ar="يُقسَم الملف إلى عدة أجزاء متوازية ينزل كل منها عبر اتصال مستقل، لاستغلال أقصى سرعة يوفرها اتصالك بالإنترنت." data-en="Files are split into independent parts downloaded concurrently, maximizing your network bandwidth.">يُقسَم الملف إلى عدة أجزاء متوازية ينزل كل منها عبر اتصال مستقل، لاستغلال أقصى سرعة يوفرها اتصالك بالإنترنت.</p>
+          <h3>تنزيل أسرع بالتقسيم</h3>
+          <p>يُقسَم الملف إلى عدة أجزاء متوازية ينزل كل منها عبر اتصال مستقل، لاستغلال أقصى سرعة يوفرها اتصالك بالإنترنت.</p>
         </div>
         <div>
-          <h3 data-ar="استئناف من حيث توقّف" data-en="Safe Resumption">استئناف من حيث توقّف</h3>
-          <p data-ar="انقطع الإنترنت أو أُغلق الجهاز؟ يحفظ سيل نقاط التقدم في ملف مؤقت (.part) ويكمل من آخر بايت مسجل دون إعادة تنزيل ما اكتمل." data-en="Power outage or connection drop? Sayl records checkpoints in atomic .part files and resumes from the exact byte reached.">انقطع الإنترنت أو أُغلق الجهاز؟ يحفظ سيل نقاط التقدم في ملف مؤقت (.part) ويكمل من آخر بايت مسجل دون إعادة تنزيل ما اكتمل.</p>
+          <h3>استئناف من حيث توقّف</h3>
+          <p>انقطع الإنترنت أو أُغلق الجهاز؟ يحفظ سيل نقاط التقدم في ملف مؤقت (.part) ويكمل من آخر بايت مسجل دون إعادة تنزيل ما اكتمل.</p>
         </div>
         <div>
-          <h3 data-ar="عربي وإنجليزي أصيل" data-en="Native Arabic & English">عربي وإنجليزي أصيل</h3>
-          <p data-ar="واجهة مكتوبة بعناية تبدأ بالعربية من اليمين إلى اليسار، مع خط مريح للقراءة وإمكانية التبديل إلى الإنجليزية في أي لحظة." data-en="Carefully designed Arabic RTL interface with clean typography, alongside a complete English LTR experience.">واجهة مكتوبة بعناية تبدأ بالعربية من اليمين إلى اليسار، مع خط مريح للقراءة وإمكانية التبديل إلى الإنجليزية في أي لحظة.</p>
+          <h3>عربي وإنجليزي أصيل</h3>
+          <p>واجهة مكتوبة بعناية تبدأ بالعربية من اليمين إلى اليسار، مع خط مريح للقراءة وإمكانية التبديل إلى الإنجليزية في أي لحظة.</p>
         </div>
         <div>
-          <h3 data-ar="اسحب وأفلت مباشرة" data-en="Drag & Drop">اسحب وأفلت مباشرة</h3>
-          <p data-ar="اسحب أي رابط من المتصفح أو أي ملف نصي وأفلته داخل نافذة سيل ليبدأ فحصه وتنزيله في الحال." data-en="Drag and drop links or URLs directly onto the Sayl window to begin downloading immediately.">اسحب أي رابط من المتصفح أو أي ملف نصي وأفلته داخل نافذة سيل ليبدأ فحصه وتنزيله في الحال.</p>
+          <h3>تصنيفات تلقائية وبحث</h3>
+          <p>تنظيم فوري للتنزيلات المكتملة في تصنيفات عملية (برامج، وسائط، مضغوطة...) مع شريط بحث سريع للوصول المباشر.</p>
         </div>
         <div>
-          <h3 data-ar="تصنيف تلقائي وبحث سريع" data-en="Categories & Search">تصنيف تلقائي وبحث سريع</h3>
-          <p data-ar="تُصنّف الملفات تلقائيًا إلى فيديو وصوت ومستندات وبرامج ومضغوطة، مع شريط بحث فوري يجد ملفاتك بالاسم أو الرابط." data-en="Automatic grouping into videos, audio, documents, programs, and archives, paired with instant search.">تُصنّف الملفات تلقائيًا إلى فيديو وصوت ومستندات وبرامج ومضغوطة، مع شريط بحث فوري يجد ملفاتك بالاسم أو الرابط.</p>
+          <h3>سطر أوامر للمطورين</h3>
+          <p>أداة CLI مستقلة (<code>sayl.exe</code>) تتيح إدارة التنزيلات والأتمتة من سطر الأوامر أو نصوص PowerShell البرمجية.</p>
         </div>
         <div>
-          <h3 data-ar="أداة سطر أوامر مستقلة" data-en="Standalone CLI Tool">أداة سطر أوامر مستقلة</h3>
-          <p data-ar="أمر sayl متوفر لمحبي الطرفية وPowerShell لإضافة التنزيلات وإدارتها واسترجاعها ودمجها في السكربتات." data-en="The sayl CLI gives terminal power-users full control over queues, downloads, recovery, and scripts.">أمر sayl متوفر لمحبي الطرفية وPowerShell لإضافة التنزيلات وإدارتها واسترجاعها ودمجها في السكربتات.</p>
+          <h3>هادئ وفي الخلفية</h3>
+          <p>يعمل سيل بخفة في شريط المهام (System Tray)، وينبهك عند اكتمال التحميل مع خيار إطفاء الحاسوب تلقائياً.</p>
         </div>
       </div>
     </section>
 
-    <!-- Split Section: Browser Extension & CLI Preview -->
-    <section class="band split" id="ext">
-      <div>
-        <h2 data-ar="من المتصفح إلى سيل مباشرة" data-en="From Browser to Sayl with One Click">من المتصفح إلى سيل مباشرة</h2>
-        <p class="sub" data-ar="ثبّت إضافة سيل على Chrome أو Edge لنقل التنزيلات تلقائيًا بمجرد الضغط عليها. وإن أردت الاختيار، فانقر بزر الفأرة الأيمن على أي رابط واختر «التحميل باستخدام سيل»." data-en="Install the Sayl extension for Chrome or Edge to catch downloads automatically. Or right-click any link and choose 'Download with Sayl'.">ثبّت إضافة سيل على Chrome أو Edge لنقل التنزيلات تلقائيًا بمجرد الضغط عليها. وإن أردت الاختيار، فانقر بزر الفأرة الأيمن على أي رابط واختر «التحميل باستخدام سيل».</p>
-        <div class="cta">
-          <a class="btn sec" href="docs.html#ext" data-ar="طريقة تفعيل الإضافة" data-en="Extension Guide">طريقة تفعيل الإضافة</a>
-          <a class="btn sec" href="docs.html#cli" data-ar="أوامر الـ CLI كاملة" data-en="Full CLI Guide">أوامر الـ CLI كاملة</a>
+    <!-- Split Section (Extension + CLI) -->
+    <section class="band">
+      <div class="split">
+        <div>
+          <h2>تكامل سلس مع المتصفح وسطر الأوامر</h2>
+          <p style="color:#b9c8e6;line-height:1.75;font-size:1.05rem">
+            التقط التنزيلات بضغطة زر واحدة من Chrome وEdge وBrave عبر إضافة المتصفح الرسمية، أو تحكم بمحرك التنزيل كاملاً من Terminal عبر أمر <code>sayl</code> البسيط والمبني بلغة Rust.
+          </p>
+          <div style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap">
+            <a class="btn sec" href="docs.html#ext">تفعيل إضافة المتصفح</a>
+            <a class="btn sec" href="docs.html#cli">دليل أوامر CLI</a>
+          </div>
         </div>
-      </div>
-      <div class="term" aria-label="أمثلة لأوامر سيل في الطرفية">
-        <span class="dim"># إضافة رابط تنزيل بـ ٨ اتصالات</span><br>
-        <b>PS&gt;</b> sayl add https://example.org/package.zip --connections 8<br>
-        <span class="dim">[0192a83f] Task queued · 1.42 GB</span><br><br>
-        <span class="dim"># عرض المهام الجارية</span><br>
-        <b>PS&gt;</b> sayl list<br>
-        <span class="dim">0192a83f  Downloading  68%  42.4 MB/s  ETA 1m 12s</span><br><br>
-        <span class="dim"># استرجاع المهام بعد إغلاق مفاجئ</span><br>
-        <b>PS&gt;</b> sayl recover<br>
-        <span class="dim">Recovered 2 non-terminal tasks to Paused</span>
+
+        <div class="term" role="region" aria-label="أوامر سطر الأوامر">
+          <span class="dim"># إضافة رابط تنزيل بـ 8 مسارات متوازية</span><br>
+          <b>sayl</b> add https://example.com/file.zip --connections 8<br><br>
+          <span class="dim"># عرض قائمة المهام النشطة بصيغة JSON للأتمتة</span><br>
+          <b>sayl</b> list --json<br><br>
+          <span class="dim"># استرداد المهام بعد انقطاع مفاجئ</span><br>
+          <b>sayl</b> recover
+        </div>
       </div>
     </section>
 
@@ -171,34 +228,41 @@
     <section class="band">
       <div class="next">
         <div>
-          <div class="tag" data-ar="قادم في 0.2.0" data-en="Coming in v0.2.0">قادم في 0.2.0</div>
-          <h2 style="margin:8px 0 6px" data-ar="تنزيل الفيديو بالجودة التي تختارها" data-en="Video Downloads with Quality Selection">تنزيل الفيديو بالجودة التي تختارها</h2>
-          <p style="margin:0;color:#b9c8e6" data-ar="زر مباشر لاختيار دقة الفيديو المفضلة أو حفظ المسار الصوتي وحده دون برامج وسيطة معقدة." data-en="Direct control over your preferred video resolution or audio-only extraction without bloated third-party tools.">زر مباشر لاختيار دقة الفيديو المفضلة أو حفظ المسار الصوتي وحده دون برامج وسيطة معقدة.</p>
+          <div class="tag">قادم في 0.2.0</div>
+          <h2 style="margin:8px 0 6px">تنزيل الفيديو بالجودة التي تختارها ونظام الإضافات</h2>
+          <p style="margin:0;color:#b9c8e6">تكامل أصيل مع yt-dlp ونظام إضافات معياري لمواقع الفيديو والتواصل الاجتماعي لحفظ المقاطع بدقة 4K أو استخراج الصوت وحده.</p>
         </div>
-        <a class="btn sec" href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer" data-ar="تابع التحديثات على GitHub" data-en="Follow on GitHub">تابع التحديثات على GitHub</a>
+        <a class="btn sec" href="plugins.html">استعرض الإضافات المخططة</a>
       </div>
     </section>
-
-    <!-- Footer -->
     <footer>
       <div class="footer-wrap">
         <div class="footer-brand">
-          <img src="favicon.svg" alt="سيل" width="28" height="20">
+          <img src="favicon.svg?v=2" alt="سيل" width="28" height="20">
           <span><strong>سيل · SAYL</strong></span>
         </div>
         <div class="footer-links">
-          <a href="docs.html" data-ar="الدليل" data-en="Docs">الدليل</a>
-          <a href="about.html" data-ar="عن الاستوديو" data-en="About">عن الاستوديو</a>
-          <a href="support.html" data-ar="ادعمنا" data-en="Support">ادعمنا</a>
-          <a href="privacy.html" data-ar="الخصوصية" data-en="Privacy">الخصوصية</a>
-          <a href="terms.html" data-ar="الشروط" data-en="Terms">الشروط</a>
+          <a href="docs.html">التوثيق</a>
+          <a href="faq.html">الأسئلة الشائعة</a>
+          <a href="compare.html">مقارنة البرامج</a>
+          <a href="idm-alternative.html">بديل IDM</a>
+          <a href="free-download-manager-windows.html">تحميل لويندوز</a>
+          <a href="plugins.html">الإضافات</a>
+          <a href="themes.html">السمات</a>
+          <a href="about.html">عن الاستوديو</a>
+          <a href="support.html">ادعمنا</a>
+          <a href="privacy.html">الخصوصية</a>
+          <a href="terms.html">الشروط</a>
           <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
         </div>
+      </div>
+      <div style="margin-top:20px;text-align:center;color:#6b80ad;font-size:0.85rem">
+        استوديو أثر · مرخّص بموجب رخصة Apache-2.0 مفتوحة المصدر · بدون إعلانات ولا تتبّع
       </div>
     </footer>
   </div>
 
-  <script src="flow.js"></script>
-  <script src="site.js"></script>
+  <script src="flow.js" defer></script>
+  <script src="site.js" defer></script>
 </body>
 </html>

@@ -1,85 +1,146 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title data-ar="سياسة الخصوصية — سيل SAYL" data-en="Privacy Policy — SAYL">سياسة الخصوصية — سيل SAYL</title>
-  <meta name="description" content="سيل لا يجمع أي بيانات عنك. لا حسابات، ولا إحصاءات استخدام، ولا إعلانات، ولا خوادم وسيطة.">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>سياسة الخصوصية · سيل SAYL</title>
+  <meta name="description" content="سياسة خصوصية سيل: صفر تتبع، تخزين محلي على جهازك، لا نجمع أي بيانات ولا نرسلها إلى أي خادم وسيط.">
   <meta name="theme-color" content="#070F2E">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
-  <link rel="apple-touch-icon" sizes="128x128" href="icon-128.png">
+  <link rel="canonical" href="https://sayl.site/privacy.html">
+  <link rel="alternate" hreflang="ar" href="https://sayl.site/privacy.html">
+  <link rel="alternate" hreflang="en" href="https://sayl.site/en/privacy.html">
+  <link rel="alternate" hreflang="x-default" href="https://sayl.site/privacy.html">
+
+  <!-- Favicons & App Icons (?v=2) -->
+  <link rel="icon" href="favicon.ico?v=2" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2">
+  <link rel="manifest" href="site.webmanifest">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:site_name" content="سيل · SAYL">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sayl.site/privacy.html">
+  <meta property="og:title" content="سياسة الخصوصية · سيل SAYL">
+  <meta property="og:description" content="سياسة خصوصية سيل: صفر تتبع، تخزين محلي على جهازك، لا نجمع أي بيانات ولا نرسلها إلى أي خادم وسيط.">
+  <meta property="og:image" content="https://sayl.site/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="سياسة الخصوصية · سيل SAYL">
+  <meta name="twitter:description" content="سياسة خصوصية سيل: صفر تتبع، تخزين محلي على جهازك، لا نجمع أي بيانات ولا نرسلها إلى أي خادم وسيط.">
+  <meta name="twitter:image" content="https://sayl.site/og-image.png">
+
+  <!-- Preload Fonts & Stylesheet -->
+  <link rel="preload" href="fonts/IBMPlexSansArabic-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/IBMPlexSansArabic-Bold.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Athar Studio",
+    "url": "https://sayl.site",
+    "logo": "https://sayl.site/icon-512.png",
+    "sameAs": [
+      "https://github.com/athar-studios",
+      "https://ko-fi.com/athar_studio"
+    ]
+  }
+  </script>
 </head>
 <body>
-  <canvas id="flow" aria-hidden="true" style="opacity:0.35"></canvas>
-
+  <canvas id="flow"></canvas>
+  <div class="lang-modal-overlay" id="lang-modal" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
+    <div class="lang-modal-card">
+      <img src="favicon.svg?v=2" alt="شعار سيل" width="56" height="38" style="margin-bottom:12px">
+      <h2 id="lang-modal-title">اختر لغة الموقع · Choose Language</h2>
+      <p>يمكنك تغيير اللغة في أي وقت من زر التبديل بأعلى الصفحة.</p>
+      <div class="lang-choices">
+        <button type="button" class="lang-choice-btn primary" data-choose-lang="ar">
+          <strong>العربية</strong>
+          <small>اللغة الأساسية والواجهة الافتراضية</small>
+        </button>
+        <button type="button" class="lang-choice-btn" data-choose-lang="en">
+          <strong>English</strong>
+          <small>English LTR Interface</small>
+        </button>
+      </div>
+    </div>
+  </div>
   <div class="wrap">
     <header>
-      <a href="index.html" class="brand-link" aria-label="العودة للرئيسية">
-        <img class="mark" src="icon.svg" alt="سيل" width="42" height="29">
+      <a href="index.html" class="brand" aria-label="سيل - الصفحة الرئيسية">
+        <img src="favicon.svg?v=2" alt="شعار سيل" width="34" height="24">
+        <span>سيل</span>
       </a>
       <nav aria-label="التنقل الرئيسي">
-        <a href="index.html" data-ar="الرئيسية" data-en="Home">الرئيسية</a>
-        <a href="docs.html" data-ar="الدليل" data-en="Docs">الدليل</a>
-        <a href="about.html" class="hide-mobile" data-ar="عن الاستوديو" data-en="About">عن الاستوديو</a>
-        <a href="support.html" class="hide-mobile" data-ar="ادعمنا" data-en="Support">ادعمنا</a>
-        <a href="https://github.com/athar-studios/sayl/releases/latest" class="hide-mobile" data-ar="التنزيل" data-en="Download">التنزيل</a>
-        <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="docs.html">التوثيق</a>
+        <a href="index.html#features" class="hide-mobile">المميزات</a>
+        <a href="faq.html">الأسئلة الشائعة</a>
+        <a href="compare.html">مقارنة</a>
+        <a href="plugins.html">الإضافات</a>
+        <a href="support.html">ادعمنا</a>
       </nav>
       <div class="header-actions">
-        <button type="button" class="lang-btn" aria-label="Switch to English">English</button>
+        <a href="en/privacy.html" class="lang-btn" aria-label="Switch to English">English</a>
       </div>
     </header>
-
     <main class="page-shell">
-      <div class="page-card">
-        <h1 data-ar="سياسة الخصوصية" data-en="Privacy Policy">سياسة الخصوصية</h1>
-        <p class="lead" data-ar="التزامنا بالخصوصية ليس مجرد نص قانوني؛ بل هو قرار هندسي متجذر في صميم تصميم برنامج سيل." data-en="Our privacy commitment is not just legal text; it is an architectural decision baked into Sayl's core.">التزامنا بالخصوصية ليس مجرد نص قانوني؛ بل هو قرار هندسي متجذر في صميم تصميم برنامج سيل.</p>
+      <article class="page-card">
+        <h1>سياسة الخصوصية · سيل</h1>
+        <p class="lead" style="color:#b9c8e6;font-size:1.15rem;margin-bottom:28px">التزامنا بالخصوصية ليس مجرد نص قانوني؛ بل هو قرار هندسي متجذر في صميم تصميم برنامج سيل.</p>
 
-        <h2 data-ar="باختصار" data-en="In Short">باختصار</h2>
-        <p data-ar="سيل لا يجمع أي بيانات عنك على الإطلاق. لا يتطلب إنشاء حساب، ولا يسجل إحصاءات استخدام (No Telemetry)، ولا يعرض إعلانات، ولا يمرر تنزيلاتك عبر أي خوادم وسيطة أو بروكسي يخصنا." data-en="Sayl collects zero personal data. No accounts required, no telemetry, no advertisements, and zero intermediate proxy servers.">سيل لا يجمع أي بيانات عنك على الإطلاق. لا يتطلب إنشاء حساب، ولا يسجل إحصاءات استخدام (No Telemetry)، ولا يعرض إعلانات، ولا يمرر تنزيلاتك عبر أي خوادم وسيطة أو بروكسي يخصنا.</p>
+        <h2>باختصار</h2>
+        <p>سيل لا يجمع أي بيانات عنك على الإطلاق. لا يتطلب إنشاء حساب، ولا يسجل إحصاءات استخدام (No Telemetry)، ولا يعرض إعلانات، ولا يمرر تنزيلاتك عبر أي خوادم وسيطة أو بروكسي يخصنا.</p>
 
-        <h2 data-ar="ما الذي يتصل به البرنامج؟" data-en="What Does the App Connect To?">ما الذي يتصل به البرنامج؟</h2>
-        <p data-ar="يتصل سيل فقط بالخوادم التي تطلب أنت تنزيل الملفات منها. طلب الاتصال يخرج مباشرة من جهازك إلى خادم الملف الأصلي، ولا يمر عبر أي خادم تابع لنا. البرنامج لا يرسل تقارير تتبع خلفية ولا يتضمن أي مكتبات إعلانية." data-en="Sayl connects exclusively to the hosts you explicitly request downloads from. Traffic flows directly between your computer and the target server, never passing through any server owned by Athar Studio.">يتصل سيل فقط بالخوادم التي تطلب أنت تنزيل الملفات منها. طلب الاتصال يخرج مباشرة من جهازك إلى خادم الملف الأصلي، ولا يمر عبر أي خادم تابع لنا. البرنامج لا يرسل تقارير تتبع خلفية ولا يتضمن أي مكتبات إعلانية.</p>
+        <h2>ما الذي يتصل به البرنامج؟</h2>
+        <p>يتصل سيل فقط بالخوادم التي تطلب أنت تنزيل الملفات منها. طلب الاتصال يخرج مباشرة من جهازك إلى خادم الملف الأصلي، ولا يمر عبر أي خادم تابع لنا. البرنامج لا يرسل تقارير تتبع خلفية ولا يتضمن أي مكتبات إعلانية.</p>
 
-        <h2 data-ar="البيانات المحفوظة على جهازك" data-en="Data Stored Locally on Your PC">البيانات المحفوظة على جهازك</h2>
-        <p data-ar="كل ما يحفظه سيل يبقى محليًا بالكامل داخل جهازك الشخصي:" data-en="Everything Sayl stores remains strictly local on your machine:">كل ما يحفظه سيل يبقى محليًا بالكامل داخل جهازك الشخصي:</p>
+        <h2>البيانات المحفوظة على جهازك</h2>
+        <p>كل ما يحفظه سيل يبقى محلياً بالكامل داخل جهازك الشخصي:</p>
         <ul>
-          <li data-ar="<strong>الإعدادات وقائمة التنزيلات:</strong> (الروابط، وأسماء الملفات، وحالة الإنجاز) تُحفظ في المجلد <code>%APPDATA%\SAYL\</code>." data-en="<strong>Settings & Task History:</strong> Saved locally in <code>%APPDATA%\SAYL\</code>."><strong>الإعدادات وقائمة التنزيلات:</strong> (الروابط، وأسماء الملفات، وحالة الإنجاز) تُحفظ في المجلد <code>%APPDATA%\SAYL\</code>.</li>
-          <li data-ar="تبقى هذه البيانات ملكك وحدك، ويمكنك حذفها نهائيًا في أي ثانية بمجرد إغلاق التطبيق وحذف المجلد المذكور." data-en="This data is entirely under your control and can be deleted anytime by removing that folder.">تبقى هذه البيانات ملكك وحدك، ويمكنك حذفها نهائيًا في أي ثانية بمجرد إغلاق التطبيق وحذف المجلد المذكور.</li>
+          <li><strong>الإعدادات وقائمة التنزيلات:</strong> (الروابط، وأسماء الملفات، وحالة الإنجاز) تُحفظ في المجلد <code>Downloads\SAYL\.data</code>.</li>
+          <li>تبقى هذه البيانات ملكك وحدك، ويمكنك حذفها نهائياً في أي ثانية بمجرد إغلاق التطبيق وحذف المجلد المذكور.</li>
         </ul>
 
-        <h2 data-ar="موقع الويب هذا (sayl.site)" data-en="This Website (sayl.site)">موقع الويب هذا (sayl.site)</h2>
-        <p data-ar="موقع <strong>sayl.site</strong> عبارة عن صفحات ويب ثابتة خفيفة، مستضافة على شبكة Cloudflare Pages، ولا تستخدم أي ملفات تعريف ارتباط (Cookies) للتتبع، ولا تحتوي على أدوات تحليل تتبع مثل Google Analytics. الخطوط والأيقونات مستضافة ذاتيًا بالكامل." data-en="The <strong>sayl.site</strong> website consists of lightweight static pages hosted on Cloudflare Pages. It uses no tracking cookies, no Google Analytics, and self-hosts all fonts locally.">موقع <strong>sayl.site</strong> عبارة عن صفحات ويب ثابتة خفيفة، مستضافة على شبكة Cloudflare Pages، ولا تستخدم أي ملفات تعريف ارتباط (Cookies) للتتبع، ولا تحتوي على أدوات تحليل تتبع مثل Google Analytics. الخطوط والأيقونات مستضافة ذاتيًا بالكامل.</p>
-        <p data-ar="عند الضغط على الروابط الخارجية (مثل مستودع GitHub أو صفحة Ko-fi للدعم)، تنتقل إلى مواقعهم وتخضع لسياسات الخصوصية الخاصة بتلك المنصات." data-en="External links (such as GitHub or Ko-fi) take you to their respective domains subject to their own policies.">عند الضغط على الروابط الخارجية (مثل مستودع GitHub أو صفحة Ko-fi للدعم)، تنتقل إلى مواقعهم وتخضع لسياسات الخصوصية الخاصة بتلك المنصات.</p>
+        <h2>موقع الويب هذا (sayl.site)</h2>
+        <p>موقع <strong>sayl.site</strong> عبارة عن صفحات ويب ثابتة خفيفة، مستضافة على شبكة Cloudflare Pages، ولا تستخدم أي ملفات تعريف ارتباط (Cookies) للتتبع، ولا تحتوي على أدوات تحليل تتبع مثل Google Analytics. الخطوط والأيقونات مستضافة ذاتياً بالكامل.</p>
+        <p>عند الضغط على الروابط الخارجية (مثل مستودع GitHub أو صفحة Ko-fi للدعم)، تنتقل إلى مواقعهم وتخضع لسياسات الخصوصية الخاصة بتلك المنصات.</p>
 
-        <h2 data-ar="التواصل والأسئلة" data-en="Contact & Inquiries">التواصل والأسئلة</h2>
-        <p data-ar="لأي استفسار بخصوص الأمان أو الخصوصية، يمكنك فتح تذكرة عبر مستودع GitHub أو مراسلتنا حسب إرشادات الأمان في <code>SECURITY.md</code>." data-en="For any privacy or security questions, open an issue on GitHub or follow the security contact guidelines in <code>SECURITY.md</code>.">لأي استفسار بخصوص الأمان أو الخصوصية، يمكنك فتح تذكرة عبر مستودع GitHub أو مراسلتنا حسب إرشادات الأمان في <code>SECURITY.md</code>.</p>
-        <p style="color: var(--silt); font-size: 0.9rem;" data-ar="آخر تحديث: أكتوبر 2026." data-en="Last updated: October 2026.">آخر تحديث: أكتوبر 2026.</p>
-      </div>
+        <p style="color:var(--silt);font-size:0.9rem;margin-top:32px">آخر تحديث: أكتوبر 2026.</p>
+      </article>
     </main>
-
-    <!-- Footer -->
     <footer>
       <div class="footer-wrap">
         <div class="footer-brand">
-          <img src="favicon.svg" alt="سيل" width="28" height="20">
+          <img src="favicon.svg?v=2" alt="سيل" width="28" height="20">
           <span><strong>سيل · SAYL</strong></span>
         </div>
         <div class="footer-links">
-          <a href="index.html" data-ar="الرئيسية" data-en="Home">الرئيسية</a>
-          <a href="docs.html" data-ar="الدليل" data-en="Docs">الدليل</a>
-          <a href="about.html" data-ar="عن الاستوديو" data-en="About">عن الاستوديو</a>
-          <a href="support.html" data-ar="ادعمنا" data-en="Support">ادعمنا</a>
-          <a href="terms.html" data-ar="الشروط" data-en="Terms">الشروط</a>
+          <a href="docs.html">التوثيق</a>
+          <a href="faq.html">الأسئلة الشائعة</a>
+          <a href="compare.html">مقارنة البرامج</a>
+          <a href="idm-alternative.html">بديل IDM</a>
+          <a href="free-download-manager-windows.html">تحميل لويندوز</a>
+          <a href="plugins.html">الإضافات</a>
+          <a href="themes.html">السمات</a>
+          <a href="about.html">عن الاستوديو</a>
+          <a href="support.html">ادعمنا</a>
+          <a href="privacy.html">الخصوصية</a>
+          <a href="terms.html">الشروط</a>
           <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
         </div>
+      </div>
+      <div style="margin-top:20px;text-align:center;color:#6b80ad;font-size:0.85rem">
+        استوديو أثر · مرخّص بموجب رخصة Apache-2.0 مفتوحة المصدر · بدون إعلانات ولا تتبّع
       </div>
     </footer>
   </div>
 
-  <script src="flow.js"></script>
-  <script src="site.js"></script>
+  <script src="flow.js" defer></script>
+  <script src="site.js" defer></script>
 </body>
 </html>

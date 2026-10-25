@@ -81,14 +81,9 @@
     const modal = document.getElementById('lang-modal');
 
     if (!saved) {
-      // First visit: show selection modal
       if (modal) {
         modal.classList.add('show');
       }
-      // Default to Arabic initially
-      applyLanguage('ar');
-    } else {
-      applyLanguage(saved);
     }
 
     // Modal button clicks
@@ -96,18 +91,24 @@
       btn.addEventListener('click', () => {
         const chosen = btn.getAttribute('data-choose-lang');
         saveLanguage(chosen);
-        applyLanguage(chosen);
         if (modal) modal.classList.remove('show');
+
+        const isCurrentlyEn = window.location.pathname.includes('/en/');
+        if (chosen === 'en' && !isCurrentlyEn) {
+          const currentFile = window.location.pathname.split('/').pop() || 'index.html';
+          window.location.href = 'en/' + currentFile;
+        } else if (chosen === 'ar' && isCurrentlyEn) {
+          const currentFile = window.location.pathname.split('/').pop() || 'index.html';
+          window.location.href = '../' + currentFile;
+        }
       });
     });
 
-    // Header toggle button
+    // Header toggle button remembers language
     document.querySelectorAll('.lang-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const current = document.documentElement.lang || 'ar';
-        const next = current === 'ar' ? 'en' : 'ar';
+        const next = document.documentElement.lang === 'ar' ? 'en' : 'ar';
         saveLanguage(next);
-        applyLanguage(next);
       });
     });
   }
@@ -121,7 +122,8 @@
 
     const ctx = canvas.getContext('2d');
     const img = new Image();
-    img.src = 'icon.svg';
+    const isEn = window.location.pathname.includes('/en/');
+    img.src = isEn ? '../icon.svg' : 'icon.svg';
 
     img.onload = () => {
       const W = 1024;
@@ -176,42 +178,110 @@
   function initDownloadDemo() {
     const segs = document.querySelector('.segs');
     const pctEl = document.getElementById('pct');
+    const spdEl = document.getElementById('spd');
+    const badgeEl = document.querySelector('.dl .state-badge');
     if (!segs || !pctEl) return;
 
-    segs.innerHTML = '';
-    for (let i = 0; i < 8; i++) {
-      const d = document.createElement('div');
-      d.className = 'seg';
-      const dur = 4.5 + Math.random() * 4.5;
-      const delay = Math.random() * 0.9;
-      d.innerHTML = `<i style="animation-duration:${dur}s;animation-delay:${delay}s"></i>`;
-      segs.appendChild(d);
-    }
-
-    const t0 = performance.now();
-    function updateCounter() {
-      const elapsed = performance.now() - t0;
-      const pct = Math.min(100, Math.round(elapsed / 80));
-      const isAr = document.documentElement.lang === 'ar';
-
-      pctEl.textContent = isAr ? pct.toLocaleString('ar-EG') + '٪' : pct + '%';
-
-      if (pct < 100 && !prefersReducedMotion) {
-        requestAnimationFrame(updateCounter);
+    if (prefersReducedMotion) {
+      segs.innerHTML = '';
+      for (let i = 0; i < 8; i++) {
+        const d = document.createElement('div');
+        d.className = 'seg';
+        d.innerHTML = '<i style="width:68%;"></i>';
+        segs.appendChild(d);
       }
-    }
-
-    if (!prefersReducedMotion) {
-      requestAnimationFrame(updateCounter);
-    } else {
       const isAr = document.documentElement.lang === 'ar';
       pctEl.textContent = isAr ? '٦٨٪' : '68%';
+      if (spdEl) spdEl.textContent = isAr ? '٤٢.٤ م.ب/ث · المتبقي ٣د ٢٠ث' : '42.4 MB/s · 3m 20s left';
+      return;
     }
 
-    window.addEventListener('sayl-lang-changed', (e) => {
-      const isAr = e.detail.lang === 'ar';
-      const current = parseInt(pctEl.textContent.replace(/[^\d]/g, ''), 10) || 68;
-      pctEl.textContent = isAr ? current.toLocaleString('ar-EG') + '٪' : current + '%';
+    let cycleTimer = null;
+    let animFrame = null;
+
+    function startCycle() {
+      if (cycleTimer) clearTimeout(cycleTimer);
+      if (animFrame) cancelAnimationFrame(animFrame);
+
+      segs.innerHTML = '';
+      const bars = [];
+      for (let i = 0; i < 8; i++) {
+        const d = document.createElement('div');
+        d.className = 'seg';
+        const inner = document.createElement('i');
+        inner.style.width = '0%';
+        d.appendChild(inner);
+        segs.appendChild(d);
+        bars.push({
+          el: inner,
+          speed: 0.88 + Math.random() * 0.28,
+          lag: Math.random() * 0.08
+        });
+      }
+
+      const isAr = document.documentElement.lang === 'ar';
+      if (badgeEl) {
+        badgeEl.textContent = isAr ? 'قيد التنزيل' : 'Downloading';
+        badgeEl.style.background = 'rgba(0, 182, 189, 0.15)';
+        badgeEl.style.color = 'var(--teal)';
+      }
+
+      const cycleDuration = 8500;
+      const startT = performance.now();
+
+      function update(now) {
+        const elapsed = now - startT;
+        const progress = Math.min(1, elapsed / cycleDuration);
+        const pctVal = Math.round(progress * 100);
+        const curAr = document.documentElement.lang === 'ar';
+
+        pctEl.textContent = curAr ? pctVal.toLocaleString('ar-EG') + '٪' : pctVal + '%';
+
+        bars.forEach((b) => {
+          const segProgress = Math.min(100, Math.max(0, (progress - b.lag) * b.speed * 100));
+          b.el.style.width = segProgress.toFixed(1) + '%';
+        });
+
+        if (spdEl) {
+          if (progress < 1) {
+            const currentSpeed = (41.4 + Math.sin(elapsed * 0.004) * 3.2).toFixed(1);
+            const remainingSecs = Math.max(0, Math.round((1 - progress) * 28));
+            if (curAr) {
+              spdEl.textContent = `${Number(currentSpeed).toLocaleString('ar-EG')} م.ب/ث · المتبقي ${remainingSecs.toLocaleString('ar-EG')} ث`;
+            } else {
+              spdEl.textContent = `${currentSpeed} MB/s · ${remainingSecs}s left`;
+            }
+          } else {
+            if (curAr) {
+              spdEl.textContent = 'اكتمل التنزيل بنجاح · ٤.٨ ج.ب';
+            } else {
+              spdEl.textContent = 'Completed successfully · 4.8 GB';
+            }
+          }
+        }
+
+        if (progress < 1) {
+          animFrame = requestAnimationFrame(update);
+        } else {
+          if (badgeEl) {
+            badgeEl.textContent = curAr ? 'مكتمل' : 'Completed';
+            badgeEl.style.background = 'rgba(0, 182, 189, 0.25)';
+            badgeEl.style.color = '#7fe9ec';
+          }
+          cycleTimer = setTimeout(startCycle, 1600);
+        }
+      }
+
+      animFrame = requestAnimationFrame(update);
+    }
+
+    startCycle();
+
+    window.addEventListener('sayl-lang-changed', () => {
+      if (prefersReducedMotion) {
+        const isAr = document.documentElement.lang === 'ar';
+        pctEl.textContent = isAr ? '٦٨٪' : '68%';
+      }
     });
   }
 
@@ -231,26 +301,12 @@
         tab.classList.add('active');
 
         const src = tab.getAttribute('data-img');
-        const arTitle = tab.getAttribute('data-ar-title');
-        const enTitle = tab.getAttribute('data-en-title');
-        const arDesc = tab.getAttribute('data-ar-desc');
-        const enDesc = tab.getAttribute('data-en-desc');
+        const title = tab.getAttribute('data-title') || tab.getAttribute('data-ar-title') || tab.getAttribute('data-en-title');
+        const desc = tab.getAttribute('data-desc') || tab.getAttribute('data-ar-desc') || tab.getAttribute('data-en-desc');
 
         if (src) img.src = src;
-
-        if (capTitle) {
-          capTitle.setAttribute('data-ar', arTitle || '');
-          capTitle.setAttribute('data-en', enTitle || '');
-          const isAr = document.documentElement.lang === 'ar';
-          capTitle.textContent = isAr ? arTitle : enTitle;
-        }
-
-        if (capDesc) {
-          capDesc.setAttribute('data-ar', arDesc || '');
-          capDesc.setAttribute('data-en', enDesc || '');
-          const isAr = document.documentElement.lang === 'ar';
-          capDesc.textContent = isAr ? arDesc : enDesc;
-        }
+        if (capTitle && title) capTitle.textContent = title;
+        if (capDesc && desc) capDesc.textContent = desc;
       });
     });
   }
