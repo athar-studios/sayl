@@ -113,6 +113,8 @@ ALLOWED_URL_HOST_PATTERNS = [
     r"^https?://hops\.com(?:/.*)?$",
     r"^https?://loop\.com(?:/.*)?$",
     r"^https?://(?:a|origin1|cdn\.other)\.com(?:/.*)?$",
+    # Official project support page (no tracking parameters, not application telemetry).
+    r"^https?://ko-fi\.com/athar_studio(?:/.*)?$",
 ]
 
 # A URL template whose host is filled in at runtime from a bound socket address,
@@ -408,6 +410,8 @@ def print_human_report(report: dict, root_dir: Path):
 
 
 def main():
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="SAYL Privacy and Network Audit")
     parser.add_argument("--json", action="store_true", help="Output audit report as JSON")
     parser.add_argument("--root", type=str, default=None, help="Root directory to audit")

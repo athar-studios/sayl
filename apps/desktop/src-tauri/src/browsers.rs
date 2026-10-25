@@ -431,7 +431,7 @@ pub mod tests {
             );
             env.insert(
                 "LOCALAPPDATA".to_string(),
-                r"C:\Users\TestUser\AppData\Local".to_string(),
+                r"C:\Users\User\AppData\Local".to_string(),
             );
             Self {
                 files: HashSet::new(),
@@ -503,7 +503,7 @@ pub mod tests {
         // 3. Per-user LocalAppData install
         let mut probe_user = MockBrowserProbe::new();
         let chrome_user =
-            PathBuf::from(r"C:\Users\TestUser\AppData\Local\Google\Chrome\Application\chrome.exe");
+            PathBuf::from(r"C:\Users\User\AppData\Local\Google\Chrome\Application\chrome.exe");
         probe_user.files.insert(chrome_user.clone());
         let res_user = detect_browser_with_probe(&probe_user, "chrome");
         assert!(res_user.installed);
@@ -550,7 +550,7 @@ pub mod tests {
     #[test]
     fn test_opera_detection_per_user_programs() {
         let mut probe = MockBrowserProbe::new();
-        let opera_path = PathBuf::from(r"C:\Users\TestUser\AppData\Local\Programs\Opera\opera.exe");
+        let opera_path = PathBuf::from(r"C:\Users\User\AppData\Local\Programs\Opera\opera.exe");
         probe.files.insert(opera_path.clone());
         let res = detect_browser_with_probe(&probe, "opera");
         assert!(res.installed);
@@ -561,7 +561,7 @@ pub mod tests {
     fn test_vivaldi_detection_per_user() {
         let mut probe = MockBrowserProbe::new();
         let vivaldi_path =
-            PathBuf::from(r"C:\Users\TestUser\AppData\Local\Vivaldi\Application\vivaldi.exe");
+            PathBuf::from(r"C:\Users\User\AppData\Local\Vivaldi\Application\vivaldi.exe");
         probe.files.insert(vivaldi_path.clone());
         let res = detect_browser_with_probe(&probe, "vivaldi");
         assert!(res.installed);
