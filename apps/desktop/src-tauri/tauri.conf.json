@@ -34,6 +34,30 @@
       "icons/128x128@2x.png",
       "icons/icon.ico",
       "icons/icon.png"
-    ]
+    ],
+    "resources": {
+      "resources/host/sayl-bridge.exe": "host/sayl-bridge.exe",
+      "resources/host/com.sayl.downloader.json": "host/com.sayl.downloader.json",
+      "resources/extensions/browser/chromium/": "extensions/browser/chromium/"
+    },
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico",
+        "headerImage": "icons/nsis-header.bmp",
+        "sidebarImage": "icons/nsis-sidebar.bmp",
+        "installerHooks": "../../../installer/nsis/hooks.nsh"
+      },
+      "wix": {
+        "bannerPath": "icons/wix-banner.bmp",
+        "dialogImagePath": "icons/wix-dialog.bmp",
+        "fragmentPaths": [
+          "../../../installer/wix/native-host.wxs"
+        ],
+        "componentGroupRefs": [
+          "NativeHostComponents"
+        ]
+      }
+    }
   }
 }

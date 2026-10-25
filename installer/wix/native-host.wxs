@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="NativeHostRegistry" Guid="9B3A2C18-E782-4B65-98C3-72D6D3A08E2B">
+        <!-- Native messaging host registration for Google Chrome (HKCU) -->
+        <RegistryKey Root="HKCU" Key="Software\Google\Chrome\NativeMessagingHosts\com.sayl.downloader">
+          <RegistryValue Type="string" Value="[INSTALLDIR]host\com.sayl.downloader.json" KeyPath="yes" />
+        </RegistryKey>
+        <!-- Native messaging host registration for Microsoft Edge (HKCU) -->
+        <RegistryKey Root="HKCU" Key="Software\Microsoft\Edge\NativeMessagingHosts\com.sayl.downloader">
+          <RegistryValue Type="string" Value="[INSTALLDIR]host\com.sayl.downloader.json" />
+        </RegistryKey>
+      </Component>
+    </DirectoryRef>
+    <ComponentGroup Id="NativeHostComponents">
+      <ComponentRef Id="NativeHostRegistry" />
+    </ComponentGroup>
+  </Fragment>
+</Wix>

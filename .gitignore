@@ -39,6 +39,7 @@ __pycache__/
 # Frontend build output and Tauri packaging artefacts
 apps/desktop/dist/
 apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/resources/
 releases/
 
 # Logs

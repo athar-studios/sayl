@@ -3,6 +3,7 @@
   "name": "__MSG_extension_name__",
   "description": "__MSG_extension_description__",
   "version": "0.1.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAymwAPycgq6/hAAIUD+PrbqRZfDvcgkvR9FkTI6/izCALs6WttL++HzoKDygIKwnh87/i+EJHoQ83cav4oEEkeQZp+Rd9waPpIHpoSQbWB4ciClgFZx6pSw2oHfgALyuBjQNip8f0e+3xrJMM8PbU+IeLYgAJfd3Kj2Ii/WQTQpAy3zVBskqTlfgwMc1qQmiK6YYdWGXEDAZ8V7qjAeRMYW2CDqGJhgdbHUw1WpWgPzuR8vac1XtnxDC7COzTebr+WXB0O00VVgc8pYgBIbn7OmFytgilWzeMg5Plk01fPxruGcoOrftWDj1I+EkWeQEzgxyWS/rn28z9rPOKjNnl9wIDAQAB",
   "default_locale": "ar",
   "permissions": ["nativeMessaging", "contextMenus", "notifications"],
   "background": {

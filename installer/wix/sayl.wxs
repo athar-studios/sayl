@@ -49,10 +49,21 @@
 
     <MediaTemplate EmbedCab="yes" />
 
+    <!-- SAYL Brand Icon for Add/Remove Programs (ARP) -->
+    <Icon Id="ProductIcon" SourceFile="..\..\apps\desktop\src-tauri\icons\icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
+
     <!-- Standard Per-User Directory Structure ($LOCALAPPDATA\Programs\SAYL) -->
     <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="ProgramsFolder" Name="Programs">
-        <Directory Id="INSTALLFOLDER" Name="SAYL" />
+        <Directory Id="INSTALLFOLDER" Name="SAYL">
+          <Directory Id="HostFolder" Name="host" />
+          <Directory Id="ExtensionsFolder" Name="extensions">
+            <Directory Id="BrowserFolder" Name="browser">
+              <Directory Id="ChromiumFolder" Name="chromium" />
+            </Directory>
+          </Directory>
+        </Directory>
       </Directory>
     </StandardDirectory>
 
@@ -79,6 +90,7 @@
                 Name="SAYL"
                 Description="SAYL Download Manager / سيل - مدير التحميل"
                 Target="[!SaylExe]"
+                Icon="ProductIcon"
                 WorkingDirectory="INSTALLFOLDER" />
       <RemoveFolder Id="CleanUpShortCut"
                     Directory="ApplicationProgramsFolder"
@@ -91,10 +103,40 @@
                      KeyPath="yes" />
     </Component>
 
+    <!-- Component 3: Native Messaging Host Files and Registry -->
+    <Component Id="NativeMessagingHost"
+               Guid="A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D"
+               Directory="HostFolder">
+      <File Id="SaylBridgeExe"
+            Source="$(var.SourceDir)\sayl-bridge.exe" />
+      <File Id="HostManifestJson"
+            Source="..\..\extensions\browser\host\com.sayl.downloader.json" />
+      <!-- Chrome HKCU Native Messaging Registration -->
+      <RegistryValue Root="HKCU"
+                     Key="Software\Google\Chrome\NativeMessagingHosts\com.sayl.downloader"
+                     Type="string"
+                     Value="[HostFolder]com.sayl.downloader.json"
+                     KeyPath="yes" />
+      <!-- Edge HKCU Native Messaging Registration -->
+      <RegistryValue Root="HKCU"
+                     Key="Software\Microsoft\Edge\NativeMessagingHosts\com.sayl.downloader"
+                     Type="string"
+                     Value="[HostFolder]com.sayl.downloader.json" />
+      <!-- Startup Run key cleanup on uninstall -->
+      <RegistryValue Root="HKCU"
+                     Key="Software\Microsoft\Windows\CurrentVersion\Run"
+                     Name="SAYL"
+                     Action="remove" />
+      <RemoveFolder Id="CleanUpHostFolder"
+                    Directory="HostFolder"
+                    On="uninstall" />
+    </Component>
+
     <!-- Features -->
     <Feature Id="MainFeature" Title="SAYL" Level="1">
       <ComponentRef Id="MainExecutable" />
       <ComponentRef Id="ApplicationShortcut" />
+      <ComponentRef Id="NativeMessagingHost" />
     </Feature>
   </Package>
 </Wix>
