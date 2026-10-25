@@ -29,7 +29,7 @@ describe("Settings contract & defaults (settings.js)", () => {
     expect(DEFAULT_SETTINGS.max_connections_per_task).toBe(4);
     expect(DEFAULT_SETTINGS.theme).toBe("system");
     expect(DEFAULT_SETTINGS.language).toBe("ar");
-    expect(DEFAULT_SETTINGS.view_mode).toBe("cards");
+    expect(DEFAULT_SETTINGS.view_mode).toBe("table");
     expect(DEFAULT_SETTINGS.sidebar_collapsed).toBe(false);
     expect(DEFAULT_SETTINGS.prevent_sleep).toBe(true);
     expect(DEFAULT_SETTINGS.show_download_window).toBe(true);
@@ -52,8 +52,8 @@ describe("Settings contract & defaults (settings.js)", () => {
     expect(partial.close_download_window_on_finish).toBe(false);
   });
 
-  it("rejects invalid view_mode in normalizeSettings and falls back to 'cards'", () => {
+  it("rejects invalid view_mode in normalizeSettings and falls back to 'table'", () => {
     const res = normalizeSettings({ view_mode: "invalid_view" });
-    expect(res.view_mode).toBe("cards");
+    expect(res.view_mode).toBe("table");
   });
 });

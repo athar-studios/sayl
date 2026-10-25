@@ -4,17 +4,26 @@
   export let state = "Queued";
 
   const stateClassMap = {
-    Queued: "pill-queued",
-    Probing: "pill-probing",
-    Downloading: "pill-downloading",
-    Verifying: "pill-verifying",
-    Finalizing: "pill-finalizing",
+    // Running / active: turquoise #00b6bd
+    Probing: "pill-running",
+    Downloading: "pill-running",
+    Verifying: "pill-running",
+    Finalizing: "pill-running",
+
+    // Completed: green
     Completed: "pill-completed",
-    Pausing: "pill-pausing",
+
+    // Paused: yellow / amber
+    Pausing: "pill-paused",
     Paused: "pill-paused",
-    Cancelling: "pill-cancelling",
-    Cancelled: "pill-cancelled",
+
+    // Failed: red
     Failed: "pill-failed",
+
+    // Waiting / queued: gray
+    Queued: "pill-queued",
+    Cancelling: "pill-queued",
+    Cancelled: "pill-queued",
   };
 
   $: pillClass = stateClassMap[state] || "pill-queued";
@@ -46,41 +55,47 @@
     background-color: currentColor;
   }
 
-  .pill-downloading {
+  /* Fixed state colours (Req 5) */
+  .pill-running {
     background-color: var(--color-accent-light);
-    color: var(--color-accent);
+    color: var(--state-running, #00b6bd);
   }
-  .pill-downloading .status-dot {
+  .pill-running .status-dot {
     animation: pulse 1.5s infinite;
-  }
-
-  .pill-probing, .pill-verifying, .pill-finalizing {
-    background-color: rgba(2, 132, 199, 0.15);
-    color: var(--color-info);
   }
 
   .pill-completed {
     background-color: rgba(22, 163, 74, 0.15);
-    color: var(--color-success);
+    color: var(--state-completed, #16a34a);
   }
 
-  .pill-paused, .pill-pausing {
+  .pill-paused {
     background-color: rgba(217, 119, 6, 0.15);
-    color: var(--color-warning);
+    color: var(--state-paused, #d97706);
   }
 
   .pill-failed {
     background-color: var(--color-danger-light);
-    color: var(--color-danger);
+    color: var(--state-failed, #dc2626);
   }
 
-  .pill-queued, .pill-cancelling, .pill-cancelled {
+  .pill-queued {
     background-color: var(--color-bg-alt);
-    color: var(--color-text-muted);
+    color: var(--state-queued, #64748b);
   }
 
   @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.3;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pill-running .status-dot {
+      animation: none !important;
+    }
   }
 </style>

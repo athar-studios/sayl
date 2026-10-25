@@ -119,6 +119,32 @@ export function formatBidi(str) {
 }
 
 /**
+ * Formats an ISO 8601 date string into localized date and time.
+ * Falls back to "—" if string is absent, empty, or invalid.
+ */
+export function formatDate(isoString, lang = "ar") {
+  if (!isoString || typeof isoString !== "string") {
+    return "—";
+  }
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) {
+    return "—";
+  }
+  try {
+    const locale = lang === "ar" ? "ar" : "en";
+    return new Intl.DateTimeFormat(locale, {
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
+  } catch {
+    return "—";
+  }
+}
+
+/**
  * Returns true if the task state allows pausing.
  */
 export function canPause(state) {
@@ -126,10 +152,38 @@ export function canPause(state) {
 }
 
 /**
+ * Returns true if task state allows pausing per toolbar and table enablement contract.
+ * Pause only for Queued, Probing, Downloading, Verifying, Finalizing.
+ */
+export function canPauseTask(state) {
+  return (
+    state === "Queued" ||
+    state === "Probing" ||
+    state === "Downloading" ||
+    state === "Verifying" ||
+    state === "Finalizing"
+  );
+}
+
+/**
  * Returns true if the task state allows resuming.
  */
 export function canResume(state) {
   return state === "Paused" || state === "Queued" || state === "Failed";
+}
+
+/**
+ * Returns true if task state allows resuming per toolbar and table enablement contract.
+ * Resume only for Paused, Pausing, Failed, Queued, Cancelled.
+ */
+export function canResumeTask(state) {
+  return (
+    state === "Paused" ||
+    state === "Pausing" ||
+    state === "Failed" ||
+    state === "Queued" ||
+    state === "Cancelled"
+  );
 }
 
 /**
