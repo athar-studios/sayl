@@ -1,61 +1,36 @@
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sayl vs IDM vs Flow: Honest Comparison</title>
-  <meta name="description" content="A factual, verifiable comparison between Sayl, IDM, and Flow: pricing, licensing, multi-threaded speed, and privacy.">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Windows Download Managers Comparison: Sayl vs IDM, DAP, FDM, JDownloader, XDM, Motrix & NDM</title>
+  <meta name="description" content="A factual, verifiable comparison between Sayl and leading Windows download managers (IDM, DAP, FDM, JDownloader 2, XDM, Motrix, and NDM) across pricing, licensing, multi-connection acceleration, and privacy.">
   <meta name="theme-color" content="#070F2E">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
   <link rel="canonical" href="https://sayl.site/en/compare">
   <link rel="alternate" hreflang="ar" href="https://sayl.site/compare">
   <link rel="alternate" hreflang="en" href="https://sayl.site/en/compare">
   <link rel="alternate" hreflang="x-default" href="https://sayl.site/compare">
-
-  <!-- Favicons & App Icons (?v=2) -->
-  <link rel="icon" href="/favicon.ico?v=2" sizes="any">
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
-  <link rel="manifest" href="/site.webmanifest">
-
-  <!-- Open Graph / Facebook -->
-  <meta property="og:site_name" content="سيل · SAYL">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://sayl.site/en/compare">
-  <meta property="og:title" content="Sayl vs IDM vs Flow: Honest Comparison">
-  <meta property="og:description" content="A factual, verifiable comparison between Sayl, IDM, and Flow: pricing, licensing, multi-threaded speed, and privacy.">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Sayl">
+  <meta property="og:title" content="Windows Download Managers Comparison: Sayl vs IDM, DAP, FDM, JDownloader, XDM, Motrix & NDM">
+  <meta property="og:description" content="A factual, verifiable comparison between Sayl and leading download managers: IDM, DAP, FDM, JDownloader 2, XDM, Motrix, and NDM.">
   <meta property="og:image" content="https://sayl.site/og-image-en.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-
-  <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Sayl vs IDM vs Flow: Honest Comparison">
-  <meta name="twitter:description" content="A factual, verifiable comparison between Sayl, IDM, and Flow: pricing, licensing, multi-threaded speed, and privacy.">
+  <meta name="twitter:title" content="Windows Download Managers Comparison: Sayl vs IDM, DAP, FDM, JDownloader, XDM, Motrix & NDM">
+  <meta name="twitter:description" content="A factual, verifiable comparison between Sayl and leading download managers: IDM, DAP, FDM, JDownloader 2, XDM, Motrix, and NDM.">
   <meta name="twitter:image" content="https://sayl.site/og-image-en.png">
-
-  <!-- Preload Fonts & Stylesheet -->
-  <link rel="preload" href="/fonts/IBMPlexSansArabic-Regular.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="/fonts/IBMPlexSansArabic-Bold.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/style.css">
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    "name": "Athar Studio",
-    "url": "https://sayl.site",
-    "logo": "https://sayl.site/icon-512.png",
-    "sameAs": [
-      "https://github.com/athar-studios",
-      "https://ko-fi.com/athar_studio"
-    ]
-  }
-  </script>
 </head>
-<body>
-  <canvas id="flow"></canvas>
+<body class="page-inner">
   <div class="lang-modal-overlay" id="lang-modal" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
     <div class="lang-modal-card">
-      <img src="/favicon.svg?v=2" alt="Sayl logo" width="56" height="38" style="margin-bottom:12px">
+      <img src="/icon.svg" alt="Sayl" class="modal-logo" width="52" height="36">
       <h2 id="lang-modal-title">Choose Language · اختر لغة الموقع</h2>
       <p>You can toggle your preferred language anytime from the header button.</p>
       <div class="lang-choices">
@@ -65,20 +40,19 @@
         </button>
         <button type="button" class="lang-choice-btn primary" data-choose-lang="en">
           <strong>English</strong>
-          <small>Default English experience</small>
+          <small>English LTR Interface</small>
         </button>
       </div>
     </div>
   </div>
   <div class="wrap">
     <header>
-      <a href="/en" class="brand" aria-label="Sayl - Home">
-        <img src="/favicon.svg?v=2" alt="Sayl logo" width="34" height="24">
-        <span>Sayl</span>
+      <a href="/en" class="brand" aria-label="Sayl">
+        <img src="/icon.svg" alt="Sayl" class="brand-logo" width="52" height="36">
       </a>
       <nav aria-label="Primary navigation">
         <a href="/en/docs">Docs</a>
-        <a href="/en#features" class="hide-mobile">Features</a>
+        <a href="/en/#features" class="hide-mobile">Features</a>
         <a href="/en/faq">FAQ</a>
         <a href="/en/compare" class="active">Compare</a>
         <a href="/en/plugins">Plugins</a>
@@ -88,107 +62,208 @@
         <a href="/compare" class="lang-btn" aria-label="التبديل إلى العربية">العربية</a>
       </div>
     </header>
-    <main class="page-shell" style="max-width:980px">
+    <main class="page-shell" style="max-width:1100px">
       <article class="page-card">
-        <h1>Sayl vs IDM vs Flow: Factual Comparison</h1>
-        <p class="lead" style="color:#b9c8e6;font-size:1.15rem;margin-bottom:28px">An honest, verified comparison between Sayl, Internet Download Manager (IDM), and Flow across pricing, architecture, and feature sets.</p>
+        <h1>Windows Download Managers Comparison: Factual &amp; Verified</h1>
+        <p class="lead" style="color:#b9c8e6;font-size:1.15rem;margin-bottom:28px">An honest, factual comparison between <strong>Sayl</strong> and prominent Windows download managers—both commercial and free—derived exclusively from official product specifications and documentation to help you choose the best tool for your workflow.</p>
 
-        <div class="table-wrap">
+        <div class="note">
+          <strong>Methodology &amp; Neutrality:</strong> All data points below reflect verified facts published on each product's official website or public repository. Any feature or claim that cannot be conclusively confirmed on modern Windows releases is indicated with <strong>"؟"</strong>. Official sources and documentation links are catalogued below the table.
+        </div>
+
+        <div class="table-wrap" style="margin-top:32px">
           <table class="doc-table">
             <thead>
               <tr>
-                <th style="width:26%">Feature</th>
-                <th style="width:28%;color:var(--teal)">Sayl</th>
-                <th style="width:23%">IDM</th>
-                <th style="width:23%">Flow</th>
+                <th style="min-width:140px">Criterion</th>
+                <th style="min-width:130px;color:var(--teal)">Sayl</th>
+                <th style="min-width:125px">IDM</th>
+                <th style="min-width:120px">DAP</th>
+                <th style="min-width:125px">FDM</th>
+                <th style="min-width:135px">JDownloader 2</th>
+                <th style="min-width:125px">XDM</th>
+                <th style="min-width:120px">Motrix</th>
+                <th style="min-width:120px">NDM</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><strong>Pricing & Licensing Model</strong></td>
-                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">100% Free forever without limits</td>
-                <td>Commercial (30-day trial, then $24.95/yr or $38 lifetime)</td>
-                <td>Freemium / Proprietary</td>
-              </tr>              <tr>
-                <td><strong>Source Code & Auditability</strong></td>
-                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">100% Open Source (Apache-2.0)</td>
+                <td><strong>Price &amp; Tier</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">100% Free &amp; Permanent ($0)</td>
+                <td>Commercial Paid (30-day trial, then $11.95/yr or $24.95 lifetime for 1 PC)</td>
+                <td>Commercial Paid (Free ad-supported tier; DAP Premium at $24.95)</td>
+                <td>Free (Freeware)</td>
+                <td>Free (accepts donations; optional MyJDownloader cloud tier)</td>
+                <td>100% Free &amp; Open Source</td>
+                <td>100% Free &amp; Open Source</td>
+                <td>Free (Freeware)</td>
+              </tr>
+              <tr>
+                <td><strong>Open Source &amp; License</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Open Source (Apache-2.0)</td>
                 <td>Closed Source (Proprietary)</td>
                 <td>Closed Source (Proprietary)</td>
-              </tr>              <tr>
-                <td><strong>Arabic Support & RTL Layout</strong></td>
-                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Native Arabic-first RTL alongside English</td>
-                <td>Basic translation with legacy LTR dialogs</td>
-                <td>English-first (Limited/no Arabic)</td>
-              </tr>              <tr>
-                <td><strong>Supported Platforms</strong></td>
-                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Windows 10 & 11 (64-bit)</td>
-                <td>Windows (All versions)</td>
-                <td>Windows & macOS</td>
-              </tr>              <tr>
-                <td><strong>Parallel Segmented Acceleration</strong></td>
-                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Yes (Concurrent multi-stream chunks)</td>
-                <td>Yes (Dynamic segmentation up to 32)</td>
-                <td>Yes (Multi-part downloads)</td>
-              </tr>              <tr>
-                <td><strong>Atomic Resume & ETag Validation</strong></td>
-                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Yes (ETag check + atomic .part files)</td>
-                <td>Yes (Reliable resume for supported links)</td>
-                <td>Yes (Resume capability)</td>
-              </tr>              <tr>
-                <td><strong>Browser Integration</strong></td>
-                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Manifest V3 extension (Chrome, Edge, Brave)</td>
-                <td>Broad browser integration modules</td>
-                <td>Chrome and Firefox extensions</td>
-              </tr>              <tr>
-                <td><strong>Standalone CLI Tool</strong></td>
-                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Yes (Native standalone sayl.exe with JSON)</td>
-                <td>Command line launch parameters</td>
-                <td>Not available</td>
-              </tr>              <tr>
-                <td><strong>Video Stream Extraction</strong></td>
-                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Scheduled for v0.2.0 (yt-dlp integration)</td>
-                <td>Available (Floating video grabber)</td>
-                <td>Available for selected sites</td>
-              </tr>              <tr>
-                <td><strong>Plugin & Theme Architecture</strong></td>
-                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Planned for v0.2.0 (Open modular plugins)</td>
-                <td>Proprietary without public plugin API</td>
-                <td>Not available</td>
-              </tr>              <tr>
-                <td><strong>Privacy & Zero Telemetry</strong></td>
-                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Zero telemetry, zero ads, no remote tracking</td>
-                <td>No ads, but connects to verify licenses</td>
-                <td>May include ads or metrics in free tier</td>
+                <td>Closed Source (Freeware; legacy v2.5/3 were GPL)</td>
+                <td>Open Source (GPL with proprietary core components)</td>
+                <td>Open Source (GPL v3)</td>
+                <td>Open Source (MIT)</td>
+                <td>Closed Source (Freeware)</td>
+              </tr>
+              <tr>
+                <td><strong>Windows Support</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Windows 10 &amp; 11 (64-bit)</td>
+                <td>Windows 11, 10, 8.1, 7 (32-bit &amp; 64-bit)</td>
+                <td>Windows 10, 8, 7, XP</td>
+                <td>Windows 11, 10, 8.1, 7 (plus macOS, Linux, Android)</td>
+                <td>Windows (Java-based runtime), macOS, Linux</td>
+                <td>Windows, Linux, macOS</td>
+                <td>Windows (Electron &amp; aria2), macOS, Linux</td>
+                <td>Windows (native lightweight C++ engine), macOS</td>
+              </tr>
+              <tr>
+                <td><strong>Arabic UI (RTL)</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Native Arabic RTL-first with custom Arabic typography</td>
+                <td>Supported (standard localized string catalog)</td>
+                <td>؟ (no verified active Arabic pack on modern releases)</td>
+                <td>Supported (multilingual UI includes Arabic)</td>
+                <td>Supported (community-contributed Arabic strings)</td>
+                <td>Supported (community-contributed Arabic in settings)</td>
+                <td>Supported (Arabic language option in settings)</td>
+                <td>Not officially supported (English default interface)</td>
+              </tr>
+              <tr>
+                <td><strong>Multi-Connection Speed</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Yes (concurrent chunked multi-segmentation)</td>
+                <td>Yes (dynamic multipart segmentation up to 32 connections)</td>
+                <td>Yes (multi-channel download acceleration)</td>
+                <td>Yes (traffic splitting and acceleration)</td>
+                <td>Yes (configurable connections per server / host)</td>
+                <td>Yes (dynamic segmentation up to 32 streams)</td>
+                <td>Yes (embedded aria2 multi-threaded engine)</td>
+                <td>Yes (dynamic multi-connection segmentation)</td>
+              </tr>
+              <tr>
+                <td><strong>Atomic Resume Support</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Yes (ETag verification + atomic .part files prevent corruption)</td>
+                <td>Yes (reliable resume for servers supporting HTTP Range)</td>
+                <td>Yes (resume interrupted downloads)</td>
+                <td>Yes (resumes supported downloads)</td>
+                <td>Yes (advanced resume with link validation)</td>
+                <td>Yes (resumes and refreshes expired URLs)</td>
+                <td>Yes (aria2 resume capabilities)</td>
+                <td>Yes (resumes supported broken transfers)</td>
+              </tr>
+              <tr>
+                <td><strong>Browser Extension</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Yes (Manifest V3 extension for Chrome, Edge, Brave)</td>
+                <td>Yes (IDM Integration Module for major browsers)</td>
+                <td>Yes (browser integration for major browsers)</td>
+                <td>Yes (extension for Chrome, Firefox, Edge)</td>
+                <td>Yes (MyJDownloader extension)</td>
+                <td>Yes (XDM Browser Monitor extension)</td>
+                <td>Community extension available on web stores</td>
+                <td>Yes (NeatDownloadManager browser extension)</td>
+              </tr>
+              <tr>
+                <td><strong>Video Sniffing &amp; Capture</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Scheduled for v0.2.0 (native yt-dlp integration)</td>
+                <td>Yes (floating video download panel on web players)</td>
+                <td>Yes (built-in video capture utility)</td>
+                <td>Yes (video downloads from popular sites)</td>
+                <td>Yes (deep link analyzer and media stream grabber)</td>
+                <td>Yes (integrated video sniffer and media converter)</td>
+                <td>No (specialized for direct HTTP/FTP and BitTorrent)</td>
+                <td>Yes (built-in video and audio capture sniffer)</td>
+              </tr>
+              <tr>
+                <td><strong>Ads &amp; Bundled Offers</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Zero ads, zero bundled offers</td>
+                <td>No third-party ads (license reminders in trial)</td>
+                <td>Free version displays ads &amp; promotions; Premium removes them</td>
+                <td>No ads on official distribution</td>
+                <td>Default installer may present partner offers; clean installer provided on forum</td>
+                <td>100% ad-free, zero bundled software</td>
+                <td>100% ad-free</td>
+                <td>100% ad-free</td>
+              </tr>
+              <tr>
+                <td><strong>Privacy &amp; Telemetry</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Zero telemetry, direct connection only to target download server</td>
+                <td>Periodic license validation calls to Tonec servers</td>
+                <td>Third-party ad networks and analytics in free tier</td>
+                <td>Periodic update checks and anonymous aggregated statistics</td>
+                <td>No commercial tracking; optional error reporting and cloud sync</td>
+                <td>No tracking telemetry</td>
+                <td>No telemetry; full source auditability</td>
+                <td>Minimal update checks; no disclosed commercial tracking</td>
+              </tr>
+              <tr>
+                <td><strong>Last Update &amp; Maintenance</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Active (2026 - v0.1.0 release)</td>
+                <td>Active (continuous minor maintenance releases)</td>
+                <td>؟ (infrequent and irregular releases in recent years)</td>
+                <td>Active (continuous regular updates)</td>
+                <td>Active (frequent core and plugin updates)</td>
+                <td>Active via GitHub community contributors</td>
+                <td>Periodic maintenance releases on GitHub</td>
+                <td>Active and stable with periodic releases</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <h2 style="margin-top:40px">Summary: Which one is right for you?</h2>
-        <p>If you value <strong>clean open-source software</strong>, zero telemetry, no suspicious cracks or serial activations, native Arabic and English support, and rock-solid multi-threaded resumption — Sayl is the cleanest modern choice for Windows.</p>
-        <p>If your daily workflow heavily relies on floating video grabber bars on proprietary streaming sites today, note that Sayl's video extraction integration is arriving in v0.2.0.</p>
+        <h2 style="margin-top:48px">Analysis: Which Download Manager Fits Your Needs?</h2>
+        
+        <h3>1. Commercial Paid Download Managers (IDM &amp; DAP)</h3>
+        <p><strong>Internet Download Manager (IDM)</strong> is renowned for its mature segmentation algorithms and responsive floating video grabber. However, it requires a paid license after a 30-day trial, is closed-source, and relies on traditional non-RTL UI layouts. <strong>Download Accelerator Plus (DAP)</strong> relies on ads in its free edition and has seen significantly slower update cycles in recent years.</p>
 
-        <div class="cta" style="margin-top:32px">
-          <a class="btn pri" href="https://github.com/athar-studios/sayl/releases/latest">Download Sayl (Free)</a>
-          <a class="btn sec" href="/en/docs">Read the Docs</a>
+        <h3>2. Freeware Proprietary Managers (FDM &amp; NDM)</h3>
+        <p><strong>Free Download Manager (FDM)</strong> is a feature-packed desktop utility with BitTorrent, video downloads, and cross-platform support, though its modern codebase remains closed-source. <strong>Neat Download Manager (NDM)</strong> provides a remarkably lightweight, native C++ experience, but lacks an open-source codebase or native Arabic RTL design.</p>
+
+        <h3>3. Free &amp; Open-Source Alternatives (Sayl, XDM, JDownloader 2 &amp; Motrix)</h3>
+        <p>Open-source tools ensure transparent codebases that can be audited by the community for safety, eliminating worries about malware, cracks, or hidden telemetry:</p>
+        <ul>
+          <li><strong>Sayl:</strong> Engineered specifically for modern Windows with a native Arabic RTL-first interface, Rust engine performance, atomic fail-safe chunk recovery, clean Manifest V3 browser integration, and zero ads or tracking.</li>
+          <li><strong>Xtreme Download Manager (XDM):</strong> A proven open-source manager equipped with an integrated video grabber and media converter.</li>
+          <li><strong>JDownloader 2:</strong> The premier solution for complex filehoster automation, cloud link packages, and batch extractions, with higher resource utilization due to its Java runtime.</li>
+          <li><strong>Motrix:</strong> An elegant, minimalist Electron-based client powered by aria2, excelling at direct HTTP/FTP and BitTorrent transfers.</li>
+        </ul>
+
+        <h2 style="margin-top:40px">Official Sources &amp; Verification Links</h2>
+        <p>To preserve integrity and accuracy, all specifications and assertions in this guide originate directly from official websites and repositories. You can verify each product's details directly at the following links:</p>
+        <ul>
+          <li><strong>Internet Download Manager (IDM):</strong> Official site: <a href="https://www.internetdownloadmanager.com/" target="_blank" rel="noopener noreferrer">internetdownloadmanager.com</a></li>
+          <li><strong>Download Accelerator Plus (DAP):</strong> Official site: <a href="https://www.speedbit.com/" target="_blank" rel="noopener noreferrer">speedbit.com</a></li>
+          <li><strong>Free Download Manager (FDM):</strong> Official site: <a href="https://www.freedownloadmanager.org/" target="_blank" rel="noopener noreferrer">freedownloadmanager.org</a></li>
+          <li><strong>JDownloader 2:</strong> Official site: <a href="https://jdownloader.org/" target="_blank" rel="noopener noreferrer">jdownloader.org</a></li>
+          <li><strong>Xtreme Download Manager (XDM):</strong> Official site: <a href="https://xtremedownloadmanager.com/" target="_blank" rel="noopener noreferrer">xtremedownloadmanager.com</a> and <a href="https://github.com/subhra74/xdm" target="_blank" rel="noopener noreferrer">GitHub (subhra74/xdm)</a></li>
+          <li><strong>Motrix:</strong> Official site: <a href="https://motrix.app/" target="_blank" rel="noopener noreferrer">motrix.app</a> and <a href="https://github.com/agalwood/motrix" target="_blank" rel="noopener noreferrer">GitHub (agalwood/motrix)</a></li>
+          <li><strong>Neat Download Manager (NDM):</strong> Official site: <a href="https://www.neatdownloadmanager.com/" target="_blank" rel="noopener noreferrer">neatdownloadmanager.com</a></li>
+          <li><strong>Sayl:</strong> Official site: <a href="https://sayl.site/" target="_blank" rel="noopener noreferrer">sayl.site</a> and <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub (athar-studios/sayl)</a></li>
+        </ul>
+
+        <div class="cta" style="margin-top:36px">
+          <a class="btn pri" href="https://github.com/athar-studios/sayl/releases/latest">Download Sayl for Windows</a>
+          <a class="btn sec" href="/en/docs">Technical Documentation</a>
         </div>
       </article>
     </main>
     <footer>
       <div class="footer-wrap">
         <div class="footer-brand">
-          <img src="/favicon.svg?v=2" alt="Sayl" width="28" height="20">
-          <span><strong>Sayl · سيل</strong></span>
+          <a href="/en" aria-label="Sayl">
+            <img src="/icon.svg" alt="Sayl" class="footer-logo" width="52" height="36">
+          </a>
         </div>
         <div class="footer-links">
           <a href="/en/docs">Docs</a>
           <a href="/en/faq">FAQ</a>
           <a href="/en/compare">Comparison</a>
           <a href="/en/idm-alternative">IDM Alternative</a>
-          <a href="/en/free-download-manager-windows">Windows FDM</a>
+          <a href="/en/free-download-manager-windows">Download for Windows</a>
           <a href="/en/plugins">Plugins</a>
           <a href="/en/themes">Themes</a>
-          <a href="/en/about">About Studio</a>
+          <a href="/en/about">About</a>
           <a href="/en/support">Support</a>
           <a href="/en/privacy">Privacy</a>
           <a href="/en/terms">Terms</a>
@@ -196,12 +271,10 @@
         </div>
       </div>
       <div style="margin-top:20px;text-align:center;color:#6b80ad;font-size:0.85rem">
-        Athar Studio · Licensed under Apache-2.0 Open Source License · Zero tracking & zero telemetry
+        Athar Studio · Apache-2.0 Open Source License · Zero ads, zero tracking
       </div>
     </footer>
   </div>
-
-  <script src="/flow.js" defer></script>
   <script src="/site.js" defer></script>
 </body>
 </html>

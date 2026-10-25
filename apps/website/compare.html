@@ -1,61 +1,36 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>مقارنة سيل مع IDM و Flow: أيهما أفضل؟ · SAYL</title>
-  <meta name="description" content="مقارنة موضوعية بالأرقام والميزات بين سيل وIDM وFlow: السعر، والترخيص، ودعم العربية، والتجزئة، والأمان.">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>مقارنة برامج التنزيل لويندوز: سيل وبدائل IDM المجانية والمدفوعة — SAYL</title>
+  <meta name="description" content="مقارنة موضوعية موثقة بين سيل (Sayl) وأشهر برامج التنزيل لويندوز: IDM و DAP و FDM و JDownloader 2 و XDM و Motrix و NDM من حيث السعر، والترخيص، والتسريع، والخصوصية.">
   <meta name="theme-color" content="#070F2E">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
   <link rel="canonical" href="https://sayl.site/compare">
   <link rel="alternate" hreflang="ar" href="https://sayl.site/compare">
   <link rel="alternate" hreflang="en" href="https://sayl.site/en/compare">
   <link rel="alternate" hreflang="x-default" href="https://sayl.site/compare">
-
-  <!-- Favicons & App Icons (?v=2) -->
-  <link rel="icon" href="/favicon.ico?v=2" sizes="any">
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
-  <link rel="manifest" href="/site.webmanifest">
-
-  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="article">
   <meta property="og:site_name" content="سيل · SAYL">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://sayl.site/compare">
-  <meta property="og:title" content="مقارنة سيل مع IDM و Flow: أيهما أفضل؟ · SAYL">
-  <meta property="og:description" content="مقارنة موضوعية بالأرقام والميزات بين سيل وIDM وFlow: السعر، والترخيص، ودعم العربية، والتجزئة، والأمان.">
+  <meta property="og:title" content="مقارنة برامج التنزيل لويندوز: سيل وبدائل IDM المجانية والمدفوعة — SAYL">
+  <meta property="og:description" content="مقارنة موضوعية موثقة بين سيل وأشهر مديري التنزيل: IDM، DAP، FDM، JDownloader 2، XDM، Motrix، و NDM.">
   <meta property="og:image" content="https://sayl.site/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-
-  <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="مقارنة سيل مع IDM و Flow: أيهما أفضل؟ · SAYL">
-  <meta name="twitter:description" content="مقارنة موضوعية بالأرقام والميزات بين سيل وIDM وFlow: السعر، والترخيص، ودعم العربية، والتجزئة، والأمان.">
+  <meta name="twitter:title" content="مقارنة برامج التنزيل لويندوز: سيل وبدائل IDM — SAYL">
+  <meta name="twitter:description" content="مقارنة موضوعية موثقة بين سيل وأشهر مديري التنزيل: IDM، DAP، FDM، JDownloader 2، XDM، Motrix، و NDM.">
   <meta name="twitter:image" content="https://sayl.site/og-image.png">
-
-  <!-- Preload Fonts & Stylesheet -->
-  <link rel="preload" href="/fonts/IBMPlexSansArabic-Regular.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="/fonts/IBMPlexSansArabic-Bold.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/style.css">
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    "name": "Athar Studio",
-    "url": "https://sayl.site",
-    "logo": "https://sayl.site/icon-512.png",
-    "sameAs": [
-      "https://github.com/athar-studios",
-      "https://ko-fi.com/athar_studio"
-    ]
-  }
-  </script>
 </head>
-<body>
-  <canvas id="flow"></canvas>
+<body class="page-inner">
   <div class="lang-modal-overlay" id="lang-modal" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
     <div class="lang-modal-card">
-      <img src="/favicon.svg?v=2" alt="شعار سيل" width="56" height="38" style="margin-bottom:12px">
+      <img src="/icon.svg" alt="سيل" class="modal-logo" width="52" height="36">
       <h2 id="lang-modal-title">اختر لغة الموقع · Choose Language</h2>
       <p>يمكنك تغيير اللغة في أي وقت من زر التبديل بأعلى الصفحة.</p>
       <div class="lang-choices">
@@ -72,9 +47,8 @@
   </div>
   <div class="wrap">
     <header>
-      <a href="/" class="brand" aria-label="سيل - الصفحة الرئيسية">
-        <img src="/favicon.svg?v=2" alt="شعار سيل" width="34" height="24">
-        <span>سيل</span>
+      <a href="/" class="brand" aria-label="سيل">
+        <img src="/icon.svg" alt="سيل" class="brand-logo" width="52" height="36">
       </a>
       <nav aria-label="التنقل الرئيسي">
         <a href="/docs">التوثيق</a>
@@ -88,97 +62,198 @@
         <a href="/en/compare" class="lang-btn" aria-label="Switch to English">English</a>
       </div>
     </header>
-    <main class="page-shell" style="max-width:980px">
+    <main class="page-shell" style="max-width:1100px">
       <article class="page-card">
-        <h1>مقارنة سيل مع IDM و Flow: أيهما تختار؟</h1>
-        <p class="lead" style="color:#b9c8e6;font-size:1.15rem;margin-bottom:28px">مقارنة موضوعية بالأرقام والوقائع بين سيل (SAYL) وInternet Download Manager (IDM) وبرنامج Flow لمساعدتك على اختيار الأنسب لاحتياجاتك.</p>
+        <h1>مقارنة برامج التنزيل لنظام ويندوز: نظرة شاملة ومحايدة</h1>
+        <p class="lead" style="color:#b9c8e6;font-size:1.15rem;margin-bottom:28px">مقارنة موضوعية موثقة بالأرقام والوقائع بين <strong>سيل (SAYL)</strong> وأشهر برامج إدارة التنزيل لنظام Windows، بشقيها المدفوع والمجاني، اعتماداً على البيانات الرسمية المنشورة على مواقع كل برنامج لمساعدتك على اتخاذ القرار الأنسب لك.</p>
 
-        <div class="table-wrap">
+        <div class="note">
+          <strong>منهجية المقارنة والحياد التام:</strong> تستند هذه المقارنة حصراً إلى الوقائع والمواصفات الرسمية المنشورة في المواقع والمستودعات المعتمدة لكل منتج. تم وضع علامة <strong>«؟»</strong> أمام أي خاصية لم نتمكن من التحقق منها بصورة قاطعة في أحدث إصدارات البرنامج. الروابط المرجعية الرسمية مدرجة بالكامل أسفل الجدول.
+        </div>
+
+        <div class="table-wrap" style="margin-top:32px">
           <table class="doc-table">
             <thead>
               <tr>
-                <th style="width:26%">المعيار</th>
-                <th style="width:28%;color:var(--teal)">سيل (SAYL)</th>
-                <th style="width:23%">IDM</th>
-                <th style="width:23%">Flow</th>
+                <th style="min-width:140px">المعيار</th>
+                <th style="min-width:130px;color:var(--teal)">سيل (Sayl)</th>
+                <th style="min-width:125px">IDM</th>
+                <th style="min-width:120px">DAP</th>
+                <th style="min-width:125px">FDM</th>
+                <th style="min-width:135px">JDownloader 2</th>
+                <th style="min-width:125px">XDM</th>
+                <th style="min-width:120px">Motrix</th>
+                <th style="min-width:120px">NDM</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><strong>السعر ونموذج الترخيص</strong></td>
-                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">مجاني 100% ودائم بلا أي قيود</td>
-                <td>مدفوع (تجربة 30 يوماً ثم 24.95$ سنوياً أو 38$ دائم)</td>
-                <td>مجاني أساسي مع ميزات مدفوعة</td>
-              </tr>              <tr>
-                <td><strong>الكود المصدري وحرية التدقيق</strong></td>
-                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">مفتوح المصدر بالكامل (Apache-2.0)</td>
-                <td>مغلق المصدر ومحمي (Proprietary)</td>
-                <td>مغلق المصدر (Proprietary)</td>
-              </tr>              <tr>
-                <td><strong>دعم اللغة العربية والاتجاه (RTL)</strong></td>
-                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">أصيل يبدأ بالعربية من اليمين لليسار مع خط محسّن</td>
-                <td>تعريب نصي تقليدي مع تخطيط يغلب عليه اليسار</td>
-                <td>واجهة إنجليزية أولاً (دعم عربي محدود)</td>
-              </tr>              <tr>
-                <td><strong>أنظمة التشغيل المدعومة</strong></td>
+                <td><strong>الفئة والسعر</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">مجاني 100% ودائم بلا قيود</td>
+                <td>تجاري مدفوع (تجربة 30 يوماً ثم 11.95$/سنة أو 24.95$ دائم لجهاز واحد)</td>
+                <td>تجاري مدفوع (DAP Free مع إعلانات، أو Premium بـ 24.95$)</td>
+                <td>مجاني (Freeware)</td>
+                <td>مجاني (مع قبول التبرعات واشتراكات استضافة مدفوعة اختيارية)</td>
+                <td>مجاني 100% ومفتوح المصدر</td>
+                <td>مجاني 100% ومفتوح المصدر</td>
+                <td>مجاني (Freeware)</td>
+              </tr>
+              <tr>
+                <td><strong>الكود المصدري والترخيص</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">مفتوح المصدر (Apache-2.0)</td>
+                <td>مغلق المصدر (احتكاري تجاري)</td>
+                <td>مغلق المصدر (احتكاري تجاري)</td>
+                <td>مغلق المصدر (احتكاري مجاني؛ كانت الإصدارات القديمة GPL)</td>
+                <td>مفتوح المصدر (GPL مع وحدات أساسية خاصة)</td>
+                <td>مفتوح المصدر (GPL v3)</td>
+                <td>مفتوح المصدر (MIT)</td>
+                <td>مغلق المصدر (احتكاري مجاني)</td>
+              </tr>
+              <tr>
+                <td><strong>دعم نظام ويندوز</strong></td>
                 <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">ويندوز 10 و 11 (64 بت)</td>
-                <td>ويندوز (جميع الإصدارات)</td>
-                <td>ويندوز وماك</td>
-              </tr>              <tr>
+                <td>ويندوز 11 و 10 و 8.1 و 7 (32 و 64 بت)</td>
+                <td>ويندوز 10 و 8 و 7 و XP</td>
+                <td>ويندوز 11 و 10 و 8.1 و 7 (بالإضافة لماك ولينكس وأندرويد)</td>
+                <td>ويندوز (يعتمد على Java)، بالإضافة لماك ولينكس</td>
+                <td>ويندوز، وماك، ولينكس</td>
+                <td>ويندوز (بنية Electron/aria2)، وماك، ولينكس</td>
+                <td>ويندوز (تطبيق C++ أصيل خفيف)، وماك</td>
+              </tr>
+              <tr>
+                <td><strong>واجهة اللغة العربية (RTL)</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">أصيل RTL مبني للعربية من الأساس بخط عربي مخصص</td>
+                <td>مدعوم (تعريب نصي تقليدي ضمن قائمة اللغات)</td>
+                <td>؟ (غير مؤكد وجود تعريب رسمي محدث في الإصدارات الأخيرة)</td>
+                <td>مدعوم (واجهة متعددة اللغات تشمل العربية)</td>
+                <td>مدعوم (ترجمة مجتمعية عربية متوفرة في الإعدادات)</td>
+                <td>مدعوم (ترجمة عربية مجتمعية في الخيارات)</td>
+                <td>مدعوم (خيار اللغة العربية متوفر في الإعدادات)</td>
+                <td>غير مدعوم رسمياً (الواجهة بالإنجليزية افتراضياً)</td>
+              </tr>
+              <tr>
                 <td><strong>تسريع التنزيل بالتقسيم المتوازي</strong></td>
-                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">نعم (تقسيم متوازي متعدد الوصلات)</td>
-                <td>نعم (تقسيم ديناميكي حتى 32 اتصالاً)</td>
-                <td>نعم (تقسيم متعدد الوصلات)</td>
-              </tr>              <tr>
-                <td><strong>الاستئناف الذري مع فحص التغير</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">نعم (تقسيم متوازي متعدد المسارات)</td>
+                <td>نعم (تقسيم ديناميكي حتى 32 اتصالاً في وقت واحد)</td>
+                <td>نعم (تسريع متعدد القنوات Multi-channel)</td>
+                <td>نعم (تقسيم الملف وتسريعه)</td>
+                <td>نعم (اتصالات متعددة مجزأة لكل رابط)</td>
+                <td>نعم (تقسيم ديناميكي حتى 32 جزءاً)</td>
+                <td>نعم (محرك aria2 مدمج متعدد الخيوط)</td>
+                <td>نعم (خوارزمية تقسيم ديناميكية متعددة الوصلات)</td>
+              </tr>
+              <tr>
+                <td><strong>استئناف التنزيل الدقيق (Resume)</strong></td>
                 <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">نعم (تحقق ETag + ملفات .part ذرية لمنع التلف)</td>
-                <td>نعم (استئناف موثوق للروابط المدعومة)</td>
-                <td>نعم (استئناف التنزيلات)</td>
-              </tr>              <tr>
-                <td><strong>إضافة المتصفح (Chromium / Firefox)</strong></td>
-                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">إضافة Manifest V3 لكروم وإيدج وبراف</td>
-                <td>إضافة شاملة لمعظم المتصفحات</td>
-                <td>إضافة لمتصفحات كروم وفايرفوكس</td>
-              </tr>              <tr>
-                <td><strong>سطر الأوامر المستقل (CLI)</strong></td>
-                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">نعم (sayl.exe متكامل بلغة Rust مع مخرجات JSON)</td>
-                <td>معاملات سطر أوامر محدودة</td>
-                <td>غير متوفر</td>
-              </tr>              <tr>
-                <td><strong>تنزيل الفيديو والوسائط</strong></td>
+                <td>نعم (استئناف موثوق للروابط التي تدعم HTTP Range)</td>
+                <td>نعم (استئناف التنزيلات المقطوعة)</td>
+                <td>نعم (استئناف التنزيل للروابط الداعمة)</td>
+                <td>نعم (استئناف قوي مع فحص الروابط)</td>
+                <td>نعم (استئناف وتحديث الروابط المنتهية الصلاحية)</td>
+                <td>نعم (استئناف عبر قدرات aria2)</td>
+                <td>نعم (استئناف التنزيلات غير المكتملة)</td>
+              </tr>
+              <tr>
+                <td><strong>إضافة المتصفح (Browser Extension)</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">نعم (معيار Manifest V3 لمتصفحات Chrome و Edge و Brave)</td>
+                <td>نعم (إضافة IDM Integration لمعظم المتصفحات)</td>
+                <td>نعم (تكامل مع متصفحات الويب الشائعة)</td>
+                <td>نعم (إضافة لمتصفحات Chrome و Firefox و Edge)</td>
+                <td>نعم (إضافة MyJDownloader للالتقاط والتحكم)</td>
+                <td>نعم (إضافة XDM Browser Monitor)</td>
+                <td>إضافة مجتمعية متوفرة في متاجر المتصفحات</td>
+                <td>نعم (إضافة NeatDownloadManager للمتصفحات)</td>
+              </tr>
+              <tr>
+                <td><strong>التقاط وتنزيل الفيديو من المواقع</strong></td>
                 <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">مجدول في v0.2.0 (تكامل أصيل مع yt-dlp)</td>
-                <td>متوفر (لوحة التقاط الفيديو العائمة)</td>
-                <td>متوفر لبعض المواقع</td>
-              </tr>              <tr>
-                <td><strong>نظام الإضافات والسمات</strong></td>
-                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">مخطط في v0.2.0 (بنية معيارية مفتوحة)</td>
-                <td>غير متاح للمطورين</td>
-                <td>غير متاح</td>
-              </tr>              <tr>
-                <td><strong>الخصوصية وخلوه من الإعلانات</strong></td>
-                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">صفر تتبع، بلا إعلانات، لا خوادم وسيطة</td>
-                <td>بلا إعلانات، ولكن يفحص التراخيص عن بعد</td>
-                <td>قد يتضمن إعلانات أو تحليلات في النسخة المجانية</td>
+                <td>نعم (لوحة التقاط الفيديو العائمة المدمجة)</td>
+                <td>نعم (ميزة تنزيل وتحميل الفيديو مدمجة)</td>
+                <td>نعم (تنزيل مقاطع الفيديو من المواقع الشائعة)</td>
+                <td>نعم (محلل وسائط شامل وروابط متعددة الجودات)</td>
+                <td>نعم (لاقط فيديو مدمج ومحول وسائط)</td>
+                <td>لا (يركز على الروابط المباشرة والتورنت فقط)</td>
+                <td>نعم (شريط التقاط وتنزيل الفيديو والصوت)</td>
+              </tr>
+              <tr>
+                <td><strong>الإعلانات والعروض المدمجة</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">صفر إعلانات وصفر عروض مدمجة</td>
+                <td>خالٍ من الإعلانات التجارية (رسائل تذكير بالشراء في التجريبي)</td>
+                <td>النسخة المجانية تتضمن إعلانات وعروضاً؛ النسخة المدفوعة تزيلها</td>
+                <td>خالٍ من الإعلانات في الإصدار الرسمي</td>
+                <td>المثبت الافتراضي قد يعرض برمجيات مدمجة؛ يتوفر مثبت نقي في المنتدى</td>
+                <td>خالٍ تماماً من الإعلانات والبرمجيات المدمجة</td>
+                <td>خالٍ تماماً من الإعلانات</td>
+                <td>خالٍ من الإعلانات</td>
+              </tr>
+              <tr>
+                <td><strong>الخصوصية والتتبع وسجلات الاستخدام</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">صفر تتبع، لا خوادم وسيطة، اتصال مباشر بسيرفر التنزيل فقط</td>
+                <td>اتصال دوري بخوادم Tonec للتحقق من صحة مفتاح الترخيص</td>
+                <td>تحليلات وشبكات إعلانية مدمجة في الإصدار المجاني</td>
+                <td>فحص تحديثات دوري وجمع إحصاءات عامة مجهولة الهوية</td>
+                <td>لا يوجد تتبع تجاري؛ تقارير أخطاء وحساب سحابي اختياري</td>
+                <td>لا يوجد تتبع أو تحليلات مدمجة</td>
+                <td>كود مفتوح المصدر بالكامل بلا أي أدوات جمع بيانات</td>
+                <td>فحص تحديثات خفيف، لا يوجد تتبع معلن</td>
+              </tr>
+              <tr>
+                <td><strong>آخر تحديث ونشاط التطوير</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">نشط ومحدث (2026 - الإصدار 0.1.0)</td>
+                <td>نشط ومستمر بتحديثات صيانة دورية متتالية</td>
+                <td>؟ (تحديثات غير منتظمة ومتباعدة في السنوات الأخيرة)</td>
+                <td>نشط ومستمر بتحديثات دورية</td>
+                <td>نشط بتحديثات دورية متكررة للمكونات الإضافية</td>
+                <td>نشط عبر مساهمات المجتمع على GitHub</td>
+                <td>تحديثات صيانة دورية على GitHub</td>
+                <td>نشط ومستقر بإصدارات تحسينية منتظمة</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <h2 style="margin-top:40px">خلاصة المقارنة: متى تختار سيل؟</h2>
-        <p>إذا كنت تبحث عن برنامج تنزيل <strong>مجاني بالكامل</strong>، لا يطلب كراك ولا تفعيلاً مشبوهاً، بواجهة عربية نظيفة وهادئة ومريحة للعين، مع سرعة قصوى بالتقسيم واستئناف آمن للملفات — فسيل هو خيارك الأفضل والأنقى.</p>
-        <p>أما إذا كان اعتمادك اليومي الأساسي هو تنزيل فيديوهات متفرقة من منصات تتطلب التقاطاً عائماً فورياً، فننصحك بمتابعة سيل لحين إطلاق الإصدار 0.2.0 الذي سيضيف دعم الفيديو عبر yt-dlp.</p>
+        <h2 style="margin-top:48px">نظرة تحليلية: كيف تختار البرنامج الأنسب لاحتياجاتك؟</h2>
+        
+        <h3>1. البرامج التجارية والمدفوعة (IDM و DAP)</h3>
+        <p>يتميز برنامج <strong>Internet Download Manager (IDM)</strong> بعراقة خوارزميات التقسيم والتكامل الوثيق مع المتصفحات عبر شريط التقاط الفيديو العائم، إلا أنه يتطلب شراء ترخيص بعد انتهاء التجربة ويفتقر للمصدر المفتوح والواجهة الحديثة الأصيلة للغة العربية. أما <strong>Download Accelerator Plus (DAP)</strong> فيعرض إعلانات في نسخته المجانية وتراجع نشاط تحديثاته مؤخراً مقارنة بالحلول الحديثة.</p>
 
-        <div class="cta" style="margin-top:32px">
-          <a class="btn pri" href="https://github.com/athar-studios/sayl/releases/latest">حمّل سيل الآن (مجاناً)</a>
-          <a class="btn sec" href="/docs">دليل الاستخدام الكامل</a>
+        <h3>2. البدائل المجانية الاحتكارية (FDM و NDM)</h3>
+        <p>يعد <strong>Free Download Manager (FDM)</strong> خياراً غنياً بالميزات يدعم التورنت وتنزيل الفيديو وتعدد المنصات، لكنه برنامج مغلق المصدر. من جانبه، يوفر <strong>Neat Download Manager (NDM)</strong> تجربة خفيفة جداً وسريعة ومكتوبة بـ C++، لكنه يفتقر للواجهة العربية وللشفافية المفتوحة المصدر.</p>
+
+        <h3>3. البرامج المجانية ومفتوحة المصدر (Sayl و XDM و JDownloader 2 و Motrix)</h3>
+        <p>تمنحك البرمجيات مفتوحة المصدر أماناً مطلقاً وإمكانية مراجعة الكود البرمجي بحرية تامة دون خوف من برمجيات خبيثة أو تتبع خفي:</p>
+        <ul>
+          <li><strong>سيل (SAYL):</strong> يركز على تقديم تجربة استثنائية لنظام Windows مع واجهة عربية أصيلة RTL، وأداء فائق بمحرك Rust الخالص، واستئناف ذري محمي من التلف، وخلو تام من الإعلانات، مع إضافة Manifest V3 حديثة للمتصفحات.</li>
+          <li><strong>Xtreme Download Manager (XDM):</strong> بديل قوي وشهير مفتوح المصدر يتضمن لاقط فيديو ومحولاً مدمجاً.</li>
+          <li><strong>JDownloader 2:</strong> الأقوى والأشمل في التعامل مع روابط مواقع مشاركة الملفات والتخزين السحابي وروابط التجميع، مع متطلبات تشغيل أعلى نسبياً لاعتماده على Java.</li>
+          <li><strong>Motrix:</strong> يتميز بواجهة رسومية عصرية أنيقة وبسيطة مبنية على Electron ويعتمد على محرك aria2 لدعم التنزيلات المباشرة وملفات التورنت.</li>
+        </ul>
+
+        <h2 style="margin-top:40px">المصادر الرسمية وروابط التحقق</h2>
+        <p>حرصاً على النزاهة والموضوعية، تم استقاء كافة المعلومات المذكورة أعلاه من المصادر الرسمية المعتمدة لكل برنامج. يمكنك مراجعة وتدقيق بيانات كل منتج عبر روابطها الرسمية أدناه:</p>
+        <ul>
+          <li><strong>Internet Download Manager (IDM):</strong> الموقع الرسمي: <a href="https://www.internetdownloadmanager.com/" target="_blank" rel="noopener noreferrer">internetdownloadmanager.com</a></li>
+          <li><strong>Download Accelerator Plus (DAP):</strong> الموقع الرسمي: <a href="https://www.speedbit.com/" target="_blank" rel="noopener noreferrer">speedbit.com</a></li>
+          <li><strong>Free Download Manager (FDM):</strong> الموقع الرسمي: <a href="https://www.freedownloadmanager.org/" target="_blank" rel="noopener noreferrer">freedownloadmanager.org</a></li>
+          <li><strong>JDownloader 2:</strong> الموقع الرسمي: <a href="https://jdownloader.org/" target="_blank" rel="noopener noreferrer">jdownloader.org</a></li>
+          <li><strong>Xtreme Download Manager (XDM):</strong> الموقع الرسمي: <a href="https://xtremedownloadmanager.com/" target="_blank" rel="noopener noreferrer">xtremedownloadmanager.com</a> ومستودع <a href="https://github.com/subhra74/xdm" target="_blank" rel="noopener noreferrer">GitHub (subhra74/xdm)</a></li>
+          <li><strong>Motrix:</strong> الموقع الرسمي: <a href="https://motrix.app/" target="_blank" rel="noopener noreferrer">motrix.app</a> ومستودع <a href="https://github.com/agalwood/motrix" target="_blank" rel="noopener noreferrer">GitHub (agalwood/motrix)</a></li>
+          <li><strong>Neat Download Manager (NDM):</strong> الموقع الرسمي: <a href="https://www.neatdownloadmanager.com/" target="_blank" rel="noopener noreferrer">neatdownloadmanager.com</a></li>
+          <li><strong>سيل (SAYL):</strong> الموقع الرسمي: <a href="https://sayl.site/" target="_blank" rel="noopener noreferrer">sayl.site</a> ومستودع <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub (athar-studios/sayl)</a></li>
+        </ul>
+
+        <div class="cta" style="margin-top:36px">
+          <a class="btn pri" href="https://github.com/athar-studios/sayl/releases/latest">حمّل سيل لويندوز مجاناً</a>
+          <a class="btn sec" href="/docs">الدليل والتوثيق التقني</a>
         </div>
       </article>
     </main>
     <footer>
       <div class="footer-wrap">
         <div class="footer-brand">
-          <img src="/favicon.svg?v=2" alt="سيل" width="28" height="20">
-          <span><strong>سيل · SAYL</strong></span>
+          <a href="/" aria-label="سيل">
+            <img src="/icon.svg" alt="سيل" class="footer-logo" width="52" height="36">
+          </a>
         </div>
         <div class="footer-links">
           <a href="/docs">التوثيق</a>
@@ -200,8 +275,6 @@
       </div>
     </footer>
   </div>
-
-  <script src="/flow.js" defer></script>
   <script src="/site.js" defer></script>
 </body>
 </html>

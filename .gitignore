@@ -62,3 +62,5 @@ desktop.ini
 # Wrangler / Cloudflare Pages local cache
 apps/website/.wrangler/
 .wrangler/
+
+tools/screenshots/
