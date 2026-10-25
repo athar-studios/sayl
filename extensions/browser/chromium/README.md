@@ -14,12 +14,12 @@
 
 ## التثبيت اليدوي ومُعرّف الامتداد / Manual Installation & Extension ID
 - **Pinned Public Key:** An RSA-2048 public key is embedded in `manifest.json` under `"key"`, ensuring the extension retains a deterministic extension ID across all installations and browsers.
-- **Pinned Extension ID:** `ipfenakpblanjjiboejfobkjhegnciif`
-- **Native Host Allowed Origin:** `chrome-extension://ipfenakpblanjjiboejfobkjhegnciif/`
+- **Pinned Extension ID:** `cpigidmkbhcfkgljofmmpnfdhdaoldoj`
+- **Native Host Allowed Origin:** `chrome-extension://cpigidmkbhcfkgljofmmpnfdhdaoldoj/`
 
 ### خطوات التثبيت اليدوي / Manual Installation Steps:
 1. Open Chrome/Edge and navigate to `chrome://extensions` or `edge://extensions`.
 2. Enable "Developer mode" (وضع مطوّر البرامج).
 3. Click "Load unpacked" (تحميل حزمة غير مضغوطة) and select this directory (`extensions/browser/chromium`) or the installed copy under `<install_dir>\extensions\browser\chromium`.
-4. Verify that the assigned Extension ID matches `ipfenakpblanjjiboejfobkjhegnciif`.
+4. Verify that the assigned Extension ID matches `cpigidmkbhcfkgljofmmpnfdhdaoldoj`.
 5. The installer automatically registers the native host for this extension ID.

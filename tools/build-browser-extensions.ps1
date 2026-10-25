@@ -22,7 +22,7 @@ $ChromiumDir = Join-Path $RepoRoot "extensions\browser\chromium"
 $FirefoxDir = Join-Path $RepoRoot "extensions\browser\firefox"
 $DistDir = Join-Path $RepoRoot "extensions\browser\dist"
 
-$EXPECTED_CHROMIUM_ID = "ipfenakpblanjjiboejfobkjhegnciif"
+$EXPECTED_CHROMIUM_ID = "cpigidmkbhcfkgljofmmpnfdhdaoldoj"
 $EXPECTED_FIREFOX_ID = "sayl@atharstudios.com"
 $REQUIRED_PERMISSIONS = @("nativeMessaging", "contextMenus", "notifications")
 
