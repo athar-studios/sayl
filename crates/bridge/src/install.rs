@@ -21,7 +21,7 @@ pub const HOST_NAME: &str = "com.sayl.downloader";
 pub const HOST_DESCRIPTION: &str = "SAYL native messaging host";
 
 /// The pinned Chromium extension ID whose public key is pinned in the repository.
-pub const PINNED_CHROMIUM_EXTENSION_ID: &str = "ipfenakpblanjjiboejfobkjhegnciif";
+pub const PINNED_CHROMIUM_EXTENSION_ID: &str = "cpigidmkbhcfkgljofmmpnfdhdaoldoj";
 
 /// The Firefox add-on ID.
 pub const FIREFOX_EXTENSION_ID: &str = "sayl@atharstudios.com";
@@ -483,7 +483,7 @@ mod tests {
         assert_eq!(manifest.host_type, "stdio");
         assert_eq!(
             manifest.allowed_origins,
-            vec!["chrome-extension://ipfenakpblanjjiboejfobkjhegnciif/"]
+            vec!["chrome-extension://cpigidmkbhcfkgljofmmpnfdhdaoldoj/"]
         );
 
         let json = serde_json::to_value(&manifest).expect("serializes to json");
@@ -491,7 +491,7 @@ mod tests {
         assert_eq!(json["type"], "stdio");
         assert_eq!(
             json["allowed_origins"][0],
-            "chrome-extension://ipfenakpblanjjiboejfobkjhegnciif/"
+            "chrome-extension://cpigidmkbhcfkgljofmmpnfdhdaoldoj/"
         );
         // Ensure Firefox key allowed_extensions is absent
         assert!(json.get("allowed_extensions").is_none());
@@ -584,14 +584,14 @@ mod tests {
 
         // Browser origin arg -> Serve
         let browser_args = vec![
-            "chrome-extension://ipfenakpblanjjiboejfobkjhegnciif/".to_string(),
+            "chrome-extension://cpigidmkbhcfkgljofmmpnfdhdaoldoj/".to_string(),
             "--parent-window=123".to_string(),
         ];
         match parse_cli_args(browser_args).unwrap() {
             BridgeCliMode::Serve(cmd) => {
                 assert_eq!(
                     cmd.caller_origin.as_deref(),
-                    Some("chrome-extension://ipfenakpblanjjiboejfobkjhegnciif/")
+                    Some("chrome-extension://cpigidmkbhcfkgljofmmpnfdhdaoldoj/")
                 );
             }
             _ => panic!("Expected Serve mode"),

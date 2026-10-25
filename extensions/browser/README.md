@@ -7,8 +7,8 @@
 ### 1. Chromium (`extensions/browser/chromium/`)
 - متوافق مع: Google Chrome, Microsoft Edge, Brave, وغيرها من متصفحات Chromium.
 - **Manifest Version:** 3 (Service Worker).
-- **Pinned Key:** RSA-2048 public key ينتج دائمًا المعرّف: `ipfenakpblanjjiboejfobkjhegnciif`.
-- **Allowed Origin:** `chrome-extension://ipfenakpblanjjiboejfobkjhegnciif/`.
+- **Pinned Key:** RSA-2048 public key ينتج دائمًا المعرّف: `cpigidmkbhcfkgljofmmpnfdhdaoldoj`.
+- **Allowed Origin:** `chrome-extension://cpigidmkbhcfkgljofmmpnfdhdaoldoj/`.
 
 ### 2. Firefox (`extensions/browser/firefox/`)
 - متوافق مع: Mozilla Firefox (109.0+).

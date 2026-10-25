@@ -2,6 +2,9 @@
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.pk8
 
 # Reports, artifacts, and agent runtime
 reports/
