@@ -122,8 +122,12 @@ jobs:
       - name: Verify installer brand icon
         shell: pwsh
         run: |
-          $v = "${{ steps.ver.outputs.version }}"
-          pwsh -NoProfile -File tools/check-installer-icon.ps1 -Path "releases/SAYL-Setup-x64-$v.exe", "releases/SAYL-Setup-x64-$v.msi"
+          $exe = "releases/SAYL-Setup-x64-${{ steps.ver.outputs.version }}.exe"
+          $msi = "releases/SAYL-Setup-x64-${{ steps.ver.outputs.version }}.msi"
+          Write-Host "Checking: $exe and $msi"
+          if (-not (Test-Path -LiteralPath $exe)) { Write-Error "Missing: $exe"; exit 1 }
+          if (-not (Test-Path -LiteralPath $msi)) { Write-Error "Missing: $msi"; exit 1 }
+          pwsh -NoProfile -File tools/check-installer-icon.ps1 -Path $exe, $msi
 
       - name: Upload installers and checksums
         uses: actions/upload-artifact@v4
