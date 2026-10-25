@@ -3,9 +3,12 @@
 //! Orchestrates the `sayl-app` download engine, manages settings,
 //! and communicates with the Svelte frontend via Tauri commands and events.
 
+pub mod autostart;
 pub mod duplicates;
+pub mod perf;
 pub mod power;
 pub mod shutdown;
+pub mod tray;
 
 pub use duplicates::{find_duplicate, normalize_url_for_compare};
 pub use power::{should_inhibit, SleepInhibitor};
@@ -16,6 +19,7 @@ pub use shutdown::{
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 
 use sayl_app::{Engine, EngineConfig};
@@ -32,6 +36,10 @@ pub struct LiveTaskStats {
     pub eta_secs: Option<u64>,
 }
 
+fn default_close_action() -> String {
+    "background".to_string()
+}
+
 /// User configurable settings.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
@@ -46,6 +54,12 @@ pub struct Settings {
     pub prevent_sleep: bool,
     pub show_download_window: bool,
     pub close_download_window_on_finish: bool,
+    #[serde(default = "default_close_action")]
+    pub close_action: String,
+    #[serde(default)]
+    pub run_at_startup: bool,
+    #[serde(default)]
+    pub close_notice_shown: bool,
 }
 
 impl Default for Settings {
@@ -56,11 +70,14 @@ impl Default for Settings {
             max_connections_per_task: 4,
             theme: "system".to_string(),
             language: "ar".to_string(),
-            view_mode: "cards".to_string(),
+            view_mode: "table".to_string(),
             sidebar_collapsed: false,
             prevent_sleep: true,
             show_download_window: true,
             close_download_window_on_finish: false,
+            close_action: "background".to_string(),
+            run_at_startup: false,
+            close_notice_shown: false,
         }
     }
 }
@@ -135,7 +152,32 @@ pub fn validate_settings(settings: &Settings) -> Result<(), String> {
     if !["cards", "table"].contains(&settings.view_mode.as_str()) {
         return Err("View mode must be cards or table".to_string());
     }
+    if !["background", "quit"].contains(&settings.close_action.as_str()) {
+        return Err("Close action must be background or quit".to_string());
+    }
     Ok(())
+}
+
+/// Active worker count estimate: for Downloading use min(parts, settings.max_connections_per_task) else 1/None.
+///
+/// Approximation rationale: In `sayl-app`, tasks in `Downloading` state allocate workers up to the number of
+/// available parts or the task connection cap (`settings.max_connections_per_task`). During `Probing`, a single HTTP
+/// connection is active to query headers. In non-running states (Queued, Paused, Completed, Cancelled, Error), no
+/// worker connections are active.
+pub fn estimate_connections(
+    state: DownloadState,
+    parts: Option<u32>,
+    max_connections_per_task: usize,
+) -> Option<u32> {
+    match state {
+        DownloadState::Downloading => {
+            let p = parts.unwrap_or(1);
+            let limit = (max_connections_per_task as u32).max(1);
+            Some(p.min(limit))
+        }
+        DownloadState::Probing => Some(1),
+        _ => None,
+    }
 }
 
 /// Flattened task representation sent to the Svelte frontend.
@@ -152,18 +194,42 @@ pub struct TaskView {
     pub error: Option<String>,
     pub mime: Option<String>,
     pub parts: Option<u32>,
+    #[serde(default)]
+    pub error_kind: Option<String>,
+    #[serde(default)]
+    pub connections: Option<u32>,
+    #[serde(default)]
+    pub created_at: Option<String>,
+    #[serde(default)]
+    pub completed_at: Option<String>,
 }
 
 impl TaskView {
-    /// Constructs a `TaskView` from a durable `TaskRecord` and optional transient stats.
+    /// Constructs a `TaskView` with default connection estimate.
     pub fn from_record(
         rec: &TaskRecord,
         speed_bps: Option<u64>,
         eta_secs: Option<u64>,
         parts: Option<u32>,
     ) -> Self {
+        Self::from_record_full(rec, speed_bps, eta_secs, parts, None)
+    }
+
+    /// Constructs a `TaskView` from a durable `TaskRecord` and transient stats/connections.
+    pub fn from_record_full(
+        rec: &TaskRecord,
+        speed_bps: Option<u64>,
+        eta_secs: Option<u64>,
+        parts: Option<u32>,
+        connections: Option<u32>,
+    ) -> Self {
         let is_running =
             rec.state == DownloadState::Downloading || rec.state == DownloadState::Probing;
+        let completed_at = if rec.state == DownloadState::Completed {
+            Some(rec.updated_at.to_rfc3339())
+        } else {
+            None
+        };
         Self {
             id: rec.id.to_string(),
             url: rec.url.clone(),
@@ -176,6 +242,61 @@ impl TaskView {
             error: rec.error.clone(),
             mime: rec.content_type.clone(),
             parts,
+            error_kind: None,
+            connections,
+            created_at: Some(rec.created_at.to_rfc3339()),
+            completed_at,
+        }
+    }
+}
+
+/// Payload matching the coalesced `sayl://tasks-changed` event.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TasksChangedPayload {
+    pub revision: u64,
+    pub full: bool,
+    pub upsert: Vec<TaskView>,
+    pub removed: Vec<String>,
+}
+
+/// Pure helper to build a coalesced batch payload with deduplication.
+pub fn build_tasks_changed_batch(
+    revision: u64,
+    full: bool,
+    pending_upsert_ids: &[TaskId],
+    pending_removed_ids: &[String],
+    lookup_view: impl Fn(TaskId) -> Option<TaskView>,
+    full_views: impl Fn() -> Vec<TaskView>,
+) -> TasksChangedPayload {
+    if full {
+        let upsert = full_views();
+        TasksChangedPayload {
+            revision,
+            full: true,
+            upsert,
+            removed: Vec::new(),
+        }
+    } else {
+        let mut deduped_ids = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for &id in pending_upsert_ids {
+            if seen.insert(id) {
+                deduped_ids.push(id);
+            }
+        }
+        let upsert = deduped_ids.into_iter().filter_map(lookup_view).collect();
+        let mut removed = Vec::new();
+        let mut seen_rem = std::collections::HashSet::new();
+        for id in pending_removed_ids {
+            if seen_rem.insert(id.clone()) {
+                removed.push(id.clone());
+            }
+        }
+        TasksChangedPayload {
+            revision,
+            full: false,
+            upsert,
+            removed,
         }
     }
 }
@@ -202,6 +323,8 @@ pub struct AppState {
     pub engine: Engine,
     pub settings: RwLock<Settings>,
     pub live_stats: Arc<Mutex<HashMap<TaskId, LiveTaskStats>>>,
+    pub parts_cache: Arc<RwLock<HashMap<TaskId, Option<u32>>>>,
+    pub active_count: Arc<AtomicUsize>,
     pub settings_path: PathBuf,
     pub sleep_inhibitor: Arc<SleepInhibitor>,
     pub shutdown_controller: Arc<ShutdownController>,
@@ -219,6 +342,8 @@ impl AppState {
             engine,
             settings: RwLock::new(settings),
             live_stats: Arc::new(Mutex::new(HashMap::new())),
+            parts_cache: Arc::new(RwLock::new(HashMap::new())),
+            active_count: Arc::new(AtomicUsize::new(0)),
             settings_path,
             sleep_inhibitor,
             shutdown_controller,
@@ -262,6 +387,27 @@ pub fn default_data_dir() -> PathBuf {
     std::env::temp_dir().join("sayl-data")
 }
 
+pub fn is_active_state(state: DownloadState) -> bool {
+    matches!(
+        state,
+        DownloadState::Queued
+            | DownloadState::Probing
+            | DownloadState::Downloading
+            | DownloadState::Verifying
+            | DownloadState::Finalizing
+    )
+}
+
+pub(crate) fn update_sleep_inhibition_with_count(
+    settings: &RwLock<Settings>,
+    inhibitor: &SleepInhibitor,
+    active_count: usize,
+) {
+    let prevent_sleep = settings.read().map(|s| s.prevent_sleep).unwrap_or(true);
+    inhibitor.set_active(power::should_inhibit(prevent_sleep, active_count));
+}
+
+#[allow(dead_code)]
 pub(crate) fn update_sleep_inhibition(
     engine: &Engine,
     settings: &RwLock<Settings>,
@@ -271,16 +417,7 @@ pub(crate) fn update_sleep_inhibition(
     let active_count = match engine.list_tasks() {
         Ok(tasks) => tasks
             .into_iter()
-            .filter(|t| {
-                matches!(
-                    t.state,
-                    DownloadState::Queued
-                        | DownloadState::Probing
-                        | DownloadState::Downloading
-                        | DownloadState::Verifying
-                        | DownloadState::Finalizing
-                )
-            })
+            .filter(|t| is_active_state(t.state))
             .count(),
         Err(_) => 0,
     };
@@ -301,6 +438,24 @@ pub(crate) fn task_parts_count(engine: &Engine, task_id: TaskId) -> Option<u32> 
         })
 }
 
+pub(crate) fn get_cached_parts(
+    engine: &Engine,
+    parts_cache: &RwLock<HashMap<TaskId, Option<u32>>>,
+    task_id: TaskId,
+) -> Option<u32> {
+    if let Ok(cache) = parts_cache.read() {
+        if let Some(&parts) = cache.get(&task_id) {
+            return parts;
+        }
+    }
+
+    let parts = task_parts_count(engine, task_id);
+    if let Ok(mut cache) = parts_cache.write() {
+        cache.insert(task_id, parts);
+    }
+    parts
+}
+
 // ----------------------------------------------------------------------------
 // Tauri Commands
 // ----------------------------------------------------------------------------
@@ -319,6 +474,12 @@ pub mod commands {
             return Err("URL cannot be empty".to_string());
         }
 
+        let max_conn = state
+            .settings
+            .read()
+            .map(|s| s.max_connections_per_task)
+            .unwrap_or(4);
+
         if force != Some(true) {
             let records = state
                 .engine
@@ -329,12 +490,14 @@ pub mod commands {
                 let stats = stats_guard
                     .as_ref()
                     .and_then(|m| m.get(&existing_rec.id).copied());
-                let parts = task_parts_count(&state.engine, existing_rec.id);
-                let view = TaskView::from_record(
+                let parts = get_cached_parts(&state.engine, &state.parts_cache, existing_rec.id);
+                let connections = estimate_connections(existing_rec.state, parts, max_conn);
+                let view = TaskView::from_record_full(
                     existing_rec,
                     stats.map(|s| s.speed_bps),
                     stats.and_then(|s| s.eta_secs),
                     parts,
+                    connections,
                 );
                 return Ok(AddTaskOutcome::Duplicate { existing: view });
             }
@@ -348,7 +511,8 @@ pub mod commands {
 
         // Auto-start the newly added task
         state.engine.spawn_start(task_id);
-        update_sleep_inhibition(&state.engine, &state.settings, &state.sleep_inhibitor);
+        let active = state.active_count.fetch_add(1, Ordering::Relaxed) + 1;
+        update_sleep_inhibition_with_count(&state.settings, &state.sleep_inhibitor, active);
 
         let record = state
             .engine
@@ -356,10 +520,11 @@ pub mod commands {
             .map_err(|e| format!("Storage read failed: {e}"))?
             .ok_or_else(|| "Task record not found after insert".to_string())?;
 
-        let parts = task_parts_count(&state.engine, task_id);
+        let parts = get_cached_parts(&state.engine, &state.parts_cache, task_id);
+        let connections = estimate_connections(record.state, parts, max_conn);
 
         Ok(AddTaskOutcome::Added {
-            task: TaskView::from_record(&record, None, None, parts),
+            task: TaskView::from_record_full(&record, None, None, parts, connections),
         })
     }
 
@@ -370,7 +535,8 @@ pub mod commands {
             .map_err(|e| format!("Invalid task ID: {e}"))?;
 
         state.engine.spawn_start(task_id);
-        update_sleep_inhibition(&state.engine, &state.settings, &state.sleep_inhibitor);
+        let active = state.active_count.load(Ordering::Relaxed);
+        update_sleep_inhibition_with_count(&state.settings, &state.sleep_inhibitor, active);
         Ok(())
     }
 
@@ -389,7 +555,8 @@ pub mod commands {
         if let Ok(mut stats) = state.live_stats.lock() {
             stats.remove(&task_id);
         }
-        update_sleep_inhibition(&state.engine, &state.settings, &state.sleep_inhibitor);
+        let active = state.active_count.load(Ordering::Relaxed);
+        update_sleep_inhibition_with_count(&state.settings, &state.sleep_inhibitor, active);
 
         Ok(())
     }
@@ -409,34 +576,49 @@ pub mod commands {
         if let Ok(mut stats) = state.live_stats.lock() {
             stats.remove(&task_id);
         }
-        update_sleep_inhibition(&state.engine, &state.settings, &state.sleep_inhibitor);
+        let active = state.active_count.load(Ordering::Relaxed);
+        update_sleep_inhibition_with_count(&state.settings, &state.sleep_inhibitor, active);
 
         Ok(())
     }
 
     #[tauri::command]
     pub async fn list_tasks(state: State<'_, AppState>) -> Result<Vec<TaskView>, String> {
-        let records = state
-            .engine
-            .list_tasks()
-            .map_err(|e| format!("Failed to list tasks: {e}"))?;
+        let engine = state.engine.clone();
+        let live_stats = Arc::clone(&state.live_stats);
+        let parts_cache = Arc::clone(&state.parts_cache);
+        let max_conn = state
+            .settings
+            .read()
+            .map(|s| s.max_connections_per_task)
+            .unwrap_or(4);
 
-        let stats_guard = state.live_stats.lock().ok();
-        let views = records
-            .into_iter()
-            .map(|rec| {
-                let stats = stats_guard.as_ref().and_then(|m| m.get(&rec.id).copied());
-                let parts = task_parts_count(&state.engine, rec.id);
-                TaskView::from_record(
-                    &rec,
-                    stats.map(|s| s.speed_bps),
-                    stats.and_then(|s| s.eta_secs),
-                    parts,
-                )
-            })
-            .collect();
+        tauri::async_runtime::spawn_blocking(move || {
+            let records = engine
+                .list_tasks()
+                .map_err(|e| format!("Failed to list tasks: {e}"))?;
 
-        Ok(views)
+            let stats_guard = live_stats.lock().ok();
+            let views = records
+                .into_iter()
+                .map(|rec| {
+                    let stats = stats_guard.as_ref().and_then(|m| m.get(&rec.id).copied());
+                    let parts = get_cached_parts(&engine, &parts_cache, rec.id);
+                    let connections = estimate_connections(rec.state, parts, max_conn);
+                    TaskView::from_record_full(
+                        &rec,
+                        stats.map(|s| s.speed_bps),
+                        stats.and_then(|s| s.eta_secs),
+                        parts,
+                        connections,
+                    )
+                })
+                .collect();
+
+            Ok(views)
+        })
+        .await
+        .map_err(|e| format!("Join error in list_tasks: {e}"))?
     }
 
     #[tauri::command]
@@ -455,6 +637,15 @@ pub mod commands {
     ) -> Result<Settings, String> {
         validate_settings(&settings)?;
 
+        let prev_run_at_startup = state
+            .settings
+            .read()
+            .map(|s| s.run_at_startup)
+            .unwrap_or(false);
+        if prev_run_at_startup != settings.run_at_startup {
+            let _ = autostart::set_autostart(settings.run_at_startup);
+        }
+
         {
             let mut w = state
                 .settings
@@ -468,7 +659,8 @@ pub mod commands {
             let _ = std::fs::write(&state.settings_path, json);
         }
 
-        update_sleep_inhibition(&state.engine, &state.settings, &state.sleep_inhibitor);
+        let active = state.active_count.load(Ordering::Relaxed);
+        update_sleep_inhibition_with_count(&state.settings, &state.sleep_inhibitor, active);
 
         Ok(settings)
     }
@@ -586,6 +778,12 @@ pub mod commands {
     pub fn get_shutdown_status(state: State<'_, AppState>) -> Result<ShutdownStatus, String> {
         Ok(state.shutdown_controller.status())
     }
+
+    #[tauri::command]
+    pub fn report_frontend_perf(payload: perf::FrontendPerf) -> Result<(), String> {
+        perf::log_frontend_perf(&payload);
+        Ok(())
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -595,6 +793,8 @@ pub mod commands {
 pub fn run() {
     let data_dir = default_data_dir();
     let _ = std::fs::create_dir_all(&data_dir);
+    perf::init(&data_dir);
+    perf::log_event("process_start");
 
     let settings_path = data_dir.join("settings.json");
     let initial_settings = if settings_path.exists() {
@@ -617,7 +817,10 @@ pub fn run() {
     };
 
     let engine = match Engine::new(&download_dir, &store_dir, engine_config) {
-        Ok(e) => e,
+        Ok(e) => {
+            perf::log_event("engine_init");
+            e
+        }
         Err(e) => {
             eprintln!("Failed to initialize download engine: {e}");
             panic!("Failed to initialize download engine: {e}");
@@ -658,6 +861,7 @@ pub fn run() {
 
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             commands::add_task,
@@ -672,95 +876,309 @@ pub fn run() {
             commands::open_task_file,
             commands::arm_shutdown,
             commands::cancel_shutdown,
-            commands::get_shutdown_status
+            commands::get_shutdown_status,
+            commands::report_frontend_perf
         ])
+        .on_page_load(move |_webview, payload| {
+            if payload.event() == tauri::webview::PageLoadEvent::Finished {
+                static ONCE: OnceLock<()> = OnceLock::new();
+                if ONCE.set(()).is_ok() {
+                    perf::log_event("window_shown");
+                }
+            }
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let app = window.app_handle();
+                if let Some(state) = app.try_state::<AppState>() {
+                    let (close_action, close_notice_shown, language) = {
+                        let s = state.settings.read().unwrap();
+                        (
+                            s.close_action.clone(),
+                            s.close_notice_shown,
+                            s.language.clone(),
+                        )
+                    };
+
+                    if close_action == "background" {
+                        api.prevent_close();
+                        let _ = window.hide();
+
+                        if !close_notice_shown {
+                            let (title, body) = if language == "en" {
+                                (
+                                    "SAYL is running in the background",
+                                    "SAYL will continue downloading your files in the system tray.",
+                                )
+                            } else {
+                                (
+                                    "سيل يعمل في الخلفية",
+                                    "سيستمر سيل في تنزيل ملفاتك في منطقة الإشعار.",
+                                )
+                            };
+
+                            use tauri_plugin_notification::NotificationExt;
+                            let _ = app.notification().builder().title(title).body(body).show();
+
+                            if let Ok(mut w) = state.settings.write() {
+                                w.close_notice_shown = true;
+                                if let Ok(json) = serde_json::to_string_pretty(&*w) {
+                                    let _ = std::fs::write(&state.settings_path, json);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
         .setup(move |app| {
+            perf::log_event("setup_done");
             let _ = app_handle_slot.set(app.handle().clone());
+
+            // Setup system tray icon and menu
+            let tray_handle = tray::setup_tray(app.handle()).ok();
+
+            // Handle --hidden startup argument
+            if autostart::is_hidden_arg(std::env::args()) {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+            }
+
             let state = app.state::<AppState>();
             let engine = state.engine.clone();
             let live_stats = Arc::clone(&state.live_stats);
+            let parts_cache = Arc::clone(&state.parts_cache);
+            let active_count_atomic = Arc::clone(&state.active_count);
             let app_handle = app.handle().clone();
             let sleep_inhibitor = Arc::clone(&state.sleep_inhibitor);
 
             tauri::async_runtime::spawn(async move {
                 // Recover non-terminal tasks from durable storage
-                match engine.recover().await {
-                    Ok(recovered) => {
-                        println!(
-                            "Engine recovery completed: {} tasks recovered",
-                            recovered.len()
-                        );
-                    }
-                    Err(err) => {
-                        eprintln!("Engine recovery error: {err}");
-                    }
-                }
+                let recovered = engine.recover().await.unwrap_or_default();
+                println!(
+                    "Engine recovery completed: {} tasks recovered",
+                    recovered.len()
+                );
 
-                // Initial sync for sleep inhibition after recovery
+                // Build initial parts cache and initial task views in background
+                let initial_views = {
+                    let eng = engine.clone();
+                    let pc = Arc::clone(&parts_cache);
+                    let max_c = app_handle
+                        .try_state::<AppState>()
+                        .and_then(|s| {
+                            s.settings
+                                .read()
+                                .ok()
+                                .map(|st| st.max_connections_per_task)
+                        })
+                        .unwrap_or(4);
+                    tauri::async_runtime::spawn_blocking(move || {
+                        let records = eng.list_tasks().unwrap_or_default();
+                        let mut active = 0;
+                        let views: Vec<TaskView> = records
+                            .into_iter()
+                            .map(|rec| {
+                                if is_active_state(rec.state) {
+                                    active += 1;
+                                }
+                                let parts = get_cached_parts(&eng, &pc, rec.id);
+                                let connections = estimate_connections(rec.state, parts, max_c);
+                                TaskView::from_record_full(&rec, None, None, parts, connections)
+                            })
+                            .collect();
+                        (views, active)
+                    })
+                    .await
+                    .unwrap_or_default()
+                };
+
+                let (initial_task_views, initial_active) = initial_views;
+                active_count_atomic.store(initial_active, Ordering::SeqCst);
+
                 if let Some(app_state) = app_handle.try_state::<AppState>() {
-                    update_sleep_inhibition(&engine, &app_state.settings, &sleep_inhibitor);
+                    update_sleep_inhibition_with_count(
+                        &app_state.settings,
+                        &sleep_inhibitor,
+                        initial_active,
+                    );
                 }
 
-                // Event forwarding pump
-                if let Some(mut rx) = engine.take_event_receiver() {
-                    while let Some(event) = rx.recv().await {
-                        let task_id = event.task_id;
+                // Initial full emission on startup/recovery completion
+                let mut revision: u64 = 1;
+                let initial_batch = TasksChangedPayload {
+                    revision,
+                    full: true,
+                    upsert: initial_task_views,
+                    removed: Vec::new(),
+                };
+                let _ = app_handle.emit("sayl://tasks-changed", &initial_batch);
 
-                        match &event.payload {
-                            sayl_core::event::EventPayload::Progress {
-                                downloaded_bytes,
-                                total_bytes,
-                                speed_bps,
-                            } => {
-                                let eta = if *speed_bps > 0 {
-                                    total_bytes.and_then(|tot| {
-                                        if tot > *downloaded_bytes {
-                                            Some((tot - *downloaded_bytes) / *speed_bps)
-                                        } else {
-                                            None
-                                        }
-                                    })
-                                } else {
-                                    None
-                                };
+                // Event coalescing pump: 250ms ticker
+                let mut rx = match engine.take_event_receiver() {
+                    Some(r) => r,
+                    None => return,
+                };
 
-                                if let Ok(mut stats) = live_stats.lock() {
-                                    stats.insert(
-                                        task_id,
-                                        LiveTaskStats {
-                                            speed_bps: *speed_bps,
-                                            eta_secs: eta,
-                                        },
-                                    );
-                                }
+                let mut ticker = tokio::time::interval(std::time::Duration::from_millis(250));
+                ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
-                                let progress = ProgressPayload {
-                                    id: task_id.to_string(),
-                                    written: *downloaded_bytes,
-                                    total: *total_bytes,
-                                    speed_bps: *speed_bps,
-                                };
-                                let _ = app_handle.emit("sayl://progress", &progress);
-                            }
-                            sayl_core::event::EventPayload::StateChanged { to, .. } => {
-                                if to.is_terminal() || *to == DownloadState::Paused {
+                let mut pending_upsert_ids: std::collections::HashSet<TaskId> =
+                    std::collections::HashSet::new();
+                let mut pending_removed_ids: std::collections::HashSet<String> =
+                    std::collections::HashSet::new();
+                let mut ticker_counter: u32 = 0;
+
+                loop {
+                    tokio::select! {
+                        event_opt = rx.recv() => {
+                            let event = match event_opt {
+                                Some(e) => e,
+                                None => break,
+                            };
+                            let task_id = event.task_id;
+
+                            match &event.payload {
+                                sayl_core::event::EventPayload::Progress {
+                                    downloaded_bytes,
+                                    total_bytes,
+                                    speed_bps,
+                                } => {
+                                    let eta = if *speed_bps > 0 {
+                                        total_bytes.and_then(|tot| {
+                                            if tot > *downloaded_bytes {
+                                                Some((tot - *downloaded_bytes) / *speed_bps)
+                                            } else {
+                                                None
+                                            }
+                                        })
+                                    } else {
+                                        None
+                                    };
+
                                     if let Ok(mut stats) = live_stats.lock() {
-                                        stats.remove(&task_id);
+                                        stats.insert(
+                                            task_id,
+                                            LiveTaskStats {
+                                                speed_bps: *speed_bps,
+                                                eta_secs: eta,
+                                            },
+                                        );
                                     }
+
+                                    let progress = ProgressPayload {
+                                        id: task_id.to_string(),
+                                        written: *downloaded_bytes,
+                                        total: *total_bytes,
+                                        speed_bps: *speed_bps,
+                                    };
+                                    let _ = app_handle.emit("sayl://progress", &progress);
                                 }
-                                if let Some(app_state) = app_handle.try_state::<AppState>() {
-                                    update_sleep_inhibition(
-                                        &engine,
-                                        &app_state.settings,
-                                        &sleep_inhibitor,
-                                    );
+                                sayl_core::event::EventPayload::StateChanged { to, .. } => {
+                                    if to.is_terminal() || *to == DownloadState::Paused {
+                                        if let Ok(mut stats) = live_stats.lock() {
+                                            stats.remove(&task_id);
+                                        }
+                                    }
+                                    // Update active count & sleep inhibition
+                                    if let Some(app_state) = app_handle.try_state::<AppState>() {
+                                        let current_active = if let Ok(tasks) = engine.list_tasks() {
+                                            tasks.into_iter().filter(|t| is_active_state(t.state)).count()
+                                        } else {
+                                            0
+                                        };
+                                        active_count_atomic.store(current_active, Ordering::Relaxed);
+                                        update_sleep_inhibition_with_count(
+                                            &app_state.settings,
+                                            &sleep_inhibitor,
+                                            current_active,
+                                        );
+                                    }
+                                    pending_upsert_ids.insert(task_id);
+                                }
+                                sayl_core::event::EventPayload::Split { .. }
+                                | sayl_core::event::EventPayload::Checkpoint { .. } => {
+                                    // Invalidate parts cache entry so it recalculates on next access
+                                    if let Ok(mut cache) = parts_cache.write() {
+                                        cache.remove(&task_id);
+                                    }
+                                    pending_upsert_ids.insert(task_id);
+                                }
+                                _ => {
+                                    pending_upsert_ids.insert(task_id);
                                 }
                             }
-                            _ => {}
                         }
+                        _ = ticker.tick() => {
+                            ticker_counter = ticker_counter.wrapping_add(1);
 
-                        // Emit general task event
-                        let _ = app_handle.emit("sayl://task", &event);
+                            // Update tray tooltip ~1/s (every 4 ticks of 250ms)
+                            if ticker_counter.is_multiple_of(4) {
+                                if let Some(ref tray) = tray_handle {
+                                    let total_speed: u64 = live_stats
+                                        .lock()
+                                        .map(|s| s.values().map(|v| v.speed_bps).sum())
+                                        .unwrap_or(0);
+                                    let active = active_count_atomic.load(Ordering::Relaxed);
+                                    let lang = app_handle
+                                        .try_state::<AppState>()
+                                        .and_then(|s| s.settings.read().ok().map(|st| st.language.clone()))
+                                        .unwrap_or_else(|| "ar".to_string());
+                                    let tooltip = tray::format_tooltip(&lang, total_speed, active);
+                                    let _ = tray.set_tooltip(Some(tooltip));
+                                }
+                            }
+
+                            // Flush pending changes if any
+                            if !pending_upsert_ids.is_empty() || !pending_removed_ids.is_empty() {
+                                let upsert_ids: Vec<TaskId> = pending_upsert_ids.drain().collect();
+                                let removed_ids: Vec<String> = pending_removed_ids.drain().collect();
+
+                                revision += 1;
+                                let eng = engine.clone();
+                                let stats_arc = Arc::clone(&live_stats);
+                                let pc = Arc::clone(&parts_cache);
+                                let max_c = app_handle
+                                    .try_state::<AppState>()
+                                    .and_then(|s| s.settings.read().ok().map(|st| st.max_connections_per_task))
+                                    .unwrap_or(4);
+
+                                let batch = tauri::async_runtime::spawn_blocking(move || {
+                                    let stats_guard = stats_arc.lock().ok();
+                                    build_tasks_changed_batch(
+                                        revision,
+                                        false,
+                                        &upsert_ids,
+                                        &removed_ids,
+                                        |id| {
+                                            eng.get_task(id).ok().flatten().map(|rec| {
+                                                let stats = stats_guard.as_ref().and_then(|m| m.get(&id).copied());
+                                                let parts = get_cached_parts(&eng, &pc, id);
+                                                let connections = estimate_connections(rec.state, parts, max_c);
+                                                TaskView::from_record_full(
+                                                    &rec,
+                                                    stats.map(|s| s.speed_bps),
+                                                    stats.and_then(|s| s.eta_secs),
+                                                    parts,
+                                                    connections,
+                                                )
+                                            })
+                                        },
+                                        Vec::new,
+                                    )
+                                })
+                                .await
+                                .unwrap_or_else(|_| TasksChangedPayload {
+                                    revision,
+                                    full: false,
+                                    upsert: Vec::new(),
+                                    removed: Vec::new(),
+                                });
+
+                                let _ = app_handle.emit("sayl://tasks-changed", &batch);
+                            }
+                        }
                     }
                 }
             });
@@ -773,8 +1191,13 @@ pub fn run() {
         Some(tauri::utils::config::AppDirectoriesOverride::Root(data_dir));
 
     builder
-        .run(context)
-        .expect("error while running SAYL desktop application");
+        .build(context)
+        .expect("error while building SAYL desktop application")
+        .run(|_app_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                perf::log_event("exit");
+            }
+        });
 }
 
 // ----------------------------------------------------------------------------
@@ -858,6 +1281,31 @@ mod tests {
     }
 
     #[test]
+    fn test_settings_validation_close_action() {
+        let background = Settings {
+            close_action: "background".to_string(),
+            ..Settings::default()
+        };
+        assert!(validate_settings(&background).is_ok());
+
+        let quit = Settings {
+            close_action: "quit".to_string(),
+            ..Settings::default()
+        };
+        assert!(validate_settings(&quit).is_ok());
+
+        let minimize = Settings {
+            close_action: "minimize".to_string(),
+            ..Settings::default()
+        };
+        assert!(validate_settings(&minimize).is_err());
+        assert_eq!(
+            validate_settings(&minimize).unwrap_err(),
+            "Close action must be background or quit"
+        );
+    }
+
+    #[test]
     fn test_settings_backward_compat_and_serialized_keys() {
         let old_json = r#"{
             "download_dir": "C:\\Downloads",
@@ -873,15 +1321,18 @@ mod tests {
         assert_eq!(settings.max_connections_per_task, 4);
         assert_eq!(settings.theme, "dark");
         assert_eq!(settings.language, "en");
-        assert_eq!(settings.view_mode, "cards");
+        assert_eq!(settings.view_mode, "table");
         assert!(!settings.sidebar_collapsed);
         assert!(settings.prevent_sleep);
         assert!(settings.show_download_window);
         assert!(!settings.close_download_window_on_finish);
+        assert_eq!(settings.close_action, "background");
+        assert!(!settings.run_at_startup);
+        assert!(!settings.close_notice_shown);
 
         let val: serde_json::Value = serde_json::to_value(&settings).expect("serializes");
         let obj = val.as_object().expect("object");
-        assert_eq!(obj.len(), 10);
+        assert_eq!(obj.len(), 13);
         let expected_keys = [
             "download_dir",
             "max_concurrent_tasks",
@@ -893,10 +1344,153 @@ mod tests {
             "prevent_sleep",
             "show_download_window",
             "close_download_window_on_finish",
+            "close_action",
+            "run_at_startup",
+            "close_notice_shown",
         ];
         for key in expected_keys {
             assert!(obj.contains_key(key), "missing key: {key}");
         }
+    }
+
+    #[test]
+    fn test_build_tasks_changed_batch_coalescing() {
+        let id1 = TaskId::new();
+        let id2 = TaskId::new();
+
+        // 1. Full batch
+        let full_batch = build_tasks_changed_batch(
+            1,
+            true,
+            &[id1, id1],
+            &["rem1".to_string()],
+            |_| None,
+            || {
+                vec![TaskView {
+                    id: id1.to_string(),
+                    url: "https://example.com/1".to_string(),
+                    filename: "1.zip".to_string(),
+                    state: "Downloading".to_string(),
+                    total_size: None,
+                    written: 0,
+                    speed_bps: None,
+                    eta_secs: None,
+                    error: None,
+                    mime: None,
+                    parts: None,
+                    error_kind: None,
+                    connections: None,
+                    created_at: None,
+                    completed_at: None,
+                }]
+            },
+        );
+        assert_eq!(full_batch.revision, 1);
+        assert!(full_batch.full);
+        assert_eq!(full_batch.upsert.len(), 1);
+        assert_eq!(full_batch.removed.len(), 0);
+
+        // 2. Incremental batch with duplicate task ids and duplicate removed ids
+        let inc_batch = build_tasks_changed_batch(
+            2,
+            false,
+            &[id1, id2, id1],
+            &["rem1".to_string(), "rem1".to_string(), "rem2".to_string()],
+            |id| {
+                Some(TaskView {
+                    id: id.to_string(),
+                    url: "https://example.com/file".to_string(),
+                    filename: "file.bin".to_string(),
+                    state: "Completed".to_string(),
+                    total_size: None,
+                    written: 100,
+                    speed_bps: None,
+                    eta_secs: None,
+                    error: None,
+                    mime: None,
+                    parts: None,
+                    error_kind: None,
+                    connections: None,
+                    created_at: None,
+                    completed_at: None,
+                })
+            },
+            Vec::new,
+        );
+        assert_eq!(inc_batch.revision, 2);
+        assert!(!inc_batch.full);
+        assert_eq!(inc_batch.upsert.len(), 2);
+        assert_eq!(inc_batch.removed.len(), 2);
+        assert_eq!(
+            inc_batch.removed,
+            vec!["rem1".to_string(), "rem2".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_estimate_connections() {
+        // Downloading with parts and cap
+        assert_eq!(
+            estimate_connections(DownloadState::Downloading, Some(8), 4),
+            Some(4)
+        );
+        assert_eq!(
+            estimate_connections(DownloadState::Downloading, Some(2), 4),
+            Some(2)
+        );
+        assert_eq!(
+            estimate_connections(DownloadState::Downloading, None, 4),
+            Some(1)
+        );
+
+        // Probing
+        assert_eq!(
+            estimate_connections(DownloadState::Probing, None, 4),
+            Some(1)
+        );
+
+        // Inactive states
+        assert_eq!(
+            estimate_connections(DownloadState::Queued, Some(4), 4),
+            None
+        );
+        assert_eq!(
+            estimate_connections(DownloadState::Paused, Some(4), 4),
+            None
+        );
+        assert_eq!(
+            estimate_connections(DownloadState::Completed, Some(4), 4),
+            None
+        );
+        assert_eq!(
+            estimate_connections(DownloadState::Cancelled, Some(4), 4),
+            None
+        );
+        assert_eq!(
+            estimate_connections(DownloadState::Failed, Some(4), 4),
+            None
+        );
+    }
+
+    #[test]
+    fn test_task_view_rfc3339_and_completed_at() {
+        let mut rec = TaskRecord::new(
+            "https://example.com/test.iso",
+            PathBuf::from("C:\\Downloads"),
+            "test.iso",
+        );
+        rec.state = DownloadState::Completed;
+
+        let view = TaskView::from_record_full(&rec, None, None, Some(4), None);
+        assert!(view.created_at.is_some());
+        assert!(view.completed_at.is_some());
+        assert_eq!(view.completed_at, Some(rec.updated_at.to_rfc3339()));
+
+        rec.state = DownloadState::Downloading;
+        let running_view = TaskView::from_record_full(&rec, None, None, Some(4), Some(4));
+        assert!(running_view.created_at.is_some());
+        assert_eq!(running_view.completed_at, None);
+        assert_eq!(running_view.connections, Some(4));
     }
 
     #[test]
