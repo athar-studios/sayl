@@ -1,0 +1,9 @@
+{
+  "name": "com.sayl.downloader",
+  "description": "SAYL native messaging host",
+  "path": "C:\\REPLACE_WITH_INSTALL_DIR\\host\\sayl-bridge.exe",
+  "type": "stdio",
+  "allowed_extensions": [
+    "sayl@atharstudios.com"
+  ]
+}

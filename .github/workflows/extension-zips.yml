@@ -1,0 +1,90 @@
+name: Browser Extension ZIPs
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+jobs:
+  build-and-package:
+    name: Build Extension ZIPs
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build and validate browser extension packages
+        run: pwsh -NoProfile -File tools/build-browser-extensions.ps1
+        shell: pwsh
+
+      - name: Validate ZIP contents
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+          $artifacts = @(
+            @{
+              Name = "Chromium"
+              Path = "extensions/browser/dist/sayl-chromium-0.1.0.zip"
+            },
+            @{
+              Name = "Firefox"
+              Path = "extensions/browser/dist/sayl-firefox-0.1.0.zip"
+            }
+          )
+
+          foreach ($art in $artifacts) {
+            $zipPath = $art.Path
+            Write-Host "Validating $($art.Name) package: $zipPath"
+
+            if (-not (Test-Path -LiteralPath $zipPath)) {
+              Write-Error "Artifact not found: $zipPath"
+              exit 1
+            }
+
+            $zip = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $zipPath).Path)
+            try {
+              $entries = $zip.Entries
+              if ($entries.Count -eq 0) {
+                Write-Error "ZIP archive is empty: $zipPath"
+                exit 1
+              }
+
+              $hasManifest = $false
+              foreach ($entry in $entries) {
+                if ($entry.FullName -eq "manifest.json") {
+                  $hasManifest = $true
+                  break
+                }
+              }
+
+              if (-not $hasManifest) {
+                Write-Error "ZIP does not contain 'manifest.json' at root: $zipPath"
+                exit 1
+              }
+
+              Write-Host "  OK: $($entries.Count) entries, manifest.json at root."
+            } finally {
+              $zip.Dispose()
+            }
+          }
+        shell: pwsh
+
+      - name: Upload Chromium extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sayl-chromium-extension
+          path: extensions/browser/dist/sayl-chromium-0.1.0.zip
+          if-no-files-found: error
+
+      - name: Upload Firefox extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sayl-firefox-extension
+          path: extensions/browser/dist/sayl-firefox-0.1.0.zip
+          if-no-files-found: error
