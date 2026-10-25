@@ -179,6 +179,16 @@ header nav a.active {
 .hero-content {
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 2;
+  background: radial-gradient(ellipse 95% 75% at 20% 45%, rgba(7, 15, 46, 0.82) 0%, rgba(7, 15, 46, 0.40) 65%, rgba(7, 15, 46, 0) 100%);
+  padding: 24px;
+  margin: -24px;
+  border-radius: 28px;
+}
+
+html[dir="rtl"] .hero-content {
+  background: radial-gradient(ellipse 95% 75% at 80% 45%, rgba(7, 15, 46, 0.82) 0%, rgba(7, 15, 46, 0.40) 65%, rgba(7, 15, 46, 0) 100%);
 }
 
 .logo-anim {
@@ -201,14 +211,16 @@ header nav a.active {
   font-weight: 700;
   letter-spacing: -0.015em;
   color: #ffffff;
+  text-shadow: 0 2px 18px rgba(7, 15, 46, 0.95);
 }
 
 .hero p.lead {
   font-size: var(--fs-3);
-  color: #b9c8e6;
+  color: #c0d1f0;
   max-width: 36ch;
   margin: 0 0 32px;
   line-height: 1.6;
+  text-shadow: 0 1px 10px rgba(7, 15, 46, 0.9);
 }
 
 .cta {

@@ -76,7 +76,7 @@
       const r = Math.round(f.d * 125);
       const g = Math.round(155 + f.d * 90);
       const b = Math.round(190 + f.d * 65);
-      const alpha = 0.16 + f.d * 0.48;
+      const alpha = Math.min(0.35, 0.09 + f.d * 0.26);
 
       x.lineWidth = (1.0 + f.d * 1.8) * dpr;
       x.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
@@ -128,7 +128,7 @@
         const r = Math.round(f.d * 120);
         const g = Math.round(150 + f.d * 90);
         const b = Math.round(185 + f.d * 70);
-        const alpha = 0.10 + f.d * 0.32;
+        const alpha = Math.min(0.28, 0.06 + f.d * 0.20);
 
         x.lineWidth = (0.9 + f.d * 1.6) * dpr;
         x.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
