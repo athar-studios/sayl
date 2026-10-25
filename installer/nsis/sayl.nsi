@@ -36,12 +36,20 @@ RequestExecutionLevel user
 !include "MUI2.nsh"
 !include "FileFunc.nsh"
 !include "LogicLib.nsh"
+!include "WordFunc.nsh"
 
 !define MUI_ABORTWARNING
 ; SAYL brand icon for the installer/uninstaller windows (paths are relative to
 ; this script, like OutFile and BUILD_DIR above).
-!define MUI_ICON "..\..\assets\brand\icon.ico"
-!define MUI_UNICON "..\..\assets\brand\icon.ico"
+!define MUI_ICON "..\..\apps\desktop\src-tauri\icons\icon.ico"
+!define MUI_UNICON "..\..\apps\desktop\src-tauri\icons\icon.ico"
+
+; Modern UI Header and Sidebar branding images
+!define MUI_HEADERIMAGE
+!define MUI_HEADERIMAGE_BITMAP "..\..\apps\desktop\src-tauri\icons\nsis-header.bmp"
+!define MUI_HEADERIMAGE_UNBITMAP "..\..\apps\desktop\src-tauri\icons\nsis-header.bmp"
+!define MUI_WELCOMEFINISHPAGE_BITMAP "..\..\apps\desktop\src-tauri\icons\nsis-sidebar.bmp"
+!define MUI_UNWELCOMEFINISHPAGE_BITMAP "..\..\apps\desktop\src-tauri\icons\nsis-sidebar.bmp"
 
 ; Installer Pages
 !insertmacro MUI_PAGE_WELCOME
@@ -70,6 +78,41 @@ Section "SAYL Core (مطلوب / Required)" SecCore
   ; Application binary
   File /nonfatal "${BUILD_DIR}\${MAIN_EXE}"
   
+  ; Native messaging host and unpacked Chromium extension
+  SetOutPath "$INSTDIR\host"
+  File /nonfatal "${BUILD_DIR}\sayl-bridge.exe"
+  File /nonfatal "..\..\extensions\browser\host\com.sayl.downloader.json"
+  
+  SetOutPath "$INSTDIR\extensions\browser\chromium"
+  File /r /x ".*" "..\..\extensions\browser\chromium\*.*"
+
+  ; Register native messaging host
+  DetailPrint "Configuring SAYL native messaging host..."
+  ${If} ${FileExists} "$INSTDIR\host\sayl-bridge.exe"
+    nsExec::ExecToLog '"$INSTDIR\host\sayl-bridge.exe" --register-host --extension-id ipfenakpblanjjiboejfobkjhegnciif'
+  ${EndIf}
+
+  ${If} ${FileExists} "$INSTDIR\host"
+    ${WordReplace} "$INSTDIR\host\sayl-bridge.exe" "\" "\\" "+" $1
+    ClearErrors
+    FileOpen $0 "$INSTDIR\host\com.sayl.downloader.json" w
+    ${Unless} ${Errors}
+      FileWrite $0 "{\r$\n"
+      FileWrite $0 '  "name": "com.sayl.downloader",$\r$\n'
+      FileWrite $0 '  "description": "SAYL native messaging host",$\r$\n'
+      FileWrite $0 '  "path": "$1",$\r$\n'
+      FileWrite $0 '  "type": "stdio",$\r$\n'
+      FileWrite $0 '  "allowed_origins": [$\r$\n'
+      FileWrite $0 '    "chrome-extension://ipfenakpblanjjiboejfobkjhegnciif/"$\r$\n'
+      FileWrite $0 "  ]$\r$\n"
+      FileWrite $0 "}$\r$\n"
+      FileClose $0
+    ${EndUnless}
+  ${EndIf}
+
+  WriteRegStr HKCU "Software\Google\Chrome\NativeMessagingHosts\com.sayl.downloader" "" "$INSTDIR\host\com.sayl.downloader.json"
+  WriteRegStr HKCU "Software\Microsoft\Edge\NativeMessagingHosts\com.sayl.downloader" "" "$INSTDIR\host\com.sayl.downloader.json"
+
   ; Write uninstaller
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   
@@ -134,9 +177,21 @@ Section "Uninstall"
   Delete "$SMPROGRAMS\SAYL\Uninstall.lnk"
   RMDir "$SMPROGRAMS\SAYL"
   
+  ; Native messaging unregistration
+  ${If} ${FileExists} "$INSTDIR\host\sayl-bridge.exe"
+    nsExec::ExecToLog '"$INSTDIR\host\sayl-bridge.exe" --unregister-host'
+  ${EndIf}
+  DeleteRegKey HKCU "Software\Google\Chrome\NativeMessagingHosts\com.sayl.downloader"
+  DeleteRegKey HKCU "Software\Microsoft\Edge\NativeMessagingHosts\com.sayl.downloader"
+  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "SAYL"
+
   ; Remove only installed application files
   Delete "$INSTDIR\${MAIN_EXE}"
   Delete "$INSTDIR\Uninstall.exe"
+  Delete "$INSTDIR\host\com.sayl.downloader.json"
+  Delete "$INSTDIR\host\sayl-bridge.exe"
+  RMDir "$INSTDIR\host"
+  RMDir /r "$INSTDIR\extensions"
   
   ; Remove install directory only if empty
   RMDir "$INSTDIR"

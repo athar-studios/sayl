@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param (
     [Parameter(Mandatory = $false)]
     [string]$Version,
@@ -133,10 +133,67 @@ if (-not $SkipFrontend) {
 }
 
 # ------------------------------------------------------------------------------
+# 3.5. Build Native Bridge & Stage Bundle Resources
+# ------------------------------------------------------------------------------
+Write-Host "`n[الخطوة 3 / Step 3] بناء جسر المتصفح وتجهيز الموارد / Building Native Bridge & Staging Resources..." -ForegroundColor Yellow
+$CargoBridgeCmd = "cargo build --release -p sayl-bridge"
+$StageDir = Join-Path $DesktopDir "src-tauri\resources"
+$HostStageDir = Join-Path $StageDir "host"
+$ExtStageDir = Join-Path $StageDir "extensions\browser\chromium"
+
+if ($DryRun) {
+    Write-Host "[DRY-RUN] Working directory: $RepoRoot" -ForegroundColor Cyan
+    Write-Host "[DRY-RUN] Command: $CargoBridgeCmd | ExitCode: 0" -ForegroundColor DarkGray
+    Write-Host "[DRY-RUN] Staging layout: $StageDir" -ForegroundColor Cyan
+    Write-Host "[DRY-RUN]   - host/sayl-bridge.exe"
+    Write-Host "[DRY-RUN]   - host/com.sayl.downloader.json"
+    Write-Host "[DRY-RUN]   - host/icon.ico"
+    Write-Host "[DRY-RUN]   - extensions/browser/chromium/**"
+} else {
+    Push-Location $RepoRoot
+    try {
+        Write-Host "Executing: $CargoBridgeCmd"
+        & cmd.exe /c "cargo build --release -p sayl-bridge"
+        $code = $LASTEXITCODE
+        Write-Host "Command: $CargoBridgeCmd | ExitCode: $code" -ForegroundColor DarkGray
+        if ($code -ne 0) { throw "cargo build sayl-bridge failed with exit code $code" }
+
+        $BuiltBridgePath = Join-Path $RepoRoot "target\release\sayl-bridge.exe"
+        if (-not (Test-Path -LiteralPath $BuiltBridgePath)) {
+            throw "Built sayl-bridge binary missing at: $BuiltBridgePath"
+        }
+
+        # Stage files for Tauri bundle resources
+        if (-not (Test-Path -LiteralPath $HostStageDir)) {
+            New-Item -ItemType Directory -Path $HostStageDir -Force | Out-Null
+        }
+        if (-not (Test-Path -LiteralPath $ExtStageDir)) {
+            New-Item -ItemType Directory -Path $ExtStageDir -Force | Out-Null
+        }
+
+        Copy-Item -LiteralPath $BuiltBridgePath -Destination (Join-Path $HostStageDir "sayl-bridge.exe") -Force
+        Copy-Item -LiteralPath (Join-Path $RepoRoot "extensions\browser\host\com.sayl.downloader.json") -Destination (Join-Path $HostStageDir "com.sayl.downloader.json") -Force
+        Copy-Item -LiteralPath (Join-Path $RepoRoot "assets\brand\icon.ico") -Destination (Join-Path $HostStageDir "icon.ico") -Force
+        Copy-Item -Path (Join-Path $RepoRoot "extensions\browser\chromium\*") -Destination $ExtStageDir -Recurse -Force
+
+        # Stage release configuration overlay for Tauri CLI
+        $DesktopInstallerDir = Join-Path $DesktopDir "installer"
+        if (-not (Test-Path -LiteralPath $DesktopInstallerDir)) {
+            New-Item -ItemType Directory -Path $DesktopInstallerDir -Force | Out-Null
+        }
+        Copy-Item -LiteralPath (Join-Path $RepoRoot "installer\tauri.bundle-resources.json") -Destination (Join-Path $DesktopInstallerDir "tauri.bundle-resources.json") -Force
+
+        Write-Host "[نجاح / PASS] تم تجهيز موارد الحزمة بنجاح داخل $StageDir" -ForegroundColor Green
+    } finally {
+        Pop-Location
+    }
+}
+
+# ------------------------------------------------------------------------------
 # 4. Build Tauri Release Binary & Packages
 # ------------------------------------------------------------------------------
-Write-Host "`n[الخطوة 3 / Step 3] بناء حزمة Tauri الإنتاجية / Building Tauri Production Release..." -ForegroundColor Yellow
-$TauriBuildCmd = "npm run tauri -- build"
+Write-Host "`n[الخطوة 4 / Step 4] بناء حزمة Tauri الإنتاجية / Building Tauri Production Release..." -ForegroundColor Yellow
+$TauriBuildCmd = "npm run tauri -- build --config installer/tauri.bundle-resources.json"
 
 if ($DryRun) {
     Write-Host "[DRY-RUN] Working directory: $DesktopDir" -ForegroundColor Cyan
@@ -144,8 +201,25 @@ if ($DryRun) {
 } else {
     Push-Location $DesktopDir
     try {
-        Write-Host "Executing: $TauriBuildCmd"
-        & cmd.exe /c "npm run tauri -- build"
+        # Guard: Validate overlay and staged resources exist before invoking Tauri build
+        $DesktopOverlayPath = Join-Path $DesktopDir "installer\tauri.bundle-resources.json"
+        if (-not (Test-Path -LiteralPath $DesktopOverlayPath)) {
+            throw "Release configuration overlay missing at: $DesktopOverlayPath"
+        }
+
+        $RequiredStagedFiles = @(
+            (Join-Path $DesktopDir "src-tauri\resources\host\sayl-bridge.exe"),
+            (Join-Path $DesktopDir "src-tauri\resources\host\com.sayl.downloader.json"),
+            (Join-Path $DesktopDir "src-tauri\resources\extensions\browser\chromium")
+        )
+        foreach ($staged in $RequiredStagedFiles) {
+            if (-not (Test-Path -LiteralPath $staged)) {
+                throw "Required staged release resource missing before Tauri build: $staged"
+            }
+        }
+
+        Write-Host "Executing: $TauriBuildCmd in $DesktopDir"
+        & cmd.exe /c $TauriBuildCmd
         $code = $LASTEXITCODE
         Write-Host "Command: $TauriBuildCmd | ExitCode: $code" -ForegroundColor DarkGray
         if ($code -ne 0) { throw "Tauri build failed with exit code $code" }
@@ -166,7 +240,7 @@ $TargetMsiPath = Join-Path $ReleasesDir $ExpectedMsiName
 $TargetZipPath = Join-Path $ReleasesDir $ExpectedZipName
 $Sha256SumsPath = Join-Path $ReleasesDir "SHA256SUMS.txt"
 
-Write-Host "`n[الخطوة 4 / Step 4] تجميع وتسمية مخرجات الإصدار / Assembling Release Artefacts..." -ForegroundColor Yellow
+Write-Host "`n[الخطوة 5 / Step 5] تجميع وتسمية مخرجات الإصدار / Assembling Release Artefacts..." -ForegroundColor Yellow
 
 if ($DryRun) {
     Write-Host "[DRY-RUN] Target folder: $ReleasesDir" -ForegroundColor Cyan
@@ -229,7 +303,7 @@ if ($DryRun) {
 # ------------------------------------------------------------------------------
 # 6. Produce Source Archive via git archive
 # ------------------------------------------------------------------------------
-Write-Host "`n[الخطوة 5 / Step 5] إنشاء أرشيف كود المصدر / Generating Source Archive..." -ForegroundColor Yellow
+Write-Host "`n[الخطوة 6 / Step 6] إنشاء أرشيف كود المصدر / Generating Source Archive..." -ForegroundColor Yellow
 $GitArchiveCmd = "git archive --format=zip --prefix=SAYL-$Version/ -o releases/$ExpectedZipName HEAD"
 
 if ($DryRun) {
@@ -249,7 +323,7 @@ if ($DryRun) {
 # ------------------------------------------------------------------------------
 # 7. Generate SHA256SUMS.txt
 # ------------------------------------------------------------------------------
-Write-Host "`n[الخطوة 6 / Step 6] حساب التجزئات وكتابة SHA256SUMS.txt / Computing SHA256 Checksums..." -ForegroundColor Yellow
+Write-Host "`n[الخطوة 7 / Step 7] حساب التجزئات وكتابة SHA256SUMS.txt / Computing SHA256 Checksums..." -ForegroundColor Yellow
 
 if ($DryRun) {
     Write-Host "[DRY-RUN] Command: Generate-SHA256SUMS -> $Sha256SumsPath | ExitCode: 0" -ForegroundColor DarkGray

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="NativeHostRegistry" Guid="9B3A2C18-E782-4B65-98C3-72D6D3A08E2B">
+        <!-- Native messaging host registration for Google Chrome (HKCU) -->
+        <RegistryKey Root="HKCU" Key="Software\Google\Chrome\NativeMessagingHosts\com.sayl.downloader">
+          <RegistryValue Type="string" Value="[INSTALLDIR]host\com.sayl.downloader.json" KeyPath="yes" />
+        </RegistryKey>
+        <!-- Native messaging host registration for Microsoft Edge (HKCU) -->
+        <RegistryKey Root="HKCU" Key="Software\Microsoft\Edge\NativeMessagingHosts\com.sayl.downloader">
+          <RegistryValue Type="string" Value="[INSTALLDIR]host\com.sayl.downloader.json" />
+        </RegistryKey>
+      </Component>
+    </DirectoryRef>
+
+    <!-- Per-user CustomActions to invoke sayl-bridge to write the absolute manifest and register/unregister host -->
+    <CustomAction Id="RegisterNativeHost"
+                  Directory="INSTALLDIR"
+                  ExeCommand="&quot;[INSTALLDIR]host\sayl-bridge.exe&quot; --register-host --extension-id ipfenakpblanjjiboejfobkjhegnciif"
+                  Execute="deferred"
+                  Impersonate="yes"
+                  Return="ignore" />
+
+    <CustomAction Id="UnregisterNativeHost"
+                  Directory="INSTALLDIR"
+                  ExeCommand="&quot;[INSTALLDIR]host\sayl-bridge.exe&quot; --unregister-host"
+                  Execute="deferred"
+                  Impersonate="yes"
+                  Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="RegisterNativeHost" After="InstallFiles">NOT (REMOVE = "ALL")</Custom>
+      <Custom Action="UnregisterNativeHost" Before="RemoveFiles">REMOVE = "ALL"</Custom>
+    </InstallExecuteSequence>
+
+    <ComponentGroup Id="NativeHostComponents">
+      <ComponentRef Id="NativeHostRegistry" />
+    </ComponentGroup>
+  </Fragment>
+</Wix>

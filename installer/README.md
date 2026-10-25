@@ -78,5 +78,57 @@ The release pipeline produces the following exact artefacts in `releases/`:
 
 - `tools/release.ps1`: سكربت بناء وتجميع مخرجات الإصدار (يدعم `-Version`, `-SkipFrontend`, `-DryRun`).
 - `tools/check_release.ps1`: سكربت فحص وتدقيق مجلد `releases/` ومطابقة التجزئات وصحة أسماء الملفات.
+- `tools/check-brand-assets.ps1`: أداة التحقق من تكامل وأبعاد أيقونات وصور الهوية لمثبتات NSIS و WiX ومطابقتها للمواصفات.
+- `tools/check-installer-icon.ps1`: أداة الفحص الآلي للأيقونة المرتبطة بملفات التثبيت التنفيذية والتحقق من طغيان ألوان العلامة التجارية (Teal/Navy) وغياب اللون الأحمر غير المعتمد.
 - `installer/version.txt`: المصدر الموحد الوحيد لإصدار المشروع الحالي.
 - `installer/RELEASE-CHECKLIST.md`: قائمة التحقق الإلزامية قبل النشر.
+
+---
+
+## 5. هيكل مجلد التثبيت والتكامل مع المتصفح / Installed Layout & Browser Integration
+
+### هيكل مجلد التثبيت بعد التنصيب / Installed Directory Layout
+تُنشر الملفات للمستخدم الحالي (`$LOCALAPPDATA\Programs\SAYL` أو مسار التثبيت المختار) بالهيكل التالي:
+
+```text
+<InstallDir>\
+├── sayl.exe                               # البرنامج الرئيسي (SAYL Desktop)
+├── Uninstall.exe                          # برنامج إلغاء التثبيت
+├── host\
+│   ├── sayl-bridge.exe                    # جسر الاتصال الأصلي مع المتصفح (Native Messaging Host)
+│   ├── com.sayl.downloader.json           # ملف تعريف الجسر (Native Host Manifest)
+│   └── icon.ico                           # أيقونة الهوية المعتمدة
+└── extensions\
+    └── browser\
+        └── chromium\                      # إضافة المتصفح غير المضغوطة (Unpacked Chromium MV3 Extension)
+            ├── manifest.json              # تعريف الإضافة متضمناً المفتاح الثابت (Fixed Key)
+            ├── background.js              # معالج الخلفية لرسائل التنزيل
+            ├── popup.html / popup.js      # واجهة الحالة المنبثقة
+            ├── icons\                     # أيقونات الإضافة (16, 32, 48, 128)
+            └── _locales\                  # الترجمة العربية والإنجليزية
+```
+
+### معرف الإضافة ومفاتيح السجل / Pinned Extension ID & Registry Keys
+- **مفتاح الإضافة الثابت (Pinned Extension ID):**
+  - المفتاح العام المُضمن في `manifest.json`: `MIIBIjANBgkq...` (RSA-2048 DER SubjectPublicKeyInfo).
+  - مُعرّف الإضافة المحسوب (SHA-256 first 16 bytes mapped 0-f -> a-p): `ipfenakpblanjjiboejfobkjhegnciif`.
+  - النطاق المصرح به (`allowed_origins`): `chrome-extension://ipfenakpblanjjiboejfobkjhegnciif/`.
+- **مفاتيح سجل Windows (نطاق المستخدم فقط HKCU):**
+  - `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.sayl.downloader`
+  - `HKCU\Software\Microsoft\Edge\NativeMessagingHosts\com.sayl.downloader`
+  - القيمة الافتراضية لكليهما تشير إلى المسار المطلق للملف: `<InstallDir>\host\com.sayl.downloader.json`.
+
+### طبقة تكوين الموارد للإصدارات / Release Resources Overlay
+- **ملف التكوين الأساسي (`apps/desktop/src-tauri/tauri.conf.json`):** لا يحتوي على حقل `bundle.resources`، مما يتيح تشغيل أوامر التطوير والبناء القياسية (`npm run tauri -- dev` أو `npm run tauri -- build`) على أي استنساخ جديد للفرع دون الفشل بسبب مجلد الموارد الموجه للإنتاج حصراً.
+- **تراكب الإنتاج (`installer/tauri.bundle-resources.json`):** يحدد تخطيط موارد الحزمة النهائي (`host/sayl-bridge.exe` و `host/com.sayl.downloader.json` و `extensions/browser/chromium/**`). يقوم سكربت الإصدار `tools/release.ps1` ببناء `sayl-bridge`، وتجهيز مجلد الموارد تحت `apps/desktop/src-tauri/resources/`، ثم تمرير التراكب عبر `--config installer/tauri.bundle-resources.json`.
+
+### نهج التسجيل وحدوده (NSIS مقابل WiX) / Registration Approach & Limitations
+1. **مثبت NSIS (`installer/nsis/hooks.nsh` و `installer/nsis/sayl.nsi`):**
+   - عند التثبيت: ينسخ الملفات، ويُنفذ `sayl-bridge.exe --register-host --extension-id ipfenakpblanjjiboejfobkjhegnciif` لكتابة المسار المطلق الدقيق وتحديث سجل النظام. كما يضمن السكربت تحديث ملف `com.sayl.downloader.json` بمسار `$INSTDIR\host\sayl-bridge.exe` المطلق وتسجيل مفاتيح HKCU في حال غياب المشغّل.
+   - عند إلغاء التثبيت: يُنفذ `sayl-bridge.exe --unregister-host`، ويحذف مفاتيح HKCU لـ Chrome و Edge، وينظف مفتاح بدء التشغيل التلقائي `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\SAYL`، ويزيل ملفات ومجلدات `host` و `extensions`.
+   - لا يتطلب أي صلاحيات مسؤول (User Scope).
+
+2. **مثبت WiX MSI (`installer/wix/native-host.wxs` و `installer/wix/sayl.wxs`):**
+   - يسجل المفاتيح `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.sayl.downloader` و Edge مشيرةً إلى `[INSTALLDIR]host\com.sayl.downloader.json` عبر مكونات WiX القياسية للمستخدم الحالي (`Scope="perUser"`).
+   - يتضمن إجراءات مخصصة (CustomActions) تعمل بصلاحيات المستخدم (`Execute="deferred" Impersonate="yes" Return="ignore"`) لتشغيل `sayl-bridge.exe --register-host` بعد نسخ الملفات و `--unregister-host` قبل حذفها.
+   - **الحدود المعلنة وحالة القالب (Honest Limitation & Template Fallback):** ملف المانيفست المشحون مع الحزمة في `extensions/browser/host/com.sayl.downloader.json` يحتوي على مسار تمثيلي مؤقت (`C:\REPLACE_WITH_INSTALL_DIR\host\sayl-bridge.exe`). في حال تعذر تشغيل الـ Custom Action أو تم تقييدها بواسطة سياسات الأمان أو التثبيت الصامت، يظل المانيفست قالباً يتطلب من تطبيق SAYL (أو جسر سيل) إعادة كتابته بالمسار المطلق الفعلي عند أول إقلاع للبرنامج.

@@ -171,6 +171,10 @@ jobs:
           Write-Host "tools/e2e scripts parse"
         shell: pwsh
 
+      - name: Validate brand assets and installer configurations
+        run: pwsh -NoProfile -File tools/check-brand-assets.ps1
+        shell: pwsh
+
   test-website-and-privacy:
     name: Website Checks and Privacy Audit
     runs-on: windows-latest
