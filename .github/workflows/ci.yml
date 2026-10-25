@@ -1,15 +1,19 @@
 name: CI
 
+# The default branch is `master`; `dev` is the integration branch that release
+# work lands on (a draft pull request from `dev` to `master` makes pull_request
+# runs cover it as well).
 on:
   push:
-    branches: [main]
+    branches: [master, dev]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 # CI runs the MSVC toolchain on purpose: windows-latest ships the Windows SDK,
-# so this job is the only place the production (MSVC) link path is exercised.
-# Locally the project falls back to stable-x86_64-pc-windows-gnu + rust-lld
-# because the Windows SDK is not installed there; see docs/TOOLCHAIN.md.
+# so this job is the only place the MSVC link path is exercised. Newly linked
+# binaries on this developer machine are held by Smart App Control, which is
+# why validation for this repository happens in CI rather than locally; see
+# docs/TOOLCHAIN.md.
 env:
   RUST_TOOLCHAIN: "stable"
 
@@ -127,4 +131,86 @@ jobs:
 
       - name: Run all workspace tests
         run: cargo test --workspace
+        shell: pwsh
+
+  test-desktop-frontend:
+    name: Desktop Frontend (Vitest + Vite build)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/desktop
+        run: npm ci
+        shell: pwsh
+
+      - name: Run unit tests
+        working-directory: apps/desktop
+        run: npm test
+        shell: pwsh
+
+      - name: Build frontend bundle
+        working-directory: apps/desktop
+        run: npm run build
+        shell: pwsh
+
+      - name: Check the browser bridge helpers parse
+        run: |
+          Get-ChildItem tools/e2e/*.mjs | ForEach-Object {
+            node --check $_.FullName
+            if ($LASTEXITCODE -ne 0) { Write-Error "syntax error in $($_.Name)"; exit 1 }
+          }
+          Write-Host "tools/e2e scripts parse"
+        shell: pwsh
+
+      - name: Validate brand assets and installer configurations
+        run: pwsh -NoProfile -File tools/check-brand-assets.ps1
+        shell: pwsh
+
+      - name: Validate installer flow policies
+        run: pwsh -NoProfile -File tools/check-installer-flow.ps1
+        shell: pwsh
+
+  test-website-and-privacy:
+    name: Website Checks and Privacy Audit
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check website JavaScript syntax
+        run: node --check apps/website/app.js
+        shell: pwsh
+
+      - name: Check browser extension JavaScript syntax
+        run: |
+          node --check extensions/browser/chromium/background.js
+          node --check extensions/browser/chromium/popup.js
+        shell: pwsh
+
+      - name: Validate JSON manifests
+        run: |
+          python -c "import json,glob; [json.load(open(p,encoding='utf-8')) for p in glob.glob('extensions/browser/**/*.json', recursive=True) + ['apps/desktop/src-tauri/tauri.conf.json']]; print('all manifests valid')"
+        shell: pwsh
+
+      - name: Run privacy audit
+        run: python tools/privacy_audit.py
         shell: pwsh

@@ -1,5 +1,5 @@
-name: Feature Request
-description: Suggest a new feature or enhancement for SAYL
+name: Feature Request / اقتراح ميزة
+description: Suggest a new feature or improvement for SAYL / اقتراح ميزة جديدة أو تحسين لبرنامج سيل
 title: "[FEAT] "
 labels: ["enhancement"]
 body:
@@ -75,7 +75,7 @@ body:
     id: roadmap
     attributes:
       label: Roadmap Alignment
-      description: Where does this fit in the MASTER-PLAN roadmap?
+      description: Where does this fit in the project roadmap?
       options:
         - Pre-M1 (core engine, HTTP, storage, testing)
         - M1 (CLI, HTTP correctness, resume, parallel, recovery)
@@ -95,7 +95,7 @@ body:
     attributes:
       label: Checklist
       options:
-        - label: I have read the MASTER-PLAN and this aligns with the project direction
+        - label: I have reviewed the roadmap and this aligns with the project direction
           required: true
         - label: This is not a duplicate of an existing issue or roadmap item
           required: true

@@ -1,0 +1,180 @@
+name: Release (Windows installers)
+
+# Produces the signed-ready Windows artefacts on a GitHub runner, where the
+# Windows SDK is present. This is the supported path for building the NSIS/MSI
+# installers: a local elevated SDK install is not required.
+#
+# Triggers:
+#   - pushing a tag like v0.1.0
+#   - manual run with an explicit version
+#   - pushes to the `dev` integration branch, so the installers are exercised
+#     while the release is being prepared (nothing is published from there)
+#
+# The run does NOT publish anything by itself. It uploads the artefacts and the
+# SHA256SUMS.txt as workflow artefacts and attaches them to the GitHub Release
+# only when the tag already exists, so publishing stays a deliberate owner action.
+
+on:
+  push:
+    tags:
+      - "v*"
+    branches:
+      - dev
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "SemVer version to build (e.g. 0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  RUST_TOOLCHAIN: "stable"
+  # Version used when the run is not a tag or a manual dispatch (dev pushes).
+  DEFAULT_VERSION: "0.1.0"
+
+jobs:
+  build-installers:
+    name: Build Windows Installers
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          DEFAULT_VERSION: ${{ env.DEFAULT_VERSION }}
+        run: |
+          # Untrusted values arrive through env, never interpolated into the script.
+          if ($env:EVENT_NAME -eq "workflow_dispatch") {
+            $v = $env:INPUT_VERSION
+          } elseif ($env:REF_NAME -like "v*") {
+            $v = $env:REF_NAME -replace '^v', ''
+          } else {
+            $v = $env:DEFAULT_VERSION
+          }
+          $v = $v.Trim()
+          if ($v -notmatch '^\d+\.\d+\.\d+$') {
+            Write-Error "Invalid SemVer version '$v'"
+            exit 1
+          }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "Building version $v"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Cache Rust build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: release-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: release-${{ runner.os }}-
+
+      - name: Validate installer flow policies
+        shell: pwsh
+        run: pwsh -NoProfile -File tools/check-installer-flow.ps1
+
+      - name: Run the release pipeline
+        shell: pwsh
+        run: pwsh -NoProfile -File tools/release.ps1 -Version "${{ steps.ver.outputs.version }}"
+
+      - name: Verify expected artefacts exist
+        shell: pwsh
+        run: |
+          $v = "${{ steps.ver.outputs.version }}"
+          $required = @(
+            "releases/SAYL-Setup-x64-$v.exe",
+            "releases/SAYL-Setup-x64-$v.msi",
+            "releases/SAYL-$v-source.zip",
+            "releases/SHA256SUMS.txt"
+          )
+          $missing = @()
+          foreach ($r in $required) { if (-not (Test-Path -LiteralPath $r)) { $missing += $r } }
+          if ($missing.Count -gt 0) {
+            Write-Error "Missing release artefacts: $($missing -join ', ')"
+            exit 1
+          }
+          Get-Content -LiteralPath releases/SHA256SUMS.txt
+          Write-Host "All required artefacts present"
+
+      - name: Verify installer brand icon
+        shell: pwsh
+        run: |
+          $exe = "releases/SAYL-Setup-x64-${{ steps.ver.outputs.version }}.exe"
+          $msi = "releases/SAYL-Setup-x64-${{ steps.ver.outputs.version }}.msi"
+          Write-Host "Checking: $exe and $msi"
+          if (-not (Test-Path -LiteralPath $exe)) { Write-Error "Missing: $exe"; exit 1 }
+          if (-not (Test-Path -LiteralPath $msi)) { Write-Error "Missing: $msi"; exit 1 }
+          & tools/check-installer-icon.ps1 -Path $exe, $msi
+
+      - name: Upload installers and checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: sayl-${{ steps.ver.outputs.version }}-windows-x64
+          path: |
+            releases/SAYL-Setup-x64-*.exe
+            releases/SAYL-Setup-x64-*.msi
+            releases/SAYL-*-source.zip
+            releases/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  attach-to-release:
+    # Separate job on purpose: it is the only place that needs write access, so the
+    # build job (and its third-party actions) keeps the read-only workflow default.
+    name: Attach Artefacts to an Existing Release
+    needs: build-installers
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download built artefacts
+        uses: actions/download-artifact@v4
+        with:
+          name: sayl-${{ needs.build-installers.outputs.version || '' }}-windows-x64
+          path: artefacts
+        continue-on-error: true
+
+      - name: Attach artefacts to an existing GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          # Tag names come from the environment, never from inline interpolation.
+          $tag = $env:TAG_NAME
+          $files = Get-ChildItem -Path artefacts -File -ErrorAction SilentlyContinue
+          if (-not $files) {
+            Write-Host "No artefacts downloaded; nothing to attach."
+            exit 0
+          }
+          $existing = gh release view $tag --json tagName 2>$null
+          if (-not $existing) {
+            Write-Host "No GitHub Release exists for $tag yet; artefacts stay as a workflow artefact. Publishing releases remains an explicit owner action."
+            exit 0
+          }
+          $files | ForEach-Object { gh release upload $tag $_.FullName --clobber }
+

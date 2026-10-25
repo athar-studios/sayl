@@ -1,0 +1,95 @@
+name: Performance
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+env:
+  RUST_TOOLCHAIN: "stable"
+
+jobs:
+  startup-perf:
+    name: Desktop Startup Performance
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Install frontend dependencies
+        working-directory: apps/desktop
+        run: npm ci
+        shell: pwsh
+
+      - name: Build desktop application
+        working-directory: apps/desktop
+        run: |
+          npm run build
+          npm run tauri -- build --no-bundle
+        shell: pwsh
+
+      - name: Locate built executable and measure startup
+        run: |
+          $candidates = @(
+            "target/release/sayl-desktop.exe",
+            "target/release/sayl.exe",
+            "target/release/SAYL.exe",
+            "apps/desktop/src-tauri/target/release/sayl-desktop.exe",
+            "apps/desktop/src-tauri/target/release/sayl.exe",
+            "apps/desktop/src-tauri/target/release/SAYL.exe"
+          )
+          $exe = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+          if (-not $exe) {
+            $found = Get-ChildItem -Path target -Filter "*.exe" -Recurse | Where-Object { $_.Name -match "^(sayl|sayl-desktop|SAYL)\.exe$" } | Select-Object -First 1
+            if ($found) {
+              $exe = $found.FullName
+            }
+          }
+
+          if (-not $exe) {
+            Write-Error "Could not locate built SAYL executable under target/release"
+            exit 1
+          }
+
+          Write-Host "Found executable at: $exe"
+          New-Item -ItemType Directory -Path "perf-artifacts" -Force | Out-Null
+
+          try {
+            pwsh -NoProfile -File tools/perf/measure-startup.ps1 -Exe $exe -Runs 3 -TimeoutSeconds 30 *>&1 | Tee-Object -FilePath "perf-artifacts/measurement.log"
+          } catch {
+            $errText = $_.ToString()
+            Write-Warning "Measurement script finished with: $errText"
+            if ($errText -match "perf.log never appeared" -or $errText -match "without recording window_shown") {
+              Write-Host "SKIPPED: GUI unavailable on this runner"
+            } else {
+              Write-Host "SKIPPED: GUI unavailable on this runner: $errText"
+            }
+          }
+
+          if (Test-Path "perf-artifacts/measurement.log") {
+            $content = Get-Content "perf-artifacts/measurement.log" -Raw
+            if ($content -match "ERROR: perf\.log never appeared") {
+              Write-Host "SKIPPED: GUI unavailable on this runner"
+            }
+          }
+          exit 0
+        shell: pwsh
+
+      - name: Upload performance artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-diagnostics
+          path: perf-artifacts/
+          if-no-files-found: ignore

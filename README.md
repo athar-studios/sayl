@@ -1,239 +1,136 @@
-# سيل (SAYL) — مدير تحميل مستقل لـ Windows
+<div align="center">
 
-[![CI](https://github.com/SAYL/SAYL/workflows/CI/badge.svg)](https://github.com/SAYL/SAYL/actions)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](#license)
+[العربية](README.md) | [English](README.en.md)
 
-**سيل (SAYL)** مدير تحميل (Download Manager) مكتوب بلغة Rust، بواجهة سطح مكتب Tauri 2 + Svelte + TypeScript، **Windows أولًا**، مصمم للاستئناف الآمن، التنزيل المتوازي المُحقق، والخصوصية المطلقة.
+<br>
 
-> **حالة المشروع:** مواصفات وتطوير مبكر (ما قبل M1). النواة والمكتبات الأساسية موجودة وتخضع للاختبار؛ واجهة سطح المكتب وتكامل المتصفح والميزات المتقدمة قيد التطوير. راجع [خريطة الطريق](#خريطة-الطريق-roadmap) أدناه.
+<img src="assets/brand/icon.svg" alt="شعار سيل" width="120" height="84">
 
----
+# سيل (SAYL)
 
-## ما هو سيل؟ (What is SAYL?)
+[![CI](https://github.com/athar-studios/sayl/actions/workflows/ci.yml/badge.svg)](https://github.com/athar-studios/sayl/actions)
+[![Latest Release](https://img.shields.io/github/v/release/athar-studios/sayl?color=00B6BD&label=%D8%A7%D9%84%D8%A5%D8%B5%D8%AF%D8%A7%D8%B1)](https://github.com/athar-studios/sayl/releases/latest)
+[![License](https://img.shields.io/badge/%D8%A7%D9%84%D8%B1%D8%AE%D8%B5%D8%A9-Apache--2.0-blue.svg)](LICENSE)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-%D8%A7%D8%AF%D8%B9%D9%85%D9%86%D8%A7-orange.svg)](https://ko-fi.com/athar_studio)
 
-| الجانب | الوصف |
-|----------|---------|
-| **الهدف** | مدير تحميل مستقل، مفتوح المصدر، يحترم الخصوصية، لـ Windows (ثم Linux/Android). |
-| **المحرك** | Rust — `sayl-core` (نماذج/حالات/أحداث)، `sayl-http` (نقل HTTP، تحقق النطاقات)، `sayl-storage` (مخزن مهام آمن من التعطل)، `sayl-test-http` (خادم اختبارات حتمي لـ 27 وضع فشل). |
-| **الواجهة** | Tauri 2 + Svelte 5 + TypeScript — عربية أولاً (RTL)، i18n، ثيمات، Timeline حقيقي من المحرك. |
-| **الخصوصية** | لا تحليلات، لا تتبع، لا خطوط خارجية، لا رفع تقارير تعطل تلقائي. البيانات لا تغادر جهازك. |
-| **السلامة** | استئناف مُحقق بالنطاقات (Range validation)، تحقق ETag قوي، أسماء ملفات آمنة، كتابة بـ fsync، استعادة بعد تعطل. |
+**سيل مدير تنزيلات سريع وخفيف لنظام Windows، مبني بلغة Rust وواجهة سطح مكتب حديثة، مفتوح المصدر بالكامل، ويحترم خصوصيتك بلا إعلانات ولا تتبّع.**
 
----
+<br>
 
-## الحالة الحالية (Current Status)
+<img src="docs/ui-mockups/01-main-light-ar.png" alt="واجهة برنامج سيل الرئيسية" width="880">
 
-| الحزمة (Crate) | الوصف | اختبارات (Tests) | الحالة |
-|---------------|---------|------------------|--------|
-| `sayl-core` | نماذج المجال، آلة الحالات (11 حالة)، نظام الأخطاء، ناقل الأحداث، مفاتيح عدم التكرار | **33** | ✅ تمر |
-| `sayl-test-http` | خادم اختبارات HTTP حتمي، 27 وضع فشل، توليد بيانات حتمي | **25** | ✅ تمر |
-| `sayl-http` | عميل HTTP، تحقق النطاقات، تتبع إعادة توجيه آمن، استخراج أسماء ملفات آمنة | **65** | ✅ تمر |
-| `sayl-storage` | مخزن مهام WAL + لقطات ذرية، قفل دليل، استعادة بعد تعطل | **18** | ✅ تمر |
-| `sayl-app` | خدمات التطبيق، أوامر/أحداث Tauri | — | 🚧 قيد التطوير |
-| `sayl-cli` | واجهة سطر أوامر | — | 📋 مخطط |
-| `sayl-media` | مُحول yt-dlp/FFmpeg | — | 📋 مخطط |
-| `sayl-torrent` | محول librqbit | — | 📋 مخطط |
-| `sayl-plugin-host` | وقت تشغيل WASM، وسيط الصلاحيات | — | 📋 مخطط |
-| `apps/desktop` | Tauri + Svelte UI | — | 🚧 قيد التطوير |
-| `apps/website` | موقع تنزيل ثابت (هذا المستودع) | — | ✅ مكتمل |
-| `extensions/browser` | ملحقات Chromium/Firefox (Native Messaging) | — | 📋 مخطط |
-
-> **ملاحظة:** الأرقام أعلاه تعكس اختبارات الوحدة/التكامل الفعلية في المستودع. لا توجد اختبارات زائفة.
+</div>
 
 ---
 
-## البناء والتشغيل (Build & Run)
+## مميزات سيل
 
-### المتطلبات
+- **تنزيل أسرع بالتقسيم:** يجزئ سيل الملف إلى عدة اتصالات متوازية مستقلة لاستغلال السعة الكاملة لاتصالك بالإنترنت.
+- **استئناف موثوق:** انقطع الاتصال أو أغلقت الحاسوب؟ يكمل سيل التنزيل من آخر بايت مسجل دون إتلاف الملف أو بدء التنزيل من الصفر.
+- **عربي وإنجليزي أصيل:** واجهة مبنية من اليمين إلى اليسار (RTL) مع خط مريح، ودعم كامل للإنجليزية والوضعين الفاتح والداكن.
+- **اسحب وأفلت:** اسحب أي رابط تنزيل إلى نافذة البرنامج ليبدأ فحصه وتنزيله فورًا.
+- **تصنيف وبحث لحظي:** فرز تلقائي لملفات الفيديو، الصوت، المستندات، البرامج، والمضغوطة، مع بحث سريع بالاسم أو الرابط.
+- **نافذة تقدّم دقيقة:** تتبع تدفق كل اتصال مستقل في شريط مخصص، مع قياس السرعة اللحظية والوقت المتبقي.
+- **إطفاء تلقائي ومنع السكون:** يمنع دخول النظام في وضع السكون أثناء التنزيل، مع خيار إطفاء الحاسوب بأمان بعد الانتهاء مع عداد تراجع مدته 30 ثانية.
+- **سطر أوامر متكامل (CLI):** أداة `sayl.exe` المستقلة لإدارة الطوابور، استرداد المهام، وأتمتة العمليات عبر PowerShell.
+- **خصوصية مطلقة:** لا حسابات مستخدمين، لا إعلانات، لا إحصاءات تتبّع (No Telemetry)، ولا خوادم وسيطة بينك وبين ملفاتك.
 
-- **Rust:** `stable-x86_64-pc-windows-gnu` (GNU toolchain مع `rust-lld`)
-- **Windows:** Windows 10 1903+ x64
-- **للاختبارات فقط:** لا حاجة لـ Windows SDK ولا `link.exe` MSVC
-- **للبناء الإنتاجي (Tauri/MSVC):** مطلوب Windows SDK (تثبيت مرفوع الامتيازات)
+---
 
-### أوامر موثقة (Verified Commands)
+## التحميل والتثبيت
 
-وفقًا لـ `docs/TOOLCHAIN.md`، البيئة الحالية تعمل مع GNU + `rust-lld`:
+تفضل بزيارة **[صفحة الإصدارات على GitHub](https://github.com/athar-studios/sayl/releases/latest)** لتنزيل أحدث نسخة:
+
+- **مثبت Windows (64 بت):** `SAYL-Setup-x64-0.1.0.exe` (تثبيت تلقائي دون الحاجة لصلاحيات المسؤول).
+
+> **ملاحظة حول تنبيه Windows SmartScreen:**  
+> نظرًا لأن سيل مشروع مجاني حديث ولا نملك بعد شهادة توقيع رقمي تجارية باهظة (EV Certificate)، قد يعرض نظام ويندوز نافذة زرقاء تفيد بأن «التطبيق غير معروف».  
+> لتشغيل البرنامج: اضغط على **«مزيد من المعلومات» (More info)** ثم اختر **«التشغيل على أي حال» (Run anyway)**. كود سيل مفتوح بالكامل ويمكنك مراجعته بنفسك للتأكد من أمانه.
+
+---
+
+## بداية سريعة
+
+### واجهة البرنامج (GUI)
+1. افتح سيل من قائمة ابدأ.
+2. اضغط على زر **«إضافة تنزيل»** أو اختصار <kbd>Ctrl + N</kbd>.
+3. الصق الرابط واضغط **«بدء التنزيل»**.
+
+### سطر الأوامر (CLI)
+سيل متاح كأمر مستقل في الطرفية:
 
 ```powershell
-# إعداد المسار والعلميات
-$env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
-$env:RUSTFLAGS = "-C linker=rust-lld"
-cd "C:\Users\Dragonfly\Downloads\Download Manager"
+# إضافة رابط تنزيل بـ ٨ اتصالات متزامنة
+sayl add https://example.com/file.zip --connections 8
 
-# فحص الأنواع
-cargo +stable-x86_64-pc-windows-gnu check -p sayl-core
-cargo +stable-x86_64-pc-windows-gnu check -p sayl-http
-cargo +stable-x86_64-pc-windows-gnu check -p sayl-test-http
-cargo +stable-x86_64-pc-windows-gnu check -p sayl-storage
+# عرض قائمة التنزيلات والسرعة
+sayl list
 
-# تشغيل الاختبارات
-cargo +stable-x86_64-pc-windows-gnu test -p sayl-core
-cargo +stable-x86_64-pc-windows-gnu test -p sayl-http
-cargo +stable-x86_64-pc-windows-gnu test -p sayl-test-http
-cargo +stable-x86_64-pc-windows-gnu test -p sayl-storage
+# إيقاف مهمة مؤقتًا أو استئنافها
+sayl pause <id>
+sayl start <id>
 
-# مساحة العمل كاملة
-cargo +stable-x86_64-pc-windows-gnu test --workspace
-```
-
-> **تحذير:** البناء الإنتاجي لـ Tauri يتطلب toolchain MSVC مع Windows SDK. البناء GNU يعمل للاختبارات فقط.
-
----
-
-## هيكل المستودع (Repository Layout)
-
-```
-.
-├── apps/
-│   ├── desktop/          # Tauri + Svelte Desktop UI (قيد التطوير)
-│   └── website/          # موقع تنزيل ثابت (HTML/CSS/JS)
-├── crates/
-│   ├── core/             # sayl-core — نماذج، حالات، أحداث، أخطاء
-│   ├── http/             # sayl-http — عميل HTTP، تحقق نطاقات، أسماء ملفات
-│   ├── test-http/        # sayl-test-http — خادم اختبارات حتمي (27 وضع)
-│   ├── storage/          # sayl-storage — WAL + لقطات ذرية، قفل دليل
-│   ├── app/              # sayl-app — خدمات تطبيق، أوامر Tauri
-│   ├── cli/              # sayl-cli — واجهة سطر أوامر
-│   ├── media/            # sayl-media — yt-dlp/FFmpeg
-│   ├── torrent/          # sayl-torrent — librqbit
-│   └── plugin-host/      # sayl-plugin-host — WASM runtime
-├── extensions/
-│   └── browser/          # ملحقات المتصفح (Native Messaging)
-├── catalog/
-│   ├── plugins/          # بيانات إضافية مراجعة
-│   └── themes/           # بيانات ثيمات
-├── locales/              # موارد ترجمة نسخة
-├── docs/
-│   ├── MASTER-PLAN.md    # الخطة الموحدة للمنتج
-│   ├── TOOLCHAIN.md      # إعداد سلسلة الأدوات
-│   └── tasks/            # بطاقات مهام مفصلة
-├── .github/
-│   ├── workflows/ci.yml  # GitHub Actions CI
-│   ├── ISSUE_TEMPLATE/   # نماذج Issues
-│   └── PULL_REQUEST_TEMPLATE.md
-├── CONTRIBUTING.md       # دليل المساهمة
-├── SECURITY.md           # سياسة الأمان
-├── CODE_OF_CONDUCT.md    # مدونة السلوك
-├── .editorconfig         # تنسيق محرر موحد
-├── .gitattributes        # خصائص Git
-└── README.md             # هذا الملف
+# استرداد المهام بعد انقطاع مفاجئ للكهرباء
+sayl recover
 ```
 
 ---
 
-## خريطة الطريق (Roadmap)
+## إضافة المتصفح
 
-### ✅ مكتمل /Implemented (ما قبل M1)
+يتوفر ملحق متصفح لمتصفحات Chromium (Chrome, Edge, Brave) في مجلد `extensions/browser/chromium`.
 
-- **sayl-core**: آلة حالات 11 حالة، انتقالات محمية، أخطاء مصنفة، ناقل أحداث محدود السعة مع ترقيم تسلسلي، مفاتيح Idempotency مع TTL، معرفات مهام UUID v7.
-- **sayl-test-http**: خادم fixture محلي، 27 وضع فشل (206 صحيح، لا Accept-Ranges، تجاهل Range، Content-Range فاسد، اقتطاع body، TCP reset، ETag متغير، ETag ضعيف، لا validator، 416، HEAD مرفوض، حجم مجهول، ملف فارغ، ترميز غير متوقع، 429 Retry-After، إعادة توجيه بأسرار، لا مساحة، إذن مرفوض، أسماء ملفات خبيثة، إيقاف أثناء probe، عامل بطيء، lease قديم، استعادة عند finalize، proxy/TLS، حدود أصل، اقتطاع ملف، pooling).
-- **sayl-http**: تحقق النطاقات النشط (HEAD → GET range=0-0)، تصنيف الدعم (Supported/Ignored/Unsupported/Unknown)، تتبع إعادة توجيه آمن (حد 5 هوب، تجريد Authorization/Cookie عبر أصول مختلفة، قائمة بيضاء http/https، كشف حلقات)، استخراج أسماء ملفات آمنة (RFC 5987، منع اجتياز مسارات، أسماء أجهزة Windows محجوزة، تحكم، Unicode NFC، حد 255 حرف)، تدفق للملف مع تحقق الطول و fsync.
-- **sayl-storage**: WAL بـ JSON-Lines، لقطات ذرية (tmp → fsync → rename)، تسامح مع ذيول مقطوعة، استعادة عبر snapshot + replay، قفل دليل حصري (Windows `share_mode(0)` + سجل في العملية).
-- **apps/website**: موقع ثابت RTL-first، تبديل لغة، فحص توفر ملفات بـ HEAD، FAQ accordion، لا تبعيات خارجية.
-
-### 🚧 قيد التطوير / Under Development
-
-- **sayl-app / apps/desktop**: Tauri 2 + Svelte 5 UI — Timeline حقيقي (نطاقات/leases/checkpoints/splits/retries من المحرك)، بطاقات مهام، طابور، منطقة سحب، اختصارات عامة، ثيمات JSON schema، i18n كامل.
-- **جدولة/طابور**: حد سرعة، جدولة زمنية، أولويات، إعادة تشغيل مهام فاشلة.
-- **تكامل المتصفح**: Native Messaging bridge، ملحقات Chromium/Firefox، صفحة "تكامل المتصفح" داخل التطبيق.
-- **دعم الفيديو**: yt-dlp/FFmpeg pinned، metadata، تقدم هيكلي، دمج/تحويل، قوائم تشغيل.
-- **دعم التورنت**: librqbit — magnet/.torrent، DHT/PEX، اختيار ملفات، بث/Seek.
-- **نظام الإضافات**: WASM runtime، hooks (extract، headers مقيدة، post-process، ui-tile declarative)، وسيط صلاحيات (DNS rebinding defense، allowlist شبكة، حدود ذاكرة/وقود/إخراج).
-- **كتالوج الإضافات/الثيمات**: داخل التطبيق والموقع — اسم/مطور/إصدار/مصدر/رخصة/توافق/صلاحيات/مراجعة/تثبيت/إزالة.
-- **Android**: Kotlin + UniFFI، HTTP Preview، SAF export، WorkManager/UIDT، إشعارات.
-- **التوزيع**: MSI/NSIS موقعة، تحديثات Tauri موقعة، SBOM، فحص تراخيص التبعيات.
-
-### 📋 مخطط / Planned (M5–M8 وما بعده)
-
-- Safari extension (مرحلة macOS منفصلة).
-- WASM plugins catalog مع remote refresh opt-in.
-- مراجعة أمنية قبل الإصدار (Strix).
-- مثبتات clean-machine، ترقية/إلغاء تثبيت نظيفة.
-- Android media/torrent/plugins بعد spikes.
+- انقر بزر الفأرة الأيمن على أي رابط واختر **«التحميل باستخدام سيل»**.
+- أو فعّل الالتقاط التلقائي للتنزيلات مباشرة.
+- خطوات التفعيل مفصلة في [دليل المتصفح في التوثيق](https://sayl.site/docs#ext).
 
 ---
 
-## المساهمة (Contributing)
+## التوثيق الشامل
 
-راجع **[CONTRIBUTING.md](CONTRIBUTING.md)** لـ:
+الشرح التفصيلي لجميع أوامر الـ CLI، وإعدادات البرنامج خيارًا بخيار، وطرق التعامل مع أخطاء الخوادم تجده في صفحة التوثيق الرسمية:
 
-- إعداد بيئة GNU + `rust-lld`
-- أوامر الاختبار والفحص
-- نمط رسائل الكوميت (English imperative)
-- قاعدة عدم الأوامر التدميرية لـ Git
-- تشغيل اختبارات HTTP fixture الحتمية دون شبكة
-- قائمة فحص Pull Request
+🌐 **[دليل استخدام سيل الكامل على الموقع الرسمي](https://sayl.site/docs)**
 
 ---
 
-## الأمان (Security)
+## البناء من المصدر
 
-راجع **[SECURITY.md](SECURITY.md)** لـ:
-
-- الإصدارات المدعومة
-- كيفية الإبلاغ عن ثغرة أمنية (خاصًا)
-- داخل النطاق / خارج النطاق
-- وعد عدم وجود تتبع/تحليلات
-- المراجعة الأمنية قبل الإصدار
-
----
-
-## مدونة السلوك (Code of Conduct)
-
-راجع **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** — نسخة مختصرة على نمط Contributor Covenant.
-
----
-
-## الرخصة (License)
-
-**License: [Apache-2.0](LICENSE)**
-
-لم تُحسم الرخصة بعد. القرار يعود لمالك المشروع.
-
----
-
-## روابط مفيدة
-
-- **الموقع:** `apps/website/` — افتح محليًا بـ `python -m http.server`
-- **Issues:** [GitHub Issues](https://github.com/SAYL/SAYL/issues)
-- **الأمان:** [SECURITY.md](SECURITY.md)
-- **خطة المنتج:** [docs/MASTER-PLAN.md](docs/MASTER-PLAN.md)
-- **سلسلة الأدوات:** [docs/TOOLCHAIN.md](docs/TOOLCHAIN.md)
-
----
-
-## English Summary
-
-**SAYL** is an independent, open-source, privacy-respecting download manager for Windows, written in Rust with a Tauri 2 + Svelte desktop UI. Arabic-first, RTL, i18n-ready.
-
-### Current Status (Pre-M1)
-
-| Crate | Description | Tests |
-|-------|-------------|-------|
-| `sayl-core` | Domain models, 11-state machine, error taxonomy, bounded event bus, idempotency keys | 33 |
-| `sayl-test-http` | Deterministic HTTP fixture server, 27 failure modes | 25 |
-| `sayl-http` | HTTP client, range validation, safe redirects, safe filenames | 65 |
-| `sayl-storage` | Crash-safe task store (WAL + atomic snapshots), directory locking | 18 |
-
-Desktop UI, browser integration, video/torrent, plugins, Android — **under development**.
-
-### Build (Test Environment)
+لبناء سيل محليًا على نظام Windows:
 
 ```powershell
-$env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+# المتطلبات: Rust (GNU toolchain) و Node.js 18+
+rustup toolchain install stable-x86_64-pc-windows-gnu
 $env:RUSTFLAGS = "-C linker=rust-lld"
-cargo +stable-x86_64-pc-windows-gnu test --workspace
+
+# فحص واختبار كافة الحزم
+cargo check --workspace
+cargo test --workspace
+
+# بناء واجهة سطح المكتب
+cd apps/desktop
+npm install
+npm run tauri build
 ```
 
-Production builds require MSVC toolchain + Windows SDK (elevated install).
+راجع **[docs/BUILD.md](docs/BUILD.md)** للحصول على التفاصيل الكاملة.
 
-### Links
+---
 
-- **Website:** `apps/website/` — `python -m http.server` to preview
-- **Issues:** GitHub Issues
-- **Security:** `SECURITY.md`
-- **Roadmap:** `docs/MASTER-PLAN.md`
-- **Toolchain:** `docs/TOOLCHAIN.md`
+## المساهمة في المشروع
 
-**License:** [Apache-2.0](LICENSE).
+نرحب بمساهمات المطورين لتحسين الأداء أو إصلاح الأخطاء. يرجى قراءة **[CONTRIBUTING.md](CONTRIBUTING.md)** و**[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** قبل إرسال طلب سحب (Pull Request).
+
+---
+
+## ادعم سيل
+
+سيل مجاني وسيبقى دائمًا مجانيًا ومفتوح المصدر. إذا وجدت البرنامج مفيدًا وترغب في دعم استمراره وتطوير ميزاته القادمة، يمكنك دعمنا بأي مبلغ عبر منصة كوفي:
+
+☕ **[ادعمنا على Ko-fi](https://ko-fi.com/athar_studio)**
+
+---
+
+## الرخصة
+
+سيل منشور ومتاح بموجب ترخيص **[Apache-2.0](LICENSE)**.
