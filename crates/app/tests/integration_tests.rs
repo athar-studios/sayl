@@ -840,7 +840,7 @@ async fn test_404_stores_real_error_text() {
     let task_id = engine.add(&url).await.expect("add task");
 
     let eng = engine.clone();
-    let _ = tokio::spawn(async move { eng.start(task_id).await });
+    let _handle = tokio::spawn(async move { eng.start(task_id).await });
 
     let terminal_state = wait_for_terminal(&engine, task_id, Duration::from_secs(5)).await;
     assert_eq!(terminal_state, DownloadState::Failed);
@@ -869,7 +869,7 @@ async fn test_retry_failed_task() {
     let task_id = engine.add(&url).await.expect("add task");
 
     // Manually mark task as Failed with an error to simulate previous failure
-    let store = Store::open(&store_dir.path().join("sayl.db")).expect("open store");
+    let store = Store::open(store_dir.path().join("sayl.db")).expect("open store");
     {
         let mut record = engine.get_task(task_id).unwrap().unwrap();
         record.state = DownloadState::Failed;
