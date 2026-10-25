@@ -795,17 +795,19 @@
   /* Inline cell progress bar */
   .cell-progress-bar {
     width: 100%;
-    height: 15px;
-    background: #eef1f5;
-    border-radius: 2px;
+    height: 18px;
+    background: #d8e2ec;
+    border-radius: 3px;
     position: relative;
     overflow: hidden;
-    border: 1px solid #d8dde6;
+    border: 1px solid #7c94a8;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
   }
 
   :global([data-theme="dark"]) .cell-progress-bar {
     background: #0f1f4d;
-    border-color: #1e3a8a;
+    border-color: #254499;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
   }
 
   .cell-progress-fill {

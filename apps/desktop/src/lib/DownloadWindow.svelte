@@ -12,12 +12,14 @@
   import { friendlyError } from "./errors.js";
   import StatusPill from "./StatusPill.svelte";
   import { createEventDispatcher } from "svelte";
+  import iconSvg from "../assets/icon.svg";
   import logoFull from "../assets/logo-full.svg";
   import logoWhite from "../assets/logo-white.svg";
 
   export let task;
   export let autoShutdown = false;
   export let autoClose = false;
+  export let isNativeWindow = false;
 
   const dispatch = createEventDispatcher();
 
@@ -84,8 +86,7 @@
   <div class="window-header">
     <div class="brand-wrap">
       <div class="logo-box" aria-hidden="true">
-        <img src={logoFull} alt="SAYL" class="logo-img logo-light" />
-        <img src={logoWhite} alt="SAYL" class="logo-img logo-dark" />
+        <img src={iconSvg} alt="SAYL" class="logo-img" />
       </div>
       <span class="file-name" title={task.filename}><bdi>{task.filename || "—"}</bdi></span>
     </div>
@@ -396,13 +397,6 @@
     object-fit: contain;
   }
 
-  .logo-dark {
-    display: none;
-  }
-  .logo-light {
-    display: block;
-  }
-
   .file-name {
     font-size: 0.85rem;
     font-weight: 700;
@@ -441,15 +435,21 @@
   .progress-section {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: 0.4rem;
+    padding: 0.6rem 0.8rem;
+    background: #ffffff;
+    border: 1px solid #a8b8c8;
+    border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
   }
 
   .progress-bar-wrap {
-    height: 16px;
-    background-color: #ffffff;
-    border: 1px solid #c0c0c0;
-    border-radius: 2px;
+    height: 20px;
+    background-color: #d8e2ec;
+    border: 1px solid #7c94a8;
+    border-radius: 3px;
     overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
   }
 
   .progress-bar-fill {

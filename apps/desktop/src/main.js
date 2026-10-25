@@ -1,11 +1,16 @@
 import { mount } from "svelte";
 import "./styles.css";
 import App from "./App.svelte";
+import StandaloneDownloadWindow from "./lib/StandaloneDownloadWindow.svelte";
 import { recordFirstPaint } from "./lib/perf.js";
 
-const app = mount(App, {
-  target: document.getElementById("app"),
-});
+const urlParams = new URLSearchParams(window.location.search);
+const taskId = urlParams.get("task");
+const target = document.getElementById("app");
+
+const app = taskId
+  ? mount(StandaloneDownloadWindow, { target, props: { taskId } })
+  : mount(App, { target });
 
 if (typeof requestAnimationFrame === "function") {
   requestAnimationFrame(() => {

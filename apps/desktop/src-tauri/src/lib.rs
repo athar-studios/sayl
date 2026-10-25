@@ -889,6 +889,42 @@ pub mod commands {
     pub fn open_browser_extensions(browser_id: String) -> Result<(), String> {
         native_host::cmd_open_browser_extensions(browser_id)
     }
+
+    #[tauri::command]
+    pub async fn open_download_window(
+        app_handle: tauri::AppHandle,
+        id: String,
+    ) -> Result<(), String> {
+        let label = format!("download-{}", id);
+        if let Some(win) = app_handle.get_webview_window(&label) {
+            let _ = win.show();
+            let _ = win.set_focus();
+            return Ok(());
+        }
+        let url = format!("index.html?task={}", id);
+        tauri::WebviewWindowBuilder::new(
+            &app_handle,
+            &label,
+            tauri::WebviewUrl::App(url.into()),
+        )
+        .title("تنزيل")
+        .inner_size(480.0, 360.0)
+        .min_inner_size(420.0, 320.0)
+        .resizable(true)
+        .decorations(true)
+        .build()
+        .map_err(|e| format!("Failed to create download window: {e}"))?;
+        Ok(())
+    }
+
+    #[tauri::command]
+    pub fn close_download_window(app_handle: tauri::AppHandle, id: String) -> Result<(), String> {
+        let label = format!("download-{}", id);
+        if let Some(win) = app_handle.get_webview_window(&label) {
+            let _ = win.close();
+        }
+        Ok(())
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -992,7 +1028,9 @@ pub fn run() {
             commands::unregister_native_host,
             commands::test_native_host,
             commands::open_extension_folder,
-            commands::open_browser_extensions
+            commands::open_browser_extensions,
+            commands::open_download_window,
+            commands::close_download_window
         ])
         .on_page_load(move |_webview, payload| {
             if payload.event() == tauri::webview::PageLoadEvent::Finished {
@@ -1004,6 +1042,9 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() != "main" {
+                    return;
+                }
                 let app = window.app_handle();
                 if let Some(state) = app.try_state::<AppState>() {
                     let (close_action, close_notice_shown, language) = {

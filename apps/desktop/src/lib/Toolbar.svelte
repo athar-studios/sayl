@@ -225,7 +225,7 @@
     border: 1px solid transparent;
     border-radius: 4px;
     background: transparent;
-    cursor: default;
+    cursor: pointer;
     color: #333333;
     gap: 3px;
     padding: 2px 4px;

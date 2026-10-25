@@ -30,6 +30,7 @@
   import Tour from "./lib/Tour.svelte";
   import ExtensionGuideDialog from "./lib/ExtensionGuideDialog.svelte";
   import SchedulerDialog from "./lib/SchedulerDialog.svelte";
+  import iconSvg from "./assets/icon.svg";
   import logoFull from "./assets/logo-full.svg";
   import logoWhite from "./assets/logo-white.svg";
   import { isTourCompleted, clearTourCompleted } from "./lib/tour.js";
@@ -273,9 +274,7 @@
         selectedId = newTask.id;
 
         if (settings.show_download_window && newTask.state !== "Cancelled") {
-          if (!openDownloadWindows.includes(newTask.id)) {
-            openDownloadWindows = [...openDownloadWindows, newTask.id];
-          }
+          handleOpenDownloadWindow(newTask.id);
         }
       }
     } catch {
@@ -485,6 +484,22 @@
     }
   }
 
+  async function handleOpenDownloadWindow(taskId) {
+    if (!taskId) return;
+    if (typeof window !== "undefined" && (window.__TAURI_INTERNALS__ || window.__TAURI__)) {
+      try {
+        await invoke("open_download_window", { id: taskId });
+        return;
+      } catch (err) {
+        console.warn("Failed to open native download window:", err);
+      }
+    }
+    // Fallback for browser mock/preview:
+    if (!openDownloadWindows.includes(taskId)) {
+      openDownloadWindows = [...openDownloadWindows, taskId];
+    }
+  }
+
   function handleOpenProperties(id) {
     const targetId = id || selectedId || (selectedIds.length > 0 ? selectedIds[0] : null);
     if (targetId) {
@@ -667,12 +682,7 @@
     await loadTasks();
     initialDataLoaded = true;
 
-    // First-run onboarding tour (runs once per machine)
-    if (!isTourCompleted()) {
-      setTimeout(() => {
-        tourActive = true;
-      }, 400);
-    }
+    // Tour is available on demand via Help -> Tour (no auto-pop on startup to avoid blocking UI)
 
     // Listen to Tauri events if available
     try {
@@ -801,7 +811,7 @@
     <!-- App Brand Header / Titlebar -->
     <header class="app-titlebar">
       <div class="titlebar-brand">
-        <img src={settings.theme === "dark" ? logoWhite : logoFull} alt="SAYL" class="titlebar-logo" />
+        <img src={iconSvg} alt="SAYL" class="titlebar-logo" />
         <span class="titlebar-title">{$t("app.fullName")}</span>
         <span class="titlebar-version">v0.1.0</span>
       </div>
@@ -1167,8 +1177,9 @@
   }
 
   .titlebar-logo {
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
   }
 
   .titlebar-title {

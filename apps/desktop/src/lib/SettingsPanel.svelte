@@ -37,17 +37,17 @@
 
   const sections = SETTINGS_SECTIONS;
 
-  $: if (open) {
+  let wasOpen = false;
+  $: if (open && !wasOpen) {
     localSettings = normalizeSettings(settings);
     saveSuccess = false;
     saveError = null;
-    if (initialSection) {
-      activeSection = initialSection;
-    }
+    activeSection = initialSection || "general";
     if (activeSection === "extension") {
       loadExtensionStatus();
     }
   }
+  $: wasOpen = open;
 
   $: if (open && activeSection === "extension" && !nativeHostStatus && !loadingExtensionState) {
     loadExtensionStatus();
@@ -141,17 +141,23 @@
     saveSuccess = false;
     try {
       const payload = normalizeSettings(localSettings);
-      const updated = await safeInvoke("set_settings", { settings: payload });
-      settings = { ...updated };
-      if (updated.language) {
-        setLanguage(updated.language);
+      if (!payload.download_dir || !payload.download_dir.trim()) {
+        payload.download_dir = settings.download_dir || "C:\\Users\\Dragonfly\\Downloads";
       }
-      dispatch("changeTheme", updated.theme);
-      saveSuccess = true;
-      setTimeout(() => {
-        saveSuccess = false;
-      }, 3000);
-      dispatch("update", updated);
+      const updated = await safeInvoke("set_settings", { settings: payload });
+      if (updated) {
+        settings = { ...updated };
+        localSettings = normalizeSettings(updated);
+        if (updated.language) {
+          setLanguage(updated.language);
+        }
+        dispatch("changeTheme", updated.theme);
+        saveSuccess = true;
+        setTimeout(() => {
+          saveSuccess = false;
+        }, 3000);
+        dispatch("update", updated);
+      }
     } catch (err) {
       saveError = typeof err === "string" ? err : err?.message || String(err);
     } finally {
