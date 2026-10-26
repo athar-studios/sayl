@@ -565,8 +565,8 @@ pub mod commands {
     }
 
     #[tauri::command]
-    pub async fn extension_diagnostics(
-    ) -> Result<capture_diagnostics::ExtensionDiagnostics, String> {
+    pub async fn extension_diagnostics() -> Result<capture_diagnostics::ExtensionDiagnostics, String>
+    {
         Ok(capture_diagnostics::collect_extension_diagnostics().await)
     }
 

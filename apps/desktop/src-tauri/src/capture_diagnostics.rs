@@ -1,7 +1,7 @@
 //! Extension capture diagnostics for Settings (staged manifest, browsers, bridge ping, log tail).
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 
 use sayl_bridge::install::chromium_manifest_path;
 use sayl_bridge::ipc::capture_log_path;
@@ -111,7 +111,7 @@ fn read_staged_extension_version() -> (Option<String>, String) {
     (version, path_display)
 }
 
-fn read_log_tail(data_dir: &PathBuf) -> CaptureLogTailSummary {
+fn read_log_tail(data_dir: &Path) -> CaptureLogTailSummary {
     let log_path = capture_log_path(Some(data_dir));
     let Ok(content) = fs::read_to_string(&log_path) else {
         return CaptureLogTailSummary::default();
@@ -125,8 +125,7 @@ pub async fn collect_extension_diagnostics() -> ExtensionDiagnostics {
 
     let reg = WindowsRegistry;
     let probe = browsers::SystemBrowserProbe;
-    let browser_statuses =
-        browsers::collect_browser_statuses(&probe, &reg, false);
+    let browser_statuses = browsers::collect_browser_statuses(&probe, &reg, false);
 
     let browsers: Vec<BrowserDiagnosticRow> = browser_statuses
         .into_iter()
@@ -173,18 +172,12 @@ mod tests {
 {"timestamp":"2026-01-01T08:02:00Z","level":"error","event":"forward_failed","detail":{}}"#;
 
         let summary = parse_capture_log_tail(content, 50);
-        assert_eq!(
-            summary.last_capture_event.as_deref(),
-            Some("capture_offer")
-        );
+        assert_eq!(summary.last_capture_event.as_deref(), Some("capture_offer"));
         assert_eq!(
             summary.last_capture_time.as_deref(),
             Some("2026-01-01T08:01:00Z")
         );
-        assert_eq!(
-            summary.last_error_event.as_deref(),
-            Some("forward_failed")
-        );
+        assert_eq!(summary.last_error_event.as_deref(), Some("forward_failed"));
         assert_eq!(
             summary.last_error_time.as_deref(),
             Some("2026-01-01T08:02:00Z")

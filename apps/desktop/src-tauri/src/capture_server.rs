@@ -11,7 +11,6 @@ use sayl_app::Engine;
 use sayl_bridge::ipc::{capture_ipc_path, CaptureIpcInfo};
 use sayl_bridge::log::{append_log, sanitize_url};
 use sayl_bridge::BrowserCookie;
-use sayl_core::state::DownloadState;
 use serde::Deserialize;
 use serde_json::json;
 use tauri::{AppHandle, Emitter, Manager};
@@ -495,6 +494,7 @@ pub async fn start_capture_server(
 mod tests {
     use super::*;
     use sayl_app::EngineConfig;
+    use sayl_core::state::DownloadState;
 
     static TEST_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 

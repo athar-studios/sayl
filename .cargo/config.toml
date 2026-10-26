@@ -1,0 +1,7 @@
+# Rust 1.90+ links x86_64-pc-windows-msvc with lld by default. That linker
+# emits a sayl-desktop test executable whose raw-dylib imports (windows-sys
+# 0.61) fail to load: the process exits 0xc0000139 STATUS_ENTRYPOINT_NOT_FOUND
+# before any test runs. CI's windows-latest host is MSVC, so keep link.exe.
+# The GNU toolchain is unchanged; it still needs rust-lld to build Tauri.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "linker-features=-lld"]

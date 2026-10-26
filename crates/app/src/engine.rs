@@ -1795,9 +1795,7 @@ impl Engine {
                 continue;
             }
 
-            let part_path = task
-                .save_path
-                .join(format!("{}.part", task.filename));
+            let part_path = task.save_path.join(format!("{}.part", task.filename));
             let part_len = if part_path.exists() {
                 tokio::fs::metadata(&part_path)
                     .await
