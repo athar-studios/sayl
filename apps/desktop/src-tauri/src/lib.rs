@@ -38,6 +38,7 @@ use sayl_core::state::DownloadState;
 use sayl_storage::TaskRecord;
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager, State};
+use tracing;
 
 /// Live stats for active tasks, tracking instantaneous transfer rate and ETA.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -980,6 +981,7 @@ pub mod commands {
         if let Some(win) = app_handle.get_webview_window(&label) {
             let _ = win.show();
             let _ = win.set_focus();
+            tracing::info!("download window shown: {label}");
             return Ok(());
         }
 
@@ -1010,15 +1012,24 @@ pub mod commands {
         };
 
         let url = format!("index.html?task={}", trimmed);
-        tauri::WebviewWindowBuilder::new(&app_handle, &label, tauri::WebviewUrl::App(url.into()))
-            .title("تنزيل")
-            .visible(false)
-            .inner_size(460.0, 260.0)
-            .resizable(false)
-            .decorations(true)
-            .background_color(bg_color)
-            .build()
-            .map_err(|e| format!("Failed to create download window: {e}"))?;
+        let window = tauri::WebviewWindowBuilder::new(
+            &app_handle,
+            &label,
+            tauri::WebviewUrl::App(url.into()),
+        )
+        .title("تنزيل")
+        .visible(false)
+        .inner_size(460.0, 260.0)
+        .resizable(false)
+        .decorations(true)
+        .background_color(bg_color)
+        .build()
+        .map_err(|e| format!("Failed to create download window: {e}"))?;
+
+        // Show and focus the window immediately after creation
+        let _ = window.show();
+        let _ = window.set_focus();
+        tracing::info!("download window created and shown: {label}");
         Ok(())
     }
 

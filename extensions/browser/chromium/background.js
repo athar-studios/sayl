@@ -3,6 +3,7 @@ import {
   extractBasename,
   sanitizeUrlForLog,
   shouldInterceptDownload,
+  recordUrlDedupe,
   DEFAULT_EXTENSIONS,
   DEFAULT_MIN_SIZE_MB
 } from "./rules.mjs";
@@ -262,40 +263,22 @@ function startHealthProbes() {
   healthProbeInterval = setInterval(checkHealth, HEALTH_PROBE_INTERVAL_MS);
 }
 
-/** @type {Map<number, { suggestedFilename?: string, capturePostInFlight?: boolean, accepted?: boolean }>} */
+/** @type {Map<number, { suggestedFilename?: string, capturePostInFlight?: boolean, accepted?: boolean, handled?: boolean, cancelled?: boolean }>} */
 const downloadCaptureState = new Map();
 
 function pruneDownloadState(id) {
   setTimeout(() => downloadCaptureState.delete(id), 5 * 60 * 1000);
 }
 
-async function cancelBrowserDownload(item, taskId, cleanUrl) {
-  try {
-    await chrome.downloads.cancel(item.id);
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    const [curr] = await chrome.downloads.search({ id: item.id });
-    if (curr) {
-      try {
-        await chrome.downloads.removeFile(item.id);
-      } catch (_) {}
-    }
-    await chrome.downloads.erase({ id: item.id });
-    sendLog("info", `Cancelled browser download ${item.id}`, `task=${taskId}`);
-  } catch (cancelErr) {
-    sendLog(
-      "warn",
-      `Failed to cancel/erase browser download: ${cancelErr.message}`,
-      cleanUrl
-    );
-  }
-}
+/** @type {Set<string>} URLs that failed native host capture and are given back to the browser */
+const givenBackUrls = new Set();
 
 async function evaluateAndCaptureDownload(item, suggestedFilename) {
   if (!item || !item.id) return;
 
   const id = item.id;
   let state = downloadCaptureState.get(id) || {};
-  if (state.accepted || state.capturePostInFlight) return;
+  if (state.handled || state.cancelled) return;
 
   if (suggestedFilename) {
     state.suggestedFilename = suggestedFilename;
@@ -323,24 +306,46 @@ async function evaluateAndCaptureDownload(item, suggestedFilename) {
       altBypasses,
       extensionId: chrome.runtime.id,
       suggestedFilename: effectiveSuggested,
-      nowMs: Date.now()
+      nowMs: Date.now(),
+      givenBackUrls,
+      checkDedupe: true
     });
 
     if (!decision.intercept) {
+      if (decision.reason === "given_back_to_browser") {
+        givenBackUrls.delete(decision.targetUrl);
+        if (freshItem.url) givenBackUrls.delete(freshItem.url);
+      }
       sendLog("info", `Download skipped: ${decision.reason}`, cleanUrl);
       return;
     }
 
     state = downloadCaptureState.get(id) || {};
-    if (state.accepted || state.capturePostInFlight) return;
+    if (state.handled || state.cancelled) return;
 
-    sendLog("info", "Download matched rules", cleanUrl);
-
-    const captureTargetUrl = decision.targetUrl || targetUrl;
-    const cookies = await getCookiesForUrl(captureTargetUrl);
-    state.capturePostInFlight = true;
+    // Immediately mark as handled and cancelled
+    state.handled = true;
+    state.cancelled = true;
     downloadCaptureState.set(id, state);
 
+    // Call chrome.downloads.cancel(id) FIRST, then erase(id)
+    // Never wait for the host reply before cancelling!
+    try {
+      await chrome.downloads.cancel(id);
+    } catch (_) {}
+    try {
+      await chrome.downloads.erase({ id });
+    } catch (_) {}
+    sendLog("info", `Cancelled and erased browser download ${id} immediately upon capture`, cleanUrl);
+
+    // Record URL for dedupe
+    const captureTargetUrl = decision.targetUrl || targetUrl;
+    recordUrlDedupe(captureTargetUrl);
+    if (freshItem.url && freshItem.url !== captureTargetUrl) {
+      recordUrlDedupe(freshItem.url);
+    }
+
+    const cookies = await getCookiesForUrl(captureTargetUrl);
     const payload = {
       type: "Capture",
       version: 1,
@@ -371,6 +376,22 @@ async function evaluateAndCaptureDownload(item, suggestedFilename) {
       const errMsg = captureResult.error.message;
       sendLog("warn", `Fallback error: ${errCode} - ${errMsg}`, cleanUrl);
       setBadgeWarning(errCode, errMsg);
+
+      // Only if host send fails: re-download once in browser with flag/marker
+      givenBackUrls.add(captureTargetUrl);
+      if (freshItem.url) givenBackUrls.add(freshItem.url);
+
+      try {
+        await chrome.downloads.download({
+          url: captureTargetUrl,
+          filename: decision.filename || undefined,
+          conflictAction: "uniquify",
+          saveAs: false
+        });
+        sendLog("info", `Re-downloaded in browser after host error: ${cleanUrl}`);
+      } catch (dlErr) {
+        sendLog("warn", `Failed to re-download in browser: ${dlErr.message}`, cleanUrl);
+      }
       return;
     }
 
@@ -381,8 +402,6 @@ async function evaluateAndCaptureDownload(item, suggestedFilename) {
     const taskId = captureResult.response.task_id;
     sendLog("info", `Download accepted by SAYL (task ${taskId})`, cleanUrl);
     setBadgeSuccess();
-
-    await cancelBrowserDownload(freshItem, taskId, cleanUrl);
   } catch (err) {
     state = downloadCaptureState.get(id) || {};
     if (!state.accepted) {

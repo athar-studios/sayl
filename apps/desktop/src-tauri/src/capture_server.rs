@@ -509,7 +509,18 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         );
-        let base = std::env::temp_dir().join(unique);
+        let tmp_root = std::env::var_os("CARGO_TARGET_TMPDIR")
+            .map(PathBuf::from)
+            .or_else(|| {
+                let p = PathBuf::from("target").join("tmp");
+                if std::fs::create_dir_all(&p).is_ok() {
+                    Some(p)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(std::env::temp_dir);
+        let base = tmp_root.join(unique);
         let data_dir = base.join("data");
         let dl_dir = base.join("dl");
         let store_dir = base.join("store");

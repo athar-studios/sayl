@@ -5,6 +5,7 @@ use sayl_core::id::TaskId;
 use sayl_core::state::DownloadState;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_notification::NotificationExt;
+use tracing;
 
 use crate::Settings;
 
@@ -15,14 +16,14 @@ pub struct CompletionUiPlan {
     pub show_toast: bool,
 }
 
-/// Pure policy: toast when the completion window setting is off or the main window is hidden (tray).
+/// Pure policy: IDM-style — always show completion window if setting is on, even when main is in tray.
+/// Toast is only shown when completion window setting is off.
 pub fn plan_completion_ui(
     show_complete_window: bool,
-    main_window_visible: bool,
+    _main_window_visible: bool,
 ) -> CompletionUiPlan {
-    let in_tray = !main_window_visible;
-    let show_window = show_complete_window && !in_tray;
-    let show_toast = !show_complete_window || in_tray;
+    let show_window = show_complete_window;
+    let show_toast = !show_complete_window;
     CompletionUiPlan {
         show_window,
         show_toast,
@@ -109,6 +110,7 @@ pub fn open_complete_window(
     if let Some(win) = app.get_webview_window(&label) {
         let _ = win.show();
         let _ = win.set_focus();
+        tracing::info!("completion window shown: {label}");
         return Ok(());
     }
 
@@ -121,7 +123,7 @@ pub fn open_complete_window(
     let url = format!("index.html?complete={trimmed}");
     let bg_color = window_background(app, settings);
 
-    tauri::WebviewWindowBuilder::new(app, &label, tauri::WebviewUrl::App(url.into()))
+    let window = tauri::WebviewWindowBuilder::new(app, &label, tauri::WebviewUrl::App(url.into()))
         .title(title)
         .visible(false)
         .inner_size(440.0, 240.0)
@@ -130,6 +132,11 @@ pub fn open_complete_window(
         .background_color(bg_color)
         .build()
         .map_err(|e| format!("Failed to create completion window: {e}"))?;
+
+    // Show and focus the window immediately after creation (IDM behavior)
+    let _ = window.show();
+    let _ = window.set_focus();
+    tracing::info!("completion window created and shown: {label}");
     Ok(())
 }
 
@@ -194,8 +201,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn plan_shows_window_when_setting_on_and_main_visible() {
+    fn plan_shows_window_when_setting_on_regardless_of_tray() {
         let plan = plan_completion_ui(true, true);
+        assert!(plan.show_window);
+        assert!(!plan.show_toast);
+
+        let plan = plan_completion_ui(true, false);
         assert!(plan.show_window);
         assert!(!plan.show_toast);
     }
@@ -205,11 +216,8 @@ mod tests {
         let plan = plan_completion_ui(false, true);
         assert!(!plan.show_window);
         assert!(plan.show_toast);
-    }
 
-    #[test]
-    fn plan_toast_when_in_tray_even_if_setting_on() {
-        let plan = plan_completion_ui(true, false);
+        let plan = plan_completion_ui(false, false);
         assert!(!plan.show_window);
         assert!(plan.show_toast);
     }

@@ -7,7 +7,10 @@ use futures_util::StreamExt;
 use sayl_core::error::CoreError;
 use sayl_core::event::{EventKind, EventPayload, EventSender};
 use sayl_core::id::TaskId;
+use sayl_http::probe::ProbeResult;
 use sayl_http::resume::ResumeInfo;
+use sayl_http::retry::RetryPolicy;
+use sayl_http::{headers::build_request_headers, probe, ProbeOptions};
 use sayl_storage::{Checkpoint, Store};
 use tokio_util::sync::CancellationToken;
 use url::Url;
@@ -20,7 +23,169 @@ pub enum DownloadOutcome {
     Cancelled { written: u64 },
 }
 
+/// Re-probes the download URL on resume to verify the resource hasn't changed.
+/// If the server returns text/html (expired link), returns a specific error with
+/// an Arabic message and "تحديث رابط التحميل" action.
+async fn reprobe_on_resume(
+    client: &reqwest::Client,
+    url: &Url,
+    custom_headers: Option<&[(String, String)]>,
+) -> Result<ProbeResult, CoreError> {
+    let mut probe_opts = ProbeOptions::default();
+    if let Some(headers) = custom_headers {
+        if let Ok(hdr_map) = build_request_headers(headers) {
+            probe_opts.custom_headers = hdr_map;
+        }
+    }
+
+    let probe_result = probe::probe_with_options(client, url.clone(), probe_opts)
+        .await
+        .map_err(|e| CoreError::http(e.status_code(), e.to_string(), e.retry_after_secs()))?;
+
+    // Check if server returned text/html (expired link page)
+    if let Some(ref content_type) = probe_result.content_type {
+        if content_type.to_lowercase().starts_with("text/html") {
+            return Err(CoreError::validation(
+                "content_type",
+                "الرابط منتهي الصلاحية، يرجى تحديث رابط التحميل".to_string(),
+            ));
+        }
+    }
+
+    Ok(probe_result)
+}
+
+/// Attempts a download with fallback strategies:
+/// 1. Original request (with Range, cookies, referrer, UA)
+/// 2. Retry without Range header
+/// 3. Retry without cookies/referrer/UA
+async fn attempt_download_with_fallbacks(
+    client: &reqwest::Client,
+    url: &Url,
+    part_path: &Path,
+    task_id: TaskId,
+    expected_length: Option<u64>,
+    resume_from: u64,
+    cancel_token: CancellationToken,
+    pause_token: CancellationToken,
+    event_sender: &EventSender,
+    store: &Store,
+    stall_timeout: std::time::Duration,
+    custom_headers: Option<&[(String, String)]>,
+    resume_info: Option<&ResumeInfo>,
+) -> Result<DownloadOutcome, CoreError> {
+    // First attempt: full headers with Range
+    let result = attempt_download_attempt(
+        client,
+        url,
+        part_path,
+        task_id,
+        expected_length,
+        resume_from,
+        cancel_token.clone(),
+        pause_token.clone(),
+        event_sender,
+        store,
+        stall_timeout,
+        custom_headers,
+        resume_info,
+        true,
+        true,
+        true,
+    )
+    .await;
+
+    match &result {
+        Ok(_) => return result,
+        Err(e) if e.to_string().contains("منتهي الصلاحية") => return result,
+        _ => {}
+    }
+
+    // If resuming failed, re-probe once to check if link has expired (server returns text/html)
+    if resume_from > 0 {
+        if let Err(e) = reprobe_on_resume(client, url, custom_headers).await {
+            if e.to_string().contains("منتهي الصلاحية") {
+                return Err(e);
+            }
+        }
+    }
+
+    // Second attempt: without Range header (full download)
+    // Truncate the partial file and restart from 0 (never append full body to a partial)
+    if let Ok(f) = std::fs::OpenOptions::new().write(true).open(part_path) {
+        let _ = f.set_len(0);
+    }
+    let _ = store.save_checkpoint(&Checkpoint::new(task_id, 0, expected_length, Vec::new()));
+    let result = attempt_download_attempt(
+        client,
+        url,
+        part_path,
+        task_id,
+        expected_length,
+        0,
+        cancel_token.clone(),
+        pause_token.clone(),
+        event_sender,
+        store,
+        stall_timeout,
+        custom_headers,
+        resume_info,
+        false,
+        true,
+        false,
+    )
+    .await;
+
+    match &result {
+        Ok(_) => return result,
+        Err(e) if e.to_string().contains("منتهي الصلاحية") => return result,
+        _ => {}
+    }
+
+    // Third attempt: without cookies/referrer/UA
+    if let Ok(f) = std::fs::OpenOptions::new().write(true).open(part_path) {
+        let _ = f.set_len(0);
+    }
+    let _ = store.save_checkpoint(&Checkpoint::new(task_id, 0, expected_length, Vec::new()));
+    let minimal_headers = custom_headers.and_then(|h| {
+        let filtered: Vec<_> = h
+            .iter()
+            .filter(|(k, _)| {
+                let lower = k.to_lowercase();
+                !lower.eq("cookie") && !lower.eq("referer") && !lower.eq("user-agent")
+            })
+            .cloned()
+            .collect();
+        if filtered.is_empty() {
+            None
+        } else {
+            Some(filtered)
+        }
+    });
+
+    attempt_download_attempt(
+        client,
+        url,
+        part_path,
+        task_id,
+        expected_length,
+        0,
+        cancel_token,
+        pause_token,
+        event_sender,
+        store,
+        stall_timeout,
+        minimal_headers.as_deref(),
+        resume_info,
+        false,
+        false,
+        false,
+    )
+    .await
+}
+
 /// Executes a sequential streaming download to a `.part` file.
+/// Supports re-probe on resume, request fallbacks, and extension guards.
 #[allow(clippy::too_many_arguments)]
 pub async fn run_sequential_download(
     client: &reqwest::Client,
@@ -37,6 +202,43 @@ pub async fn run_sequential_download(
     stall_timeout: std::time::Duration,
     custom_headers: Option<&[(String, String)]>,
 ) -> Result<DownloadOutcome, CoreError> {
+    attempt_download_with_fallbacks(
+        client,
+        url,
+        part_path,
+        task_id,
+        expected_length,
+        resume_from,
+        cancel_token,
+        pause_token,
+        event_sender,
+        store,
+        stall_timeout,
+        custom_headers,
+        resume_info,
+    )
+    .await
+}
+
+/// Internal helper to perform a single download attempt with given header flags
+async fn attempt_download_attempt(
+    client: &reqwest::Client,
+    url: &Url,
+    part_path: &Path,
+    task_id: TaskId,
+    expected_length: Option<u64>,
+    resume_from: u64,
+    cancel_token: CancellationToken,
+    pause_token: CancellationToken,
+    event_sender: &EventSender,
+    store: &Store,
+    stall_timeout: std::time::Duration,
+    custom_headers: Option<&[(String, String)]>,
+    resume_info: Option<&ResumeInfo>,
+    use_range: bool,
+    include_cookies_referrer_ua: bool,
+    _is_first_attempt: bool,
+) -> Result<DownloadOutcome, CoreError> {
     if cancel_token.is_cancelled() {
         return Ok(DownloadOutcome::Cancelled {
             written: resume_from,
@@ -51,13 +253,27 @@ pub async fn run_sequential_download(
     let mut req_builder = client.get(url.clone());
     req_builder = req_builder.header(reqwest::header::ACCEPT_ENCODING, "identity");
 
+    // Build headers based on flags
     if let Some(headers) = custom_headers {
-        if let Ok(hdr_map) = sayl_http::headers::build_request_headers(headers) {
+        let filtered_headers: Vec<_> = if include_cookies_referrer_ua {
+            headers.to_vec()
+        } else {
+            headers
+                .iter()
+                .filter(|(k, _)| {
+                    let lower = k.to_lowercase();
+                    !lower.eq("cookie") && !lower.eq("referer") && !lower.eq("user-agent")
+                })
+                .cloned()
+                .collect()
+        };
+
+        if let Ok(hdr_map) = build_request_headers(&filtered_headers) {
             req_builder = req_builder.headers(hdr_map);
         }
     }
 
-    if resume_from > 0 {
+    if use_range && resume_from > 0 {
         req_builder = req_builder.header(
             reqwest::header::RANGE,
             sayl_http::range::format_byte_range(resume_from, None),
@@ -74,7 +290,7 @@ pub async fn run_sequential_download(
         .map_err(|e| CoreError::http(None, e.to_string(), None))?;
 
     // Retry loop for transient failures (429, 503, 408, 425, 5xx) with backoff
-    let retry_policy = sayl_http::retry::RetryPolicy::default();
+    let retry_policy = RetryPolicy::default();
     let mut attempts = 0u32;
     let res = loop {
         attempts += 1;
@@ -144,6 +360,19 @@ pub async fn run_sequential_download(
     };
 
     let status = res.status();
+    // If resuming and server returns text/html, the download link expired
+    if resume_from > 0 {
+        if let Some(ct) = res.headers().get(reqwest::header::CONTENT_TYPE) {
+            if let Ok(ct_str) = ct.to_str() {
+                if ct_str.to_ascii_lowercase().starts_with("text/html") {
+                    return Err(CoreError::validation(
+                        "content_type",
+                        "الرابط منتهي الصلاحية، يرجى تحديث رابط التحميل".to_string(),
+                    ));
+                }
+            }
+        }
+    }
     let is_partial = status == reqwest::StatusCode::PARTIAL_CONTENT;
     let mut valid_partial = is_partial;
 

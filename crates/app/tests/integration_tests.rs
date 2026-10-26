@@ -1970,3 +1970,86 @@ async fn test_resume_origin_ignores_range_restarts_from_zero_staying_downloading
     let bytes = tokio::fs::read(&final_file).await.expect("read final file");
     assert_eq!(bytes, expected_data);
 }
+
+#[tokio::test]
+async fn test_fallback_without_range_truncates_partial_to_zero() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    let size = 8192;
+    let expected_data = sayl_test_http::generate_bytes(size);
+    let server_data = expected_data.clone();
+
+    tokio::spawn(async move {
+        loop {
+            let (mut socket, _) = match listener.accept().await {
+                Ok(s) => s,
+                Err(_) => break,
+            };
+            let data = server_data.clone();
+            tokio::spawn(async move {
+                let mut buf = vec![0u8; 4096];
+                let n = socket.read(&mut buf).await.unwrap_or(0);
+                let req = String::from_utf8_lossy(&buf[..n]);
+
+                if req.contains("Range:") {
+                    // Reject Range with 400 Bad Request to trigger fallback without Range
+                    let resp = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                } else {
+                    // Fallback request without Range: send 200 OK with full content
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                    let _ = socket.write_all(&data).await;
+                }
+            });
+        }
+    });
+
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let config = EngineConfig::default();
+    let store = std::sync::Arc::new(Store::open(store_dir.path()).expect("open store"));
+    let engine = Engine::with_store(dl_dir.path(), std::sync::Arc::clone(&store), config)
+        .expect("create engine");
+
+    let url = format!("http://{addr}/test_fallback.dat");
+    let task_id = sayl_core::id::TaskId::new();
+    let filename = "test_fallback.dat";
+
+    // Pre-create partial file with 4000 junk bytes
+    let part_path = dl_dir.path().join(format!("{filename}.part"));
+    tokio::fs::write(&part_path, vec![0xEE; 4000])
+        .await
+        .expect("write dummy partial");
+
+    let mut record = TaskRecord::with_id(task_id, &url, dl_dir.path(), filename);
+    record.total_size = Some(size as u64);
+    record.written = 4000;
+    record.state = DownloadState::Paused;
+    store.upsert_task(&record).expect("upsert record");
+
+    let checkpoint =
+        sayl_storage::Checkpoint::new(task_id, 4000, Some(size as u64), vec![(0, 4000)]);
+    store.save_checkpoint(&checkpoint).expect("save checkpoint");
+
+    // Start download — should attempt with Range (fails), then fallback without Range (truncates to 0)
+    engine.start(task_id).await.expect("start task");
+    let terminal = wait_for_terminal(&engine, task_id, Duration::from_secs(5)).await;
+
+    assert_eq!(terminal, DownloadState::Completed);
+
+    let final_file = dl_dir.path().join(filename);
+    let bytes = tokio::fs::read(&final_file).await.expect("read final file");
+    assert_eq!(
+        bytes.len(),
+        size,
+        "file length must be exactly full size, not appended to partial"
+    );
+    assert_eq!(bytes, expected_data);
+}

@@ -250,6 +250,33 @@ export function sanitizeUrlForLog(rawUrl) {
   }
 }
 
+/** URL dedupe cache - module level for testability */
+export const urlDedupeCache = new Map();
+export const DEDUPE_WINDOW_MS = 15_000;
+
+export function isUrlDeduped(url, nowMs = Date.now()) {
+  const lastSeen = urlDedupeCache.get(url);
+  if (lastSeen && nowMs - lastSeen < DEDUPE_WINDOW_MS) {
+    return true;
+  }
+  recordUrlDedupe(url, nowMs);
+  return false;
+}
+
+export function recordUrlDedupe(url, nowMs = Date.now()) {
+  urlDedupeCache.set(url, nowMs);
+  // Prune old entries periodically
+  if (urlDedupeCache.size > 1000) {
+    for (const [u, t] of urlDedupeCache.entries()) {
+      if (nowMs - t > DEDUPE_WINDOW_MS) urlDedupeCache.delete(u);
+    }
+  }
+}
+
+export function resetUrlDedupeCache() {
+  urlDedupeCache.clear();
+}
+
 /**
  * Evaluates whether a download item should be intercepted by SAYL.
  * @param {object} params
@@ -259,6 +286,8 @@ export function sanitizeUrlForLog(rawUrl) {
  * @param {string} [params.extensionId]
  * @param {string} [params.suggestedFilename] from onDeterminingFilename
  * @param {number} [params.nowMs]
+ * @param {Set<string>} [params.givenBackUrls]
+ * @param {boolean} [params.checkDedupe]
  * @returns {{ intercept: boolean, reason: string, filename: string, size: number, targetUrl: string }}
  */
 export function shouldInterceptDownload({
@@ -267,7 +296,9 @@ export function shouldInterceptDownload({
   altBypasses,
   extensionId,
   suggestedFilename,
-  nowMs = Date.now()
+  nowMs = Date.now(),
+  givenBackUrls,
+  checkDedupe = false,
 }) {
   if (!item) {
     return { intercept: false, reason: "invalid_item", filename: "", size: 0, targetUrl: "" };
@@ -278,13 +309,37 @@ export function shouldInterceptDownload({
     return { intercept: false, reason: "disabled", filename: "", size: 0, targetUrl: "" };
   }
 
+  // Guard 1: own download triggered by this extension
   if (extensionId && item.byExtensionId === extensionId) {
     return { intercept: false, reason: "own_download", filename: "", size: 0, targetUrl: "" };
+  }
+
+  // Guard 2: other extension / restored download
+  if (item.byExtensionId && (!extensionId || item.byExtensionId !== extensionId)) {
+    return { intercept: false, reason: "restored_download", filename: "", size: 0, targetUrl: "" };
+  }
+
+  // Guard 3: old download (>30s)
+  if (item.startTime) {
+    const startMs = new Date(item.startTime).getTime();
+    if (!isNaN(startMs) && (nowMs - startMs > 30_000)) {
+      return { intercept: false, reason: "old_download", filename: "", size: 0, targetUrl: "" };
+    }
   }
 
   const targetUrl = item.finalUrl || item.url || "";
   if (!targetUrl || !/^https?:\/\//i.test(targetUrl)) {
     return { intercept: false, reason: "non_http_url", filename: "", size: 0, targetUrl };
+  }
+
+  // Guard 4: given back to browser once
+  if (givenBackUrls && (givenBackUrls.has(targetUrl) || (item.url && givenBackUrls.has(item.url)))) {
+    return { intercept: false, reason: "given_back_to_browser", filename: "", size: 0, targetUrl };
+  }
+
+  // Guard 5: 15s same-URL dedupe
+  if (checkDedupe && isUrlDeduped(targetUrl, nowMs)) {
+    return { intercept: false, reason: "url_deduped", filename: "", size: 0, targetUrl };
   }
 
   if (isAltBypassed(targetUrl, altBypasses, nowMs, 10000) || (item.url && isAltBypassed(item.url, altBypasses, nowMs, 10000))) {
@@ -310,4 +365,94 @@ export function shouldInterceptDownload({
   }
 
   return { intercept: true, reason: "allowed", filename, size, targetUrl };
+}
+
+/**
+ * Executes the complete download capture pipeline:
+ * 1. Checks guards and rules.
+ * 2. On intercept: immediately cancels and erases the browser download (never keeps it).
+ * 3. Sends capture payload to SAYL native host.
+ * 4. Only if host send fails: re-downloads once in the browser via downloadsApi.download.
+ */
+export async function processDownloadCapture({
+  item,
+  settings,
+  altBypasses,
+  extensionId,
+  suggestedFilename,
+  nowMs = Date.now(),
+  givenBackUrls = new Set(),
+  downloadsApi,
+  sendCaptureFn
+}) {
+  const decision = shouldInterceptDownload({
+    item,
+    settings,
+    altBypasses,
+    extensionId,
+    suggestedFilename,
+    nowMs,
+    givenBackUrls,
+    checkDedupe: true
+  });
+
+  if (!decision.intercept) {
+    if (decision.reason === "given_back_to_browser") {
+      givenBackUrls.delete(decision.targetUrl);
+      if (item.url) givenBackUrls.delete(item.url);
+    }
+    return { intercept: false, reason: decision.reason, cancelled: false };
+  }
+
+  // 1. Immediately cancel and erase browser download so it never runs in both
+  let cancelled = false;
+  let erased = false;
+  if (downloadsApi?.cancel) {
+    await downloadsApi.cancel(item.id);
+    cancelled = true;
+  }
+  if (downloadsApi?.erase) {
+    await downloadsApi.erase({ id: item.id });
+    erased = true;
+  }
+
+  // Record dedupe
+  recordUrlDedupe(decision.targetUrl, nowMs);
+  if (item.url && item.url !== decision.targetUrl) {
+    recordUrlDedupe(item.url, nowMs);
+  }
+
+  // 2. Send to native host
+  let hostResult = null;
+  if (sendCaptureFn) {
+    hostResult = await sendCaptureFn({
+      url: item.url || decision.targetUrl,
+      final_url: decision.targetUrl,
+      filename: decision.filename,
+      size: decision.size
+    });
+  }
+
+  // 3. Only if host send fails: re-download once in browser
+  let redownloaded = false;
+  if (hostResult && !hostResult.ok) {
+    givenBackUrls.add(decision.targetUrl);
+    if (item.url) givenBackUrls.add(item.url);
+    if (downloadsApi?.download) {
+      await downloadsApi.download({
+        url: decision.targetUrl,
+        filename: decision.filename || undefined
+      });
+      redownloaded = true;
+    }
+  }
+
+  return {
+    intercept: true,
+    decision,
+    cancelled,
+    erased,
+    hostResult,
+    redownloaded
+  };
 }

@@ -12,7 +12,11 @@ import {
   sanitizeUrlForLog,
   shouldInterceptDownload,
   isGithubRedirectUrl,
-  resolveInterceptFilename
+  resolveInterceptFilename,
+  isUrlDeduped,
+  resetUrlDedupeCache,
+  urlDedupeCache,
+  processDownloadCapture
 } from "./rules.mjs";
 
 describe("rules.mjs pure logic", () => {
@@ -296,5 +300,226 @@ describe("rules.mjs pure logic", () => {
       assert.equal(res.intercept, true);
       assert.equal(res.filename, "app.zip");
     });
+
+    test("13. own download is skipped (byExtensionId)", () => {
+      const extId = "abcdefghijklmnop";
+      const item = {
+        id: 8,
+        url: "https://example.com/file.zip",
+        filename: "file.zip",
+        totalBytes: 20 * 1024 * 1024,
+        byExtensionId: extId
+      };
+      const res = shouldInterceptDownload({
+        item,
+        settings: baseSettings,
+        extensionId: extId
+      });
+      assert.equal(res.intercept, false);
+      assert.equal(res.reason, "own_download");
+    });
+  });
+});
+
+describe("isUrlDeduped", () => {
+  test("1. same URL within 15s is deduped", () => {
+    resetUrlDedupeCache();
+    const url = "https://example.com/file.zip";
+    assert.equal(isUrlDeduped(url), false, "first time should not be deduped");
+    assert.equal(isUrlDeduped(url), true, "second time within 15s should be deduped");
+  });
+
+  test("2. same URL after 15s is not deduped", () => {
+    resetUrlDedupeCache();
+    const url = "https://example.com/file2.zip";
+    assert.equal(isUrlDeduped(url), false);
+    // Simulate time passing by manipulating the cache directly
+    urlDedupeCache.set(url, Date.now() - 20_000);
+    assert.equal(isUrlDeduped(url), false, "after 15s should not be deduped");
+  });
+
+  test("3. different URLs are not deduped", () => {
+    resetUrlDedupeCache();
+    assert.equal(isUrlDeduped("https://example.com/a.zip"), false);
+    assert.equal(isUrlDeduped("https://example.com/b.zip"), false);
+  });
+});
+
+describe("extension guards and download capture pipeline", () => {
+  const baseSettings = { enabled: true, minSizeMb: 1, extensions: DEFAULT_EXTENSIONS };
+  const baseAltBypasses = {};
+
+  test("14. normal new download is captured and allowed (guards do not skip it)", () => {
+    resetUrlDedupeCache();
+    const now = Date.now();
+    const item = {
+      id: 201,
+      url: "https://example.com/fresh-release.zip",
+      filename: "fresh-release.zip",
+      totalBytes: 15 * 1024 * 1024,
+      startTime: new Date(now - 1000).toISOString() // 1 second ago
+    };
+    const res = shouldInterceptDownload({
+      item,
+      settings: baseSettings,
+      altBypasses: baseAltBypasses,
+      extensionId: "our-extension-id",
+      nowMs: now
+    });
+    assert.equal(res.intercept, true);
+    assert.equal(res.reason, "allowed");
+  });
+
+  test("15. captured download => cancel called immediately, browser download not kept", async () => {
+    resetUrlDedupeCache();
+    const cancelledIds = [];
+    const erasedIds = [];
+    const fakeDownloadsApi = {
+      cancel: async (id) => { cancelledIds.push(id); },
+      erase: async (query) => { erasedIds.push(query.id); },
+      download: async () => {}
+    };
+    const fakeSendCapture = async () => ({ ok: true, response: { task_id: "sayl-task-99" } });
+
+    const item = {
+      id: 202,
+      url: "https://example.com/package.tar.gz",
+      filename: "package.tar.gz",
+      totalBytes: 50 * 1024 * 1024
+    };
+
+    const res = await processDownloadCapture({
+      item,
+      settings: baseSettings,
+      downloadsApi: fakeDownloadsApi,
+      sendCaptureFn: fakeSendCapture
+    });
+
+    assert.equal(res.intercept, true);
+    assert.equal(res.cancelled, true, "chrome.downloads.cancel must be called immediately");
+    assert.equal(res.erased, true, "chrome.downloads.erase must be called immediately");
+    assert.deepEqual(cancelledIds, [202]);
+    assert.deepEqual(erasedIds, [202]);
+    assert.equal(res.redownloaded, false, "must not re-download when host succeeds");
+  });
+
+  test("16. host send fails => re-downloaded in browser once with marker (give back once)", async () => {
+    resetUrlDedupeCache();
+    const redownloadedUrls = [];
+    const fakeDownloadsApi = {
+      cancel: async () => {},
+      erase: async () => {},
+      download: async (opts) => { redownloadedUrls.push(opts.url); }
+    };
+    const fakeSendCaptureFail = async () => ({
+      ok: false,
+      error: { code: "HOST_UNREACHABLE", message: "Sayl app not running" }
+    });
+    const givenBackUrls = new Set();
+
+    const item = {
+      id: 203,
+      url: "https://example.com/driver.msi",
+      filename: "driver.msi",
+      totalBytes: 25 * 1024 * 1024
+    };
+
+    // First attempt: host fails
+    const res = await processDownloadCapture({
+      item,
+      settings: baseSettings,
+      givenBackUrls,
+      downloadsApi: fakeDownloadsApi,
+      sendCaptureFn: fakeSendCaptureFail
+    });
+
+    assert.equal(res.intercept, true);
+    assert.equal(res.cancelled, true, "original download must be cancelled first");
+    assert.equal(res.redownloaded, true, "must trigger browser re-download once");
+    assert.deepEqual(redownloadedUrls, ["https://example.com/driver.msi"]);
+    assert.equal(givenBackUrls.has("https://example.com/driver.msi"), true);
+
+    // Second event arriving from browser re-download: must be skipped and allowed in browser
+    const retryItem = {
+      id: 204,
+      url: "https://example.com/driver.msi",
+      filename: "driver.msi",
+      totalBytes: 25 * 1024 * 1024
+    };
+    const retryRes = shouldInterceptDownload({
+      item: retryItem,
+      settings: baseSettings,
+      givenBackUrls
+    });
+    assert.equal(retryRes.intercept, false);
+    assert.equal(retryRes.reason, "given_back_to_browser");
+  });
+
+  test("17. restored download (byExtensionId from other extension) is skipped", () => {
+    const item = {
+      id: 205,
+      url: "https://example.com/other-ext.zip",
+      filename: "other-ext.zip",
+      totalBytes: 10 * 1024 * 1024,
+      byExtensionId: "some-other-extension-id"
+    };
+    const res = shouldInterceptDownload({
+      item,
+      settings: baseSettings,
+      extensionId: "our-extension-id"
+    });
+    assert.equal(res.intercept, false);
+    assert.equal(res.reason, "restored_download");
+  });
+
+  test("18. download older than 30s is skipped", () => {
+    const now = Date.now();
+    const item = {
+      id: 206,
+      url: "https://example.com/old-file.zip",
+      filename: "old-file.zip",
+      totalBytes: 10 * 1024 * 1024,
+      startTime: new Date(now - 45_000).toISOString() // 45s ago
+    };
+    const res = shouldInterceptDownload({
+      item,
+      settings: baseSettings,
+      nowMs: now
+    });
+    assert.equal(res.intercept, false);
+    assert.equal(res.reason, "old_download");
+  });
+
+  test("19. same-URL dedupe within 15s is skipped when checkDedupe is true", () => {
+    resetUrlDedupeCache();
+    const now = Date.now();
+    const url = "https://example.com/dedupe-file.zip";
+    const item = {
+      id: 207,
+      url,
+      filename: "dedupe-file.zip",
+      totalBytes: 10 * 1024 * 1024
+    };
+
+    const first = shouldInterceptDownload({
+      item,
+      settings: baseSettings,
+      nowMs: now,
+      checkDedupe: true
+    });
+    assert.equal(first.intercept, true);
+
+    // Record dedupe for this URL
+    urlDedupeCache.set(url, now);
+
+    // Second download for same URL within 15s
+    const second = shouldInterceptDownload({
+      item: { ...item, id: 208 },
+      settings: baseSettings,
+      nowMs: now + 5000,
+      checkDedupe: true
+    });
+    assert.equal(second.intercept, false);
+    assert.equal(second.reason, "url_deduped");
   });
 });
