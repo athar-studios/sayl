@@ -191,6 +191,48 @@ describe("rules.mjs pure logic", () => {
       assert.equal(res.reason, "disabled");
     });
 
+    test("8. crdownload local name does not block URL extension intercept", () => {
+      const item = {
+        id: 9,
+        url: "https://example.com/a.zip",
+        filename: "Unconfirmed 12345.crdownload",
+        totalBytes: 5 * 1024 * 1024
+      };
+      const res = shouldInterceptDownload({ item, settings: baseSettings });
+      assert.equal(res.intercept, true);
+      assert.equal(res.reason, "allowed");
+      assert.equal(res.filename, "a.zip");
+    });
+
+    test("9. URL without listed extension is not intercepted without suggested name", () => {
+      const item = {
+        id: 10,
+        url: "https://example.com/page",
+        filename: "Unconfirmed 99.crdownload",
+        totalBytes: 5 * 1024 * 1024
+      };
+      const res = shouldInterceptDownload({ item, settings: baseSettings });
+      assert.equal(res.intercept, false);
+      assert.equal(res.reason, "non_listed_extension");
+    });
+
+    test("10. suggested filename enables intercept when URL has no extension", () => {
+      const item = {
+        id: 11,
+        url: "https://example.com/page",
+        filename: "Unconfirmed 99.crdownload",
+        totalBytes: 5 * 1024 * 1024
+      };
+      const res = shouldInterceptDownload({
+        item,
+        settings: baseSettings,
+        suggestedFilename: "report.pdf"
+      });
+      assert.equal(res.intercept, true);
+      assert.equal(res.reason, "allowed");
+      assert.equal(res.filename, "report.pdf");
+    });
+
     test("7. own download is skipped", () => {
       const extId = "abcdefghijklmnop";
       const item = {

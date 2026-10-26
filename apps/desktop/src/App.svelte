@@ -22,6 +22,7 @@
   import Toolbar from "./lib/Toolbar.svelte";
   import TaskList from "./lib/TaskList.svelte";
   import AddTaskDialog from "./lib/AddTaskDialog.svelte";
+  import PreDownloadDialog from "./lib/PreDownloadDialog.svelte";
   import DuplicateTaskDialog from "./lib/DuplicateTaskDialog.svelte";
   import DeleteConfirmDialog from "./lib/DeleteConfirmDialog.svelte";
   import DownloadWindow from "./lib/DownloadWindow.svelte";
@@ -62,6 +63,9 @@
   let tourActive = false;
   let extensionGuideOpen = false;
 
+  let preDownloadOpen = false;
+  let captureOffer = null;
+
   // Duplicate task dialog state
   let duplicateDialogOpen = false;
   let duplicateExistingTask = null;
@@ -89,6 +93,7 @@
   let unlistenShutdown = null;
   let unlistenDragDrop = null;
   let unlistenClipboardUrl = null;
+  let unlistenCaptureOffer = null;
 
   // Pending start/resume state keyed by task id (Item 3)
   let pendingStart = new Set();
@@ -812,6 +817,44 @@
     extensionGuideOpen = true;
   }
 
+  async function handleCaptureOfferConfirm(event) {
+    const { taskId, filename, folder } = event.detail || {};
+    if (!taskId) {
+      preDownloadOpen = false;
+      captureOffer = null;
+      return;
+    }
+    try {
+      await invoke("prepare_capture_task", {
+        id: taskId,
+        filename,
+        save_path: folder,
+      });
+      markPendingStart(taskId);
+      await invoke("start_task", { id: taskId });
+      preDownloadOpen = false;
+      captureOffer = null;
+      await loadTasks();
+    } catch (err) {
+      const msg =
+        typeof err === "string"
+          ? err
+          : err?.message || ($currentLang === "ar" ? "تعذر بدء التنزيل" : "Failed to start download");
+      showToast(msg, "error");
+    }
+  }
+
+  async function handleCaptureOfferCancel() {
+    const taskId = captureOffer?.task_id;
+    preDownloadOpen = false;
+    captureOffer = null;
+    if (!taskId) return;
+    try {
+      await invoke("delete_task", { id: taskId, delete_files: false });
+      await loadTasks();
+    } catch (_) {}
+  }
+
   onMount(async () => {
     // Initial mount: exactly one get_settings + one list_tasks (Req 11)
     await loadSettings();
@@ -849,6 +892,13 @@
             droppedUrl = url;
             addDialogOpen = true;
           }
+        });
+
+        unlistenCaptureOffer = await listen("sayl://capture-offer", (event) => {
+          const payload = event.payload;
+          if (!payload?.task_id) return;
+          captureOffer = payload;
+          preDownloadOpen = true;
         });
 
         // Open settings listener (Req 11)
@@ -971,6 +1021,7 @@
     if (unlistenTasksChanged) unlistenTasksChanged();
     if (unlistenTrayAction) unlistenTrayAction();
     if (unlistenClipboardUrl) unlistenClipboardUrl();
+    if (unlistenCaptureOffer) unlistenCaptureOffer();
     if (unlistenOpenSettings) unlistenOpenSettings();
     if (unlistenWindowClosed) unlistenWindowClosed();
     if (unlistenProgress) unlistenProgress();
@@ -1189,6 +1240,14 @@
       droppedUrl = "";
     }}
     on:submit={(e) => handleAddTask(e.detail)}
+  />
+
+  <PreDownloadDialog
+    open={preDownloadOpen}
+    offer={captureOffer}
+    defaultFolder={settings.download_dir}
+    on:confirm={handleCaptureOfferConfirm}
+    on:cancel={handleCaptureOfferCancel}
   />
 
   <!-- Duplicate Task Dialog -->

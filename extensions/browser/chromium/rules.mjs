@@ -8,6 +8,23 @@ export const DEFAULT_EXTENSIONS = [
 
 export const DEFAULT_MIN_SIZE_MB = 1;
 
+/** Browser temp/in-progress download extensions to ignore when choosing a name. */
+export const TEMP_DOWNLOAD_EXTENSIONS = new Set([
+  "crdownload",
+  "tmp",
+  "partial",
+  ""
+]);
+
+/**
+ * @param {string} filename
+ * @returns {boolean}
+ */
+export function isTempDownloadName(filename) {
+  const ext = extractExtension(filename);
+  return TEMP_DOWNLOAD_EXTENSIONS.has(ext);
+}
+
 /**
  * Normalizes an array or comma-separated string into a Set of lowercase extensions without leading dots.
  * @param {string[]|string|Set<string>} input
@@ -175,6 +192,7 @@ export function sanitizeUrlForLog(rawUrl) {
  * @param {object} [params.settings] { enabled, extensions, minSizeMb }
  * @param {Record<string, number>} [params.altBypasses]
  * @param {string} [params.extensionId]
+ * @param {string} [params.suggestedFilename] from onDeterminingFilename
  * @param {number} [params.nowMs]
  * @returns {{ intercept: boolean, reason: string, filename: string, size: number, targetUrl: string }}
  */
@@ -183,6 +201,7 @@ export function shouldInterceptDownload({
   settings,
   altBypasses,
   extensionId,
+  suggestedFilename,
   nowMs = Date.now()
 }) {
   if (!item) {
@@ -207,8 +226,26 @@ export function shouldInterceptDownload({
     return { intercept: false, reason: "alt_bypass", filename: "", size: 0, targetUrl };
   }
 
-  const filename = extractBasename(item.filename) || extractBasename(targetUrl) || "download";
   const allowedExtensions = settings?.extensions ?? DEFAULT_EXTENSIONS;
+  const urlBasename = extractBasename(targetUrl);
+  let filename = urlBasename || "download";
+
+  if (matchesExtension(urlBasename, allowedExtensions)) {
+    filename = urlBasename;
+  } else {
+    const suggestedBase = suggestedFilename
+      ? extractBasename(suggestedFilename)
+      : "";
+    const localBase = item.filename ? extractBasename(item.filename) : "";
+
+    if (suggestedBase && !isTempDownloadName(suggestedBase)) {
+      filename = suggestedBase;
+    } else if (localBase && !isTempDownloadName(localBase)) {
+      filename = localBase;
+    } else {
+      filename = urlBasename || localBase || "download";
+    }
+  }
 
   if (!matchesExtension(filename, allowedExtensions)) {
     return { intercept: false, reason: "non_listed_extension", filename, size: 0, targetUrl };

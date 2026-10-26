@@ -9,9 +9,12 @@ use std::time::Duration;
 
 use sayl_app::Engine;
 use sayl_bridge::ipc::{capture_ipc_path, CaptureIpcInfo};
+use sayl_bridge::log::{append_log, sanitize_url};
 use sayl_bridge::BrowserCookie;
+use sayl_core::state::DownloadState;
 use serde::Deserialize;
 use serde_json::json;
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;
@@ -124,10 +127,20 @@ async fn write_response(
     Ok(())
 }
 
+#[derive(Clone, serde::Serialize)]
+pub struct CaptureOfferPayload {
+    pub task_id: String,
+    pub filename: String,
+    pub size: Option<u64>,
+    pub url: String,
+}
+
 async fn handle_connection(
     mut stream: TcpStream,
     expected_token: Arc<String>,
     engine: Engine,
+    app_handle: Option<AppHandle>,
+    data_dir: PathBuf,
 ) -> std::io::Result<()> {
     let mut buffer = Vec::with_capacity(16 * 1024);
     let mut chunk = [0u8; 4096];
@@ -336,11 +349,11 @@ async fn handle_connection(
             }
         }
 
-        // Add task to engine with metadata and start it
+        // Queue task with metadata; download bytes start only after UI confirm.
         match engine
             .add_with_metadata(
                 target_url,
-                sanitized_filename,
+                sanitized_filename.clone(),
                 size_or_none,
                 payload.referrer.clone(),
                 Some(custom_headers),
@@ -348,7 +361,35 @@ async fn handle_connection(
             .await
         {
             Ok(task_id) => {
-                std::mem::drop(engine.spawn_start(task_id));
+                let filename_for_ui = sanitized_filename.unwrap_or_else(|| "download".to_string());
+                let offer = CaptureOfferPayload {
+                    task_id: task_id.to_string(),
+                    filename: filename_for_ui.clone(),
+                    size: size_or_none,
+                    url: target_url.to_string(),
+                };
+
+                let _ = append_log(
+                    Some(&data_dir),
+                    "info",
+                    "capture_offer",
+                    json!({
+                        "task_id": task_id.to_string(),
+                        "filename": filename_for_ui,
+                        "size": size_or_none,
+                        "url": sanitize_url(target_url),
+                    }),
+                );
+
+                if let Some(handle) = app_handle.as_ref() {
+                    if let Some(window) = handle.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.unminimize();
+                        let _ = window.set_focus();
+                    }
+                    let _ = handle.emit("sayl://capture-offer", &offer);
+                }
+
                 let resp_body = json!({
                     "status": "accepted",
                     "task_id": task_id.to_string(),
@@ -376,6 +417,7 @@ pub async fn start_capture_server(
     engine: Engine,
     data_dir: PathBuf,
     custom_token: Option<String>,
+    app_handle: Option<AppHandle>,
 ) -> Result<CaptureServerHandle, String> {
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
@@ -404,6 +446,7 @@ pub async fn start_capture_server(
     let (shutdown_tx, mut shutdown_rx) = oneshot::channel();
     let token_arc = Arc::new(token.clone());
 
+    let data_dir_for_conn = data_dir.clone();
     let server_task = tokio::spawn(async move {
         loop {
             tokio::select! {
@@ -412,10 +455,18 @@ pub async fn start_capture_server(
                         Ok((stream, _)) => {
                             let token_clone = Arc::clone(&token_arc);
                             let engine_clone = engine.clone();
+                            let app_handle_clone = app_handle.clone();
+                            let data_dir_clone = data_dir_for_conn.clone();
                             tokio::spawn(async move {
                                 let _ = tokio::time::timeout(
                                     Duration::from_secs(15),
-                                    handle_connection(stream, token_clone, engine_clone),
+                                    handle_connection(
+                                        stream,
+                                        token_clone,
+                                        engine_clone,
+                                        app_handle_clone,
+                                        data_dir_clone,
+                                    ),
                                 ).await;
                             });
                         }
@@ -494,7 +545,7 @@ mod tests {
     #[tokio::test]
     async fn test_capture_server_health_ok() {
         let (engine, base, data_dir, _) = make_test_engine_and_dirs();
-        let handle = start_capture_server(engine, data_dir.clone(), None)
+        let handle = start_capture_server(engine, data_dir.clone(), None, None)
             .await
             .expect("start capture server");
 
@@ -514,7 +565,7 @@ mod tests {
     #[tokio::test]
     async fn test_capture_server_post_capture_with_metadata_accepted_and_task_exists() {
         let (engine, base, data_dir, _) = make_test_engine_and_dirs();
-        let handle = start_capture_server(engine.clone(), data_dir.clone(), None)
+        let handle = start_capture_server(engine.clone(), data_dir.clone(), None, None)
             .await
             .expect("start capture server");
 
@@ -553,6 +604,7 @@ mod tests {
         let rec = task_record.unwrap();
         assert_eq!(rec.filename, "archive.zip");
         assert_eq!(rec.total_size, Some(65536));
+        assert_eq!(rec.state, DownloadState::Queued);
 
         drop(handle);
         let _ = std::fs::remove_dir_all(&base);
@@ -561,7 +613,7 @@ mod tests {
     #[tokio::test]
     async fn test_capture_server_bad_token_returns_401() {
         let (engine, base, data_dir, _) = make_test_engine_and_dirs();
-        let handle = start_capture_server(engine, data_dir.clone(), None)
+        let handle = start_capture_server(engine, data_dir.clone(), None, None)
             .await
             .expect("start capture server");
 
@@ -597,7 +649,7 @@ mod tests {
     #[tokio::test]
     async fn test_capture_server_oversized_body_returns_413() {
         let (engine, base, data_dir, _) = make_test_engine_and_dirs();
-        let handle = start_capture_server(engine, data_dir.clone(), None)
+        let handle = start_capture_server(engine, data_dir.clone(), None, None)
             .await
             .expect("start capture server");
 

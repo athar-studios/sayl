@@ -1,0 +1,313 @@
+<script>
+  import { createEventDispatcher } from "svelte";
+  import { t, currentLang } from "./i18n.js";
+  import { formatBytes } from "./format.js";
+  import { CATEGORIES, classifyFile, getCategoryLabel } from "./classify.js";
+
+  export let open = false;
+  export let offer = null;
+  export let defaultFolder = "";
+
+  let filename = "";
+  let folder = "";
+  let selectedCategory = "other";
+  let busy = false;
+  let errorMsg = null;
+
+  const dispatch = createEventDispatcher();
+
+  $: if (open && offer) {
+    filename = offer.filename || "download";
+    folder = defaultFolder || "";
+    selectedCategory = classifyFile(filename, null);
+    errorMsg = null;
+    busy = false;
+  }
+
+  $: categoryOptions = CATEGORIES.filter((c) => c.id !== "all");
+
+  function handleCancel() {
+    if (busy) return;
+    dispatch("cancel");
+  }
+
+  async function handleBrowseFolder() {
+    errorMsg = null;
+    try {
+      if (typeof window !== "undefined" && (window.__TAURI_INTERNALS__ || window.__TAURI__)) {
+        const { open: openDialog } = await import("@tauri-apps/plugin-dialog");
+        const selected = await openDialog({
+          directory: true,
+          multiple: false,
+          defaultPath: folder || undefined,
+        });
+        if (selected && typeof selected === "string") {
+          folder = selected;
+        }
+      }
+    } catch (err) {
+      errorMsg = typeof err === "string" ? err : err?.message || String(err);
+    }
+  }
+
+  function handleConfirm() {
+    if (busy || !offer) return;
+    const trimmedName = (filename || "").trim();
+    const trimmedFolder = (folder || "").trim();
+    if (!trimmedName) {
+      errorMsg = $t("preDownload.errorFilename");
+      return;
+    }
+    if (!trimmedFolder) {
+      errorMsg = $t("preDownload.errorFolder");
+      return;
+    }
+    errorMsg = null;
+    dispatch("confirm", {
+      taskId: offer.task_id,
+      filename: trimmedName,
+      folder: trimmedFolder,
+      category: selectedCategory,
+      url: offer.url,
+    });
+  }
+
+  function handleKeydown(e) {
+    if (e.key === "Escape") {
+      handleCancel();
+    }
+  }
+</script>
+
+<svelte:window on:keydown={handleKeydown} />
+
+{#if open && offer}
+  <div class="dialog-backdrop" on:click={handleCancel} on:keydown={handleKeydown} role="presentation">
+    <div
+      class="dialog-card"
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+      role="dialog"
+      tabindex="-1"
+      aria-modal="true"
+      aria-labelledby="pre-dl-title"
+    >
+      <div class="dialog-header">
+        <h3 id="pre-dl-title" class="dialog-title">{$t("preDownload.title")}</h3>
+        <button class="close-btn" on:click={handleCancel} aria-label={$t("preDownload.cancel")}>
+          <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18" aria-hidden="true">
+            <path
+              fill-rule="evenodd"
+              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </button>
+      </div>
+
+      <div class="dialog-body">
+        <div class="form-group">
+          <label for="pre-filename" class="form-label">{$t("preDownload.filename")}</label>
+          <input
+            id="pre-filename"
+            class="form-control"
+            bind:value={filename}
+            type="text"
+            dir="ltr"
+            disabled={busy}
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="pre-folder" class="form-label">{$t("preDownload.folder")}</label>
+          <div class="folder-row">
+            <input
+              id="pre-folder"
+              class="form-control folder-input"
+              bind:value={folder}
+              type="text"
+              dir="ltr"
+              disabled={busy}
+            />
+            <button type="button" class="btn btn-secondary btn-sm" on:click={handleBrowseFolder} disabled={busy}>
+              {$t("preDownload.browse")}
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="pre-category" class="form-label">{$t("preDownload.category")}</label>
+          <select id="pre-category" class="form-control" bind:value={selectedCategory} disabled={busy}>
+            {#each categoryOptions as cat (cat.id)}
+              <option value={cat.id}>{getCategoryLabel(cat.id, $currentLang)}</option>
+            {/each}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <span class="form-label">{$t("preDownload.size")}</span>
+          <div class="size-readonly" dir="ltr">
+            {#if offer.size != null && offer.size > 0}
+              {formatBytes(offer.size, $currentLang)}
+            {:else}
+              {$t("preDownload.unknownSize")}
+            {/if}
+          </div>
+        </div>
+
+        {#if errorMsg}
+          <p class="error-text">{errorMsg}</p>
+        {/if}
+      </div>
+
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-secondary" on:click={handleCancel} disabled={busy}>
+          {$t("preDownload.cancel")}
+        </button>
+        <button type="button" class="btn btn-primary" on:click={handleConfirm} disabled={busy}>
+          {$t("preDownload.confirm")}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<style>
+  .dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(11, 26, 78, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1200;
+    padding: 1rem;
+  }
+
+  .dialog-card {
+    background: #fff;
+    border-radius: 12px;
+    width: min(520px, 100%);
+    box-shadow: 0 20px 50px rgba(11, 26, 78, 0.2);
+    border-top: 4px solid #00b6bd;
+    overflow: hidden;
+  }
+
+  .dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .dialog-title {
+    margin: 0;
+    font-size: 1.125rem;
+    color: #0b1a4e;
+    font-weight: 700;
+  }
+
+  .close-btn {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: #64748b;
+    padding: 0.25rem;
+    border-radius: 6px;
+  }
+
+  .dialog-body {
+    padding: 1rem 1.25rem 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .form-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #0b1a4e;
+  }
+
+  .form-control {
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.9375rem;
+  }
+
+  .folder-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .folder-input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .size-readonly {
+    padding: 0.5rem 0.65rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    color: #334155;
+    font-size: 0.9375rem;
+  }
+
+  .dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem 1.25rem 1.25rem;
+  }
+
+  .btn {
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+  }
+
+  .btn-primary {
+    background: #0b1a4e;
+    color: #fff;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: #00b6bd;
+    color: #0b1a4e;
+  }
+
+  .btn-secondary {
+    background: #f1f5f9;
+    color: #0b1a4e;
+    border: 1px solid #cbd5e1;
+  }
+
+  .btn-sm {
+    padding: 0.45rem 0.75rem;
+    font-size: 0.875rem;
+    white-space: nowrap;
+  }
+
+  .error-text {
+    color: #b91c1c;
+    font-size: 0.875rem;
+    margin: 0;
+  }
+
+  .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+</style>

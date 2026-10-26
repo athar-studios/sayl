@@ -526,7 +526,8 @@ impl Engine {
             let _ = self.inner.store.upsert_task(&record);
         }
         let part_filename = format!("{safe_filename}.part");
-        let part_path = self.resolve_destination_path(&part_filename)?;
+        let base_dir = record.save_path.as_path();
+        let part_path = self.resolve_destination_path_in(base_dir, &part_filename)?;
         let disk_len = if part_path.exists() {
             tokio::fs::metadata(&part_path)
                 .await
@@ -536,7 +537,7 @@ impl Engine {
             0
         };
 
-        let final_path = self.resolve_destination_path(&safe_filename)?;
+        let final_path = self.resolve_destination_path_in(base_dir, &safe_filename)?;
         let final_len = if final_path.exists() {
             tokio::fs::metadata(&final_path)
                 .await
@@ -1438,7 +1439,8 @@ impl Engine {
         self.transition_and_persist(record, DownloadState::Verifying)
             .await?;
 
-        let final_path = self.resolve_destination_path(&record.filename)?;
+        let final_path =
+            self.resolve_destination_path_in(record.save_path.as_path(), &record.filename)?;
 
         let actual_len = if part_path.exists() {
             tokio::fs::metadata(part_path)
@@ -1793,9 +1795,8 @@ impl Engine {
                 continue;
             }
 
-            let part_path = self
-                .inner
-                .download_dir
+            let part_path = task
+                .save_path
                 .join(format!("{}.part", task.filename));
             let part_len = if part_path.exists() {
                 tokio::fs::metadata(&part_path)
@@ -1847,7 +1848,7 @@ impl Engine {
             }
 
             // Check if final file exists and is complete (handles crash after write before finalize)
-            let final_path = self.inner.download_dir.join(&task.filename);
+            let final_path = task.save_path.join(&task.filename);
             let final_exists = final_path.exists();
             let final_len = if final_exists {
                 tokio::fs::metadata(&final_path)
@@ -1982,6 +1983,35 @@ impl Engine {
     }
 
     /// Fetches a task record by ID.
+    /// Updates filename and destination folder for a queued task (pre-download confirm).
+    pub fn update_queued_destination(
+        &self,
+        task_id: TaskId,
+        save_path: PathBuf,
+        filename: String,
+    ) -> Result<(), CoreError> {
+        let mut record = self
+            .get_task(task_id)?
+            .ok_or_else(|| CoreError::validation("task_id", "task not found"))?;
+        if record.state != DownloadState::Queued {
+            return Err(CoreError::validation(
+                "state",
+                "task must be queued to update destination",
+            ));
+        }
+        let safe_filename = sayl_http::filename::sanitize_filename(&filename);
+        if safe_filename.is_empty() {
+            return Err(CoreError::validation("filename", "filename is empty"));
+        }
+        std::fs::create_dir_all(&save_path)
+            .map_err(|e| CoreError::io_with_context(e, "create save_path"))?;
+        record.filename = safe_filename;
+        record.save_path = save_path;
+        record.updated_at = Utc::now();
+        self.inner.store.upsert_task(&record)?;
+        Ok(())
+    }
+
     pub fn get_task(&self, task_id: TaskId) -> Result<Option<TaskRecord>, CoreError> {
         self.inner.store.get_task(task_id).map_err(CoreError::from)
     }
@@ -2068,12 +2098,20 @@ impl Engine {
         Ok(())
     }
 
-    /// Resolves a safe destination path within `download_dir` from an untrusted filename,
-    /// re-sanitizing it and asserting `download_dir` is its ancestor.
+    /// Resolves a safe destination path within the engine default download directory.
     pub fn resolve_destination_path(&self, raw_filename: &str) -> Result<PathBuf, CoreError> {
+        self.resolve_destination_path_in(&self.inner.download_dir, raw_filename)
+    }
+
+    /// Resolves a safe destination path within `base_dir` from an untrusted filename.
+    pub fn resolve_destination_path_in(
+        &self,
+        base_dir: &Path,
+        raw_filename: &str,
+    ) -> Result<PathBuf, CoreError> {
         let safe_filename = sayl_http::filename::sanitize_filename(raw_filename);
-        let target_path = self.inner.download_dir.join(&safe_filename);
-        if !target_path.starts_with(&self.inner.download_dir) {
+        let target_path = base_dir.join(&safe_filename);
+        if !target_path.starts_with(base_dir) {
             return Err(CoreError::scheduler(format!(
                 "destination path traversal detected: '{raw_filename}' escapes download directory"
             )));

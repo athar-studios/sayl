@@ -5,6 +5,7 @@
 
 pub mod autostart;
 pub mod browsers;
+pub mod capture_diagnostics;
 pub mod capture_server;
 pub mod clipboard;
 pub mod delete;
@@ -544,6 +545,29 @@ pub mod commands {
         Ok(AddTaskOutcome::Added {
             task: TaskView::from_record_full(&record, None, None, parts, connections),
         })
+    }
+
+    #[tauri::command]
+    pub async fn prepare_capture_task(
+        state: State<'_, AppState>,
+        id: String,
+        filename: String,
+        save_path: String,
+    ) -> Result<(), String> {
+        validate_download_dir(&save_path)?;
+        let task_id = id
+            .parse::<TaskId>()
+            .map_err(|e| format!("Invalid task ID: {e}"))?;
+        state
+            .engine
+            .update_queued_destination(task_id, PathBuf::from(save_path), filename)
+            .map_err(|e| e.to_string())
+    }
+
+    #[tauri::command]
+    pub async fn extension_diagnostics(
+    ) -> Result<capture_diagnostics::ExtensionDiagnostics, String> {
+        Ok(capture_diagnostics::collect_extension_diagnostics().await)
     }
 
     #[tauri::command]
@@ -1089,7 +1113,9 @@ pub fn run() {
             commands::open_extension_folder,
             commands::open_browser_extensions,
             commands::open_download_window,
-            commands::close_download_window
+            commands::close_download_window,
+            commands::prepare_capture_task,
+            commands::extension_diagnostics
         ])
         .on_page_load(move |_webview, payload| {
             if payload.event() == tauri::webview::PageLoadEvent::Finished {
@@ -1213,8 +1239,16 @@ pub fn run() {
             // Start loopback IPC capture server
             let capture_engine = engine.clone();
             let capture_data_dir = default_data_dir();
+            let capture_app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                match capture_server::start_capture_server(capture_engine, capture_data_dir, None).await {
+                match capture_server::start_capture_server(
+                    capture_engine,
+                    capture_data_dir,
+                    None,
+                    Some(capture_app_handle),
+                )
+                .await
+                {
                     Ok(handle) => {
                         Box::leak(Box::new(handle));
                     }

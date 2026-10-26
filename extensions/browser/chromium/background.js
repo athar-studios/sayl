@@ -238,82 +238,14 @@ function checkHealth() {
   );
 }
 
-// Track handled downloads to avoid duplicates
-const handledDownloads = new Set();
+/** @type {Map<number, { suggestedFilename?: string, captureInFlight?: boolean, accepted?: boolean }>} */
+const downloadCaptureState = new Map();
 
-// Listen to download creation
-chrome.downloads.onCreated.addListener(async (item) => {
-  if (!item || !item.id) return;
-  if (handledDownloads.has(item.id)) return;
-  handledDownloads.add(item.id);
-  // Clear item from set after 5 minutes
-  setTimeout(() => handledDownloads.delete(item.id), 5 * 60 * 1000);
+function pruneDownloadState(id) {
+  setTimeout(() => downloadCaptureState.delete(id), 5 * 60 * 1000);
+}
 
-  const targetUrl = item.finalUrl || item.url || "";
-  const cleanUrl = sanitizeUrlForLog(targetUrl);
-  sendLog("info", "Download created", cleanUrl);
-
-  const settings = await getSettings();
-
-  let altBypasses = {};
-  try {
-    const sessionRes = await chrome.storage.session.get("alt_clicks");
-    altBypasses = (sessionRes && sessionRes.alt_clicks) || {};
-  } catch (_) {}
-
-  const decision = shouldInterceptDownload({
-    item,
-    settings,
-    altBypasses,
-    extensionId: chrome.runtime.id,
-    nowMs: Date.now()
-  });
-
-  if (!decision.intercept) {
-    sendLog("info", `Download skipped: ${decision.reason}`, cleanUrl);
-    return;
-  }
-
-  sendLog("info", "Download matched rules", cleanUrl);
-
-  const cookies = await getCookiesForUrl(targetUrl);
-  const payload = {
-    type: "Capture",
-    version: 1,
-    url: item.url || targetUrl,
-    final_url: targetUrl,
-    filename: decision.filename,
-    referrer: item.referrer || "",
-    cookies,
-    user_agent: navigator.userAgent,
-    size: decision.size,
-    mime: item.mime || ""
-  };
-
-  sendLog(
-    "info",
-    "Sending capture payload to SAYL host",
-    `file=${decision.filename}, size=${decision.size}`
-  );
-
-  const captureResult = await sendCaptureToHost(payload);
-  if (!captureResult.ok) {
-    // On error, timeout, or no response: do NOT touch download (never lose it)
-    const errCode = captureResult.error.code;
-    const errMsg = captureResult.error.message;
-    sendLog("warn", `Fallback error: ${errCode} - ${errMsg}`, cleanUrl);
-    setBadgeWarning(errCode, errMsg);
-    return;
-  }
-
-  // Capture accepted!
-  const taskId = captureResult.response.task_id;
-  sendLog("info", `Download accepted by SAYL (task ${taskId})`, cleanUrl);
-  setBadgeSuccess();
-
-  // Cancel and erase browser download. A fast origin can finish the browser
-  // download before SAYL accepts it, so remove the file even when the state is
-  // already "complete" - otherwise the user keeps a duplicate copy.
+async function cancelBrowserDownload(item, taskId, cleanUrl) {
   try {
     await chrome.downloads.cancel(item.id);
     await new Promise((resolve) => setTimeout(resolve, 150));
@@ -332,6 +264,123 @@ chrome.downloads.onCreated.addListener(async (item) => {
       cleanUrl
     );
   }
+}
+
+async function evaluateAndCaptureDownload(item, suggestedFilename) {
+  if (!item || !item.id) return;
+
+  const id = item.id;
+  let state = downloadCaptureState.get(id) || {};
+  if (state.accepted || state.captureInFlight) return;
+
+  if (suggestedFilename) {
+    state.suggestedFilename = suggestedFilename;
+  }
+
+  state.captureInFlight = true;
+  downloadCaptureState.set(id, state);
+
+  const effectiveSuggested = state.suggestedFilename || suggestedFilename;
+  const targetUrl = item.finalUrl || item.url || "";
+  const cleanUrl = sanitizeUrlForLog(targetUrl);
+
+  try {
+    const settings = await getSettings();
+
+    let altBypasses = {};
+    try {
+      const sessionRes = await chrome.storage.session.get("alt_clicks");
+      altBypasses = (sessionRes && sessionRes.alt_clicks) || {};
+    } catch (_) {}
+
+    const decision = shouldInterceptDownload({
+      item,
+      settings,
+      altBypasses,
+      extensionId: chrome.runtime.id,
+      suggestedFilename: effectiveSuggested,
+      nowMs: Date.now()
+    });
+
+    if (!decision.intercept) {
+      sendLog("info", `Download skipped: ${decision.reason}`, cleanUrl);
+      state = downloadCaptureState.get(id) || {};
+      if (!state.accepted) {
+        state.captureInFlight = false;
+        downloadCaptureState.set(id, state);
+      }
+      return;
+    }
+
+    state = downloadCaptureState.get(id) || {};
+    if (state.accepted) return;
+
+    sendLog("info", "Download matched rules", cleanUrl);
+
+    const cookies = await getCookiesForUrl(targetUrl);
+    const payload = {
+      type: "Capture",
+      version: 1,
+      url: item.url || targetUrl,
+      final_url: targetUrl,
+      filename: decision.filename,
+      referrer: item.referrer || "",
+      cookies,
+      user_agent: navigator.userAgent,
+      size: decision.size,
+      mime: item.mime || ""
+    };
+
+    sendLog(
+      "info",
+      "Sending capture payload to SAYL host",
+      `file=${decision.filename}, size=${decision.size}`
+    );
+
+    const captureResult = await sendCaptureToHost(payload);
+
+    state = downloadCaptureState.get(id) || {};
+    state.captureInFlight = false;
+
+    if (!captureResult.ok) {
+      downloadCaptureState.set(id, state);
+      const errCode = captureResult.error.code;
+      const errMsg = captureResult.error.message;
+      sendLog("warn", `Fallback error: ${errCode} - ${errMsg}`, cleanUrl);
+      setBadgeWarning(errCode, errMsg);
+      return;
+    }
+
+    state.accepted = true;
+    downloadCaptureState.set(id, state);
+    pruneDownloadState(id);
+
+    const taskId = captureResult.response.task_id;
+    sendLog("info", `Download accepted by SAYL (task ${taskId})`, cleanUrl);
+    setBadgeSuccess();
+
+    await cancelBrowserDownload(item, taskId, cleanUrl);
+  } catch (err) {
+    state = downloadCaptureState.get(id) || {};
+    if (!state.accepted) {
+      state.captureInFlight = false;
+      downloadCaptureState.set(id, state);
+    }
+    throw err;
+  }
+}
+
+chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
+  const suggested = item.filename || "";
+  suggest({ filename: suggested });
+  const basename = extractBasename(suggested);
+  void evaluateAndCaptureDownload(item, basename || undefined);
+});
+
+chrome.downloads.onCreated.addListener(async (item) => {
+  if (!item || !item.id) return;
+  sendLog("info", "Download created", sanitizeUrlForLog(item.finalUrl || item.url || ""));
+  await evaluateAndCaptureDownload(item, undefined);
 });
 
 // Setup context menu on installation

@@ -35,6 +35,7 @@
   let extensionGuideOpen = false;
   let guideBrowser = null;
   let stagedExtensionDir = "";
+  let extensionDiagnostics = null;
 
   const sections = SETTINGS_SECTIONS;
 
@@ -69,9 +70,10 @@
     if (loadingExtensionState) return;
     loadingExtensionState = true;
     try {
-      const [nhRes, bRes] = await Promise.allSettled([
+      const [nhRes, bRes, diagRes] = await Promise.allSettled([
         safeInvoke("native_host_status"),
         safeInvoke("browser_status"),
+        safeInvoke("extension_diagnostics"),
       ]);
 
       if (nhRes.status === "fulfilled" && nhRes.value) {
@@ -86,8 +88,15 @@
       } else {
         browserList = [];
       }
+
+      if (diagRes.status === "fulfilled" && diagRes.value) {
+        extensionDiagnostics = diagRes.value;
+      } else {
+        extensionDiagnostics = null;
+      }
     } catch {
       browserList = [];
+      extensionDiagnostics = null;
     } finally {
       loadingExtensionState = false;
     }
@@ -651,6 +660,66 @@
                   {:else}
                     <span>{$t("extension.testFailed").replace("{msg}", testResult.message || "")}</span>
                   {/if}
+                </div>
+              {/if}
+
+              {#if extensionDiagnostics}
+                <div class="capture-diagnostics-box">
+                  <h5 class="diag-title">{$t("extension.diagTitle")}</h5>
+                  <dl class="diag-meta">
+                    <div class="diag-row">
+                      <dt>{$t("extension.diagExtensionVersion")}</dt>
+                      <dd dir="ltr">{extensionDiagnostics.extension_version || $t("extension.diagNone")}</dd>
+                    </div>
+                    <div class="diag-row">
+                      <dt>{$t("extension.diagExtensionPath")}</dt>
+                      <dd dir="ltr" class="diag-path">{extensionDiagnostics.extension_path}</dd>
+                    </div>
+                    <div class="diag-row">
+                      <dt>{$t("extension.diagBridgePing")}</dt>
+                      <dd>
+                        {#if extensionDiagnostics.bridge_ping_reached}
+                          <span class="diag-ok">{$t("extension.diagBridgeReached")}</span>
+                        {:else}
+                          <span class="diag-warn">{$t("extension.diagBridgeNotReached")}</span>
+                        {/if}
+                      </dd>
+                    </div>
+                    <div class="diag-row">
+                      <dt>{$t("extension.diagLastCapture")}</dt>
+                      <dd dir="ltr">
+                        {extensionDiagnostics.last_capture_event || $t("extension.diagNone")}
+                        {#if extensionDiagnostics.last_capture_time}
+                          <small>({extensionDiagnostics.last_capture_time})</small>
+                        {/if}
+                      </dd>
+                    </div>
+                    <div class="diag-row">
+                      <dt>{$t("extension.diagLastError")}</dt>
+                      <dd dir="ltr">
+                        {extensionDiagnostics.last_error_event || $t("extension.diagNone")}
+                        {#if extensionDiagnostics.last_error_time}
+                          <small>({extensionDiagnostics.last_error_time})</small>
+                        {/if}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <div class="diag-browsers">
+                    {#each extensionDiagnostics.browsers as row (row.id)}
+                      <div class="diag-browser-row">
+                        <strong>{row.name}</strong>
+                        <span>
+                          {$t("extension.diagInstalled")}:
+                          {row.installed ? $t("extension.diagHostKeyYes") : $t("extension.diagHostKeyNo")}
+                        </span>
+                        <span>
+                          {$t("extension.diagHostKey")}:
+                          {row.host_key_present ? $t("extension.diagHostKeyYes") : $t("extension.diagHostKeyNo")}
+                        </span>
+                      </div>
+                    {/each}
+                  </div>
                 </div>
               {/if}
 
@@ -1235,6 +1304,83 @@
     background: rgba(239, 68, 68, 0.15);
     color: #ef4444;
     border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+
+  .capture-diagnostics-box {
+    margin: 1rem 0 1.25rem;
+    padding: 1rem 1.1rem;
+    border-radius: 10px;
+    border: 1px solid rgba(0, 182, 189, 0.35);
+    background: linear-gradient(180deg, rgba(0, 182, 189, 0.06), rgba(11, 26, 78, 0.03));
+  }
+
+  .diag-title {
+    margin: 0 0 0.75rem;
+    color: #0b1a4e;
+    font-size: 0.95rem;
+    font-weight: 700;
+  }
+
+  .diag-meta {
+    margin: 0 0 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .diag-row {
+    display: grid;
+    grid-template-columns: minmax(8rem, 38%) 1fr;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+  }
+
+  .diag-row dt {
+    margin: 0;
+    color: #0b1a4e;
+    font-weight: 600;
+  }
+
+  .diag-row dd {
+    margin: 0;
+    color: #334155;
+    word-break: break-word;
+  }
+
+  .diag-path {
+    font-family: ui-monospace, monospace;
+    font-size: 0.8125rem;
+  }
+
+  .diag-ok {
+    color: #0b1a4e;
+    font-weight: 600;
+  }
+
+  .diag-warn {
+    color: #b45309;
+    font-weight: 600;
+  }
+
+  .diag-browsers {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    border-top: 1px solid rgba(11, 26, 78, 0.08);
+    padding-top: 0.65rem;
+  }
+
+  .diag-browser-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    font-size: 0.8125rem;
+    color: #475569;
+  }
+
+  .diag-browser-row strong {
+    color: #0b1a4e;
+    min-width: 6rem;
   }
 
   .browsers-list {
