@@ -611,6 +611,49 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_capture_server_github_signed_final_url_uses_final_url_for_task() {
+        let (engine, base, data_dir, _) = make_test_engine_and_dirs();
+        let handle = start_capture_server(engine.clone(), data_dir.clone(), None, None)
+            .await
+            .expect("start capture server");
+
+        let release_url =
+            "https://github.com/athar-studios/sayl/releases/download/v0.1.0/SAYL-Setup-x64.exe";
+        let signed_final = "https://release-assets.githubusercontent.com/github-production-release-asset-2e65bee/123/abc?sp=r&sig=token";
+
+        let payload = json!({
+            "url": release_url,
+            "final_url": signed_final,
+            "filename": "SAYL-Setup-x64.exe",
+            "referrer": "https://github.com/athar-studios/sayl/releases",
+            "size": 6522100,
+            "mime": "application/octet-stream"
+        })
+        .to_string();
+
+        let raw_req = format!(
+            "POST /capture HTTP/1.1\r\nHost: 127.0.0.1\r\nAuthorization: Bearer {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            handle.token,
+            payload.len(),
+            payload
+        );
+
+        let (status, body) = send_raw_request(handle.port, &raw_req).await;
+        assert_eq!(status, 200);
+
+        let val: serde_json::Value = serde_json::from_str(&body).unwrap();
+        let task_id_str = val["task_id"].as_str().expect("task_id present");
+        let task_id: sayl_core::id::TaskId = task_id_str.parse().unwrap();
+        let rec = engine.get_task(task_id).unwrap().expect("task exists");
+        assert_eq!(rec.filename, "SAYL-Setup-x64.exe");
+        assert_eq!(rec.url.as_str(), signed_final);
+        assert_eq!(rec.state, DownloadState::Queued);
+
+        drop(handle);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[tokio::test]
     async fn test_capture_server_bad_token_returns_401() {
         let (engine, base, data_dir, _) = make_test_engine_and_dirs();
         let handle = start_capture_server(engine, data_dir.clone(), None, None)

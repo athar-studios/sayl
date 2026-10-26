@@ -419,6 +419,12 @@ export default {
     diagHostKeyYes: "نعم",
     diagHostKeyNo: "لا",
   },
+  capture: {
+    prepareFailed: "تعذّر تجهيز التنزيل من المتصفح. جرّب مرة أخرى أو راجع تشخيص الإضافة في الإعدادات.",
+    invalidFolder: "مجلد الحفظ غير صالح. اختر مساراً كاملاً على القرص (مثل C:\\Users\\…\\Downloads).",
+    taskNotFound: "تعذّر العثور على مهمة التنزيل. ألغِ المحاولة وأعد الالتقاط من المتصفح.",
+    folderAccessDenied: "لا يمكن الكتابة في مجلد الحفظ. اختر مجلداً آخر أو تحقق من الصلاحيات.",
+  },
   preDownload: {
     title: "تأكيد التنزيل",
     filename: "اسم الملف",

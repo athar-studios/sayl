@@ -419,6 +419,12 @@ export default {
     diagHostKeyYes: "Yes",
     diagHostKeyNo: "No",
   },
+  capture: {
+    prepareFailed: "Could not prepare the browser capture. Try again or check extension diagnostics in Settings.",
+    invalidFolder: "Invalid save folder. Choose a full path on disk (e.g. C:\\Users\\…\\Downloads).",
+    taskNotFound: "Download task not found. Cancel and capture again from the browser.",
+    folderAccessDenied: "Cannot write to the save folder. Choose another folder or check permissions.",
+  },
   preDownload: {
     title: "Confirm download",
     filename: "File name",

@@ -171,6 +171,71 @@ export function isAltBypassed(url, bypassRecords, nowMs = Date.now(), ttlMs = 10
  * @param {string} rawUrl
  * @returns {string}
  */
+/** Host suffixes used for GitHub release/raw redirect targets (signed, often extensionless paths). */
+export const GITHUB_REDIRECT_HOST_SUFFIXES = [
+  ".githubusercontent.com",
+  "codeload.github.com",
+];
+
+/**
+ * @param {string} rawUrl
+ * @returns {boolean}
+ */
+export function isGithubRedirectUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== "string") return false;
+  try {
+    const host = new URL(rawUrl).hostname.toLowerCase();
+    return GITHUB_REDIRECT_HOST_SUFFIXES.some(
+      (suffix) => host === suffix.replace(/^\./, "") || host.endsWith(suffix)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Picks the best filename for intercept rules when finalUrl is a CDN redirect without an extension.
+ * @param {object} item
+ * @param {string|undefined} suggestedFilename
+ * @param {string[]|string|Set<string>} allowedExtensions
+ * @returns {string}
+ */
+export function resolveInterceptFilename(item, suggestedFilename, allowedExtensions) {
+  const targetUrl = item?.finalUrl || item?.url || "";
+  const sourceUrl = item?.url || "";
+
+  /** @type {string[]} */
+  const candidates = [];
+
+  const pushName = (raw) => {
+    if (!raw || typeof raw !== "string") return;
+    const base = extractBasename(raw);
+    if (!base || isTempDownloadName(base)) return;
+    if (!candidates.includes(base)) {
+      candidates.push(base);
+    }
+  };
+
+  pushName(targetUrl);
+  if (sourceUrl && sourceUrl !== targetUrl) {
+    pushName(sourceUrl);
+  }
+  if (suggestedFilename) {
+    pushName(suggestedFilename);
+  }
+  if (item?.filename) {
+    pushName(item.filename);
+  }
+
+  for (const base of candidates) {
+    if (matchesExtension(base, allowedExtensions)) {
+      return base;
+    }
+  }
+
+  return candidates[0] || "download";
+}
+
 export function sanitizeUrlForLog(rawUrl) {
   if (!rawUrl || typeof rawUrl !== "string") return "";
   try {
@@ -227,25 +292,7 @@ export function shouldInterceptDownload({
   }
 
   const allowedExtensions = settings?.extensions ?? DEFAULT_EXTENSIONS;
-  const urlBasename = extractBasename(targetUrl);
-  let filename = urlBasename || "download";
-
-  if (matchesExtension(urlBasename, allowedExtensions)) {
-    filename = urlBasename;
-  } else {
-    const suggestedBase = suggestedFilename
-      ? extractBasename(suggestedFilename)
-      : "";
-    const localBase = item.filename ? extractBasename(item.filename) : "";
-
-    if (suggestedBase && !isTempDownloadName(suggestedBase)) {
-      filename = suggestedBase;
-    } else if (localBase && !isTempDownloadName(localBase)) {
-      filename = localBase;
-    } else {
-      filename = urlBasename || localBase || "download";
-    }
-  }
+  const filename = resolveInterceptFilename(item, suggestedFilename, allowedExtensions);
 
   if (!matchesExtension(filename, allowedExtensions)) {
     return { intercept: false, reason: "non_listed_extension", filename, size: 0, targetUrl };

@@ -10,7 +10,9 @@ import {
   passesSize,
   isAltBypassed,
   sanitizeUrlForLog,
-  shouldInterceptDownload
+  shouldInterceptDownload,
+  isGithubRedirectUrl,
+  resolveInterceptFilename
 } from "./rules.mjs";
 
 describe("rules.mjs pure logic", () => {
@@ -249,6 +251,50 @@ describe("rules.mjs pure logic", () => {
       });
       assert.equal(res.intercept, false);
       assert.equal(res.reason, "own_download");
+    });
+
+    test("11. GitHub 302 signed finalUrl without extension uses release URL basename", () => {
+      const signedFinal =
+        "https://release-assets.githubusercontent.com/github-production-release-asset-2e65bee/12345678/abcdef0123456789?sp=r&sv=2018-11-09&sr=b&sig=signedtoken";
+      const releaseUrl =
+        "https://github.com/athar-studios/sayl/releases/download/v0.1.0/SAYL-Setup-x64.exe";
+
+      assert.equal(isGithubRedirectUrl(signedFinal), true);
+
+      const item = {
+        id: 12,
+        url: releaseUrl,
+        finalUrl: signedFinal,
+        filename: "Unconfirmed 12345.crdownload",
+        totalBytes: 8 * 1024 * 1024
+      };
+
+      const res = shouldInterceptDownload({ item, settings: baseSettings });
+      assert.equal(res.intercept, true);
+      assert.equal(res.reason, "allowed");
+      assert.equal(res.filename, "SAYL-Setup-x64.exe");
+      assert.equal(res.targetUrl, signedFinal);
+    });
+
+    test("12. codeload.github.com redirect resolves filename from original url", () => {
+      const signedFinal =
+        "https://objects.githubusercontent.com/github-production-release-asset-2e65bee/999/aaaaaaaaaaaaaaaa?X-Amz-Algorithm=AWS4-HMAC-SHA256";
+      const releaseUrl =
+        "https://github.com/org/repo/releases/download/v1.0/app.zip";
+
+      const item = {
+        id: 13,
+        url: releaseUrl,
+        finalUrl: signedFinal,
+        totalBytes: 0
+      };
+
+      const name = resolveInterceptFilename(item, undefined, DEFAULT_EXTENSIONS);
+      assert.equal(name, "app.zip");
+
+      const res = shouldInterceptDownload({ item, settings: baseSettings });
+      assert.equal(res.intercept, true);
+      assert.equal(res.filename, "app.zip");
     });
   });
 });

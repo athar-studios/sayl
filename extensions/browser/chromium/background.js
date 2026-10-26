@@ -118,6 +118,18 @@ async function getSettings() {
 }
 
 // Retrieve cookies for URL mapped to [{ name, value }]
+/** Re-read the download from the Chrome downloads API (finalUrl after 302). */
+async function refreshDownloadItem(item) {
+  if (!item?.id) return item;
+  try {
+    const results = await chrome.downloads.search({ id: item.id });
+    if (Array.isArray(results) && results[0]) {
+      return results[0];
+    }
+  } catch (_) {}
+  return item;
+}
+
 async function getCookiesForUrl(url) {
   if (!url) return [];
   try {
@@ -250,7 +262,7 @@ function startHealthProbes() {
   healthProbeInterval = setInterval(checkHealth, HEALTH_PROBE_INTERVAL_MS);
 }
 
-/** @type {Map<number, { suggestedFilename?: string, captureInFlight?: boolean, accepted?: boolean }>} */
+/** @type {Map<number, { suggestedFilename?: string, capturePostInFlight?: boolean, accepted?: boolean }>} */
 const downloadCaptureState = new Map();
 
 function pruneDownloadState(id) {
@@ -283,20 +295,20 @@ async function evaluateAndCaptureDownload(item, suggestedFilename) {
 
   const id = item.id;
   let state = downloadCaptureState.get(id) || {};
-  if (state.accepted || state.captureInFlight) return;
+  if (state.accepted || state.capturePostInFlight) return;
 
   if (suggestedFilename) {
     state.suggestedFilename = suggestedFilename;
   }
-
-  state.captureInFlight = true;
   downloadCaptureState.set(id, state);
 
   const effectiveSuggested = state.suggestedFilename || suggestedFilename;
-  const targetUrl = item.finalUrl || item.url || "";
-  const cleanUrl = sanitizeUrlForLog(targetUrl);
 
   try {
+    const freshItem = await refreshDownloadItem(item);
+    const targetUrl = freshItem.finalUrl || freshItem.url || "";
+    const cleanUrl = sanitizeUrlForLog(targetUrl);
+
     const settings = await getSettings();
 
     let altBypasses = {};
@@ -306,7 +318,7 @@ async function evaluateAndCaptureDownload(item, suggestedFilename) {
     } catch (_) {}
 
     const decision = shouldInterceptDownload({
-      item,
+      item: freshItem,
       settings,
       altBypasses,
       extensionId: chrome.runtime.id,
@@ -316,31 +328,30 @@ async function evaluateAndCaptureDownload(item, suggestedFilename) {
 
     if (!decision.intercept) {
       sendLog("info", `Download skipped: ${decision.reason}`, cleanUrl);
-      state = downloadCaptureState.get(id) || {};
-      if (!state.accepted) {
-        state.captureInFlight = false;
-        downloadCaptureState.set(id, state);
-      }
       return;
     }
 
     state = downloadCaptureState.get(id) || {};
-    if (state.accepted) return;
+    if (state.accepted || state.capturePostInFlight) return;
 
     sendLog("info", "Download matched rules", cleanUrl);
 
-    const cookies = await getCookiesForUrl(targetUrl);
+    const captureTargetUrl = decision.targetUrl || targetUrl;
+    const cookies = await getCookiesForUrl(captureTargetUrl);
+    state.capturePostInFlight = true;
+    downloadCaptureState.set(id, state);
+
     const payload = {
       type: "Capture",
       version: 1,
-      url: item.url || targetUrl,
-      final_url: targetUrl,
+      url: freshItem.url || captureTargetUrl,
+      final_url: captureTargetUrl,
       filename: decision.filename,
-      referrer: item.referrer || "",
+      referrer: freshItem.referrer || "",
       cookies,
       user_agent: navigator.userAgent,
       size: decision.size,
-      mime: item.mime || ""
+      mime: freshItem.mime || ""
     };
 
     sendLog(
@@ -352,7 +363,7 @@ async function evaluateAndCaptureDownload(item, suggestedFilename) {
     const captureResult = await sendCaptureToHost(payload);
 
     state = downloadCaptureState.get(id) || {};
-    state.captureInFlight = false;
+    state.capturePostInFlight = false;
 
     if (!captureResult.ok) {
       downloadCaptureState.set(id, state);
@@ -371,11 +382,11 @@ async function evaluateAndCaptureDownload(item, suggestedFilename) {
     sendLog("info", `Download accepted by SAYL (task ${taskId})`, cleanUrl);
     setBadgeSuccess();
 
-    await cancelBrowserDownload(item, taskId, cleanUrl);
+    await cancelBrowserDownload(freshItem, taskId, cleanUrl);
   } catch (err) {
     state = downloadCaptureState.get(id) || {};
     if (!state.accepted) {
-      state.captureInFlight = false;
+      state.capturePostInFlight = false;
       downloadCaptureState.set(id, state);
     }
     throw err;

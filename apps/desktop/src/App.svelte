@@ -41,6 +41,11 @@
     clearSelection,
     moveSelection,
   } from "./lib/selection.js";
+  import {
+    buildPrepareCaptureTaskArgs,
+    friendlyPrepareCaptureError,
+    logCaptureDiagnostic,
+  } from "./lib/capture.js";
 
   let tasks = [];
   let selectedId = null;
@@ -65,6 +70,8 @@
 
   let preDownloadOpen = false;
   let captureOffer = null;
+  /** Dedupe capture-offer events: one browser capture → one dialog session. */
+  let captureOfferTaskId = null;
 
   // Duplicate task dialog state
   let duplicateDialogOpen = false;
@@ -147,9 +154,9 @@
   let settings = { ...DEFAULT_SETTINGS, view_mode: "table" };
 
   // Instrument safeInvoke across all call sites (Req 12)
-  function invoke(cmd, args) {
+  function invoke(cmd, args, options) {
     recordInvoke();
-    return safeInvoke(cmd, args);
+    return safeInvoke(cmd, args, options);
   }
 
   // Selected task object for Toolbar enablement (Req 1)
@@ -818,29 +825,31 @@
   }
 
   async function handleCaptureOfferConfirm(event) {
-    const { taskId, filename, folder } = event.detail || {};
+    const { taskId, filename, folder, category } = event.detail || {};
     if (!taskId) {
       preDownloadOpen = false;
       captureOffer = null;
+      captureOfferTaskId = null;
       return;
     }
     try {
-      await invoke("prepare_capture_task", {
+      const prepareArgs = buildPrepareCaptureTaskArgs({
         id: taskId,
         filename,
-        save_path: folder,
+        folder,
+        category,
+        settings,
       });
+      await invoke("prepare_capture_task", prepareArgs, { suppressToast: true });
       markPendingStart(taskId);
-      await invoke("start_task", { id: taskId });
+      await invoke("start_task", { id: taskId }, { suppressToast: true });
       preDownloadOpen = false;
       captureOffer = null;
+      captureOfferTaskId = null;
       await loadTasks();
     } catch (err) {
-      const msg =
-        typeof err === "string"
-          ? err
-          : err?.message || ($currentLang === "ar" ? "تعذر بدء التنزيل" : "Failed to start download");
-      showToast(msg, "error");
+      logCaptureDiagnostic(err, "handleCaptureOfferConfirm");
+      showToast(friendlyPrepareCaptureError(err, $currentLang), "error");
     }
   }
 
@@ -897,6 +906,10 @@
         unlistenCaptureOffer = await listen("sayl://capture-offer", (event) => {
           const payload = event.payload;
           if (!payload?.task_id) return;
+          if (payload.task_id === captureOfferTaskId && preDownloadOpen) return;
+          captureOfferTaskId = payload.task_id;
+          addDialogOpen = false;
+          droppedUrl = "";
           captureOffer = payload;
           preDownloadOpen = true;
         });

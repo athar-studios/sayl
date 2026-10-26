@@ -3,9 +3,23 @@ import { DEFAULT_SETTINGS, normalizeSettings } from "./settings.js";
 
 export const toasts = writable([]);
 
+const TOAST_DEDUPE_MS = 4000;
+/** @type {Map<string, number>} */
+const recentToastMessages = new Map();
+
 export function showToast(message, type = "error") {
+  const text = String(message || "").trim();
+  if (!text) return;
+
+  const now = Date.now();
+  const last = recentToastMessages.get(text);
+  if (last != null && now - last < TOAST_DEDUPE_MS) {
+    return;
+  }
+  recentToastMessages.set(text, now);
+
   const id = Date.now() + Math.random().toString(36).substring(2, 7);
-  toasts.update((current) => [...current, { id, message, type }]);
+  toasts.update((current) => [...current, { id, message: text, type }]);
   setTimeout(() => {
     toasts.update((current) => current.filter((t) => t.id !== id));
   }, 4500);
@@ -35,7 +49,12 @@ async function getTauriCore() {
  * Robust wrapper around Tauri `invoke` that catches any boundary error
  * and surfaces it in the toast notification bar.
  */
-export async function safeInvoke(command, args = {}) {
+/**
+ * @param {string} command
+ * @param {Record<string, unknown>} [args]
+ * @param {{ suppressToast?: boolean, toastMessage?: string }} [options]
+ */
+export async function safeInvoke(command, args = {}, options = {}) {
   try {
     const core = await getTauriCore();
     if (core && typeof core.invoke === "function") {
@@ -44,8 +63,12 @@ export async function safeInvoke(command, args = {}) {
     // Safe mock fallback for headless/browser preview
     return handleBrowserMock(command, args);
   } catch (err) {
-    const msg = typeof err === "string" ? err : err?.message || String(err);
-    showToast(msg, "error");
+    if (!options.suppressToast) {
+      const msg =
+        options.toastMessage ||
+        (typeof err === "string" ? err : err?.message || String(err));
+      showToast(msg, "error");
+    }
     throw err;
   }
 }
@@ -358,6 +381,13 @@ function handleBrowserMock(command, args) {
 
     case "prepare_extension":
       return "C:\\Users\\User\\AppData\\Local\\Sayl\\extension\\chromium";
+
+    case "prepare_capture_task": {
+      if (!args.savePath || typeof args.savePath !== "string" || !args.savePath.trim()) {
+        throw new Error("invalid args `savePath` for command `prepare_capture_task`");
+      }
+      return null;
+    }
 
     case "test_native_host":
       return { ok: true, roundtrip_ms: 12, message: "OK" };

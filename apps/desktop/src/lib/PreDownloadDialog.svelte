@@ -3,6 +3,7 @@
   import { t, currentLang } from "./i18n.js";
   import { formatBytes } from "./format.js";
   import { CATEGORIES, classifyFile, getCategoryLabel } from "./classify.js";
+  import { defaultSavePathForCapture } from "./capture.js";
 
   export let open = false;
   export let offer = null;
@@ -18,8 +19,11 @@
 
   $: if (open && offer) {
     filename = offer.filename || "download";
-    folder = defaultFolder || "";
     selectedCategory = classifyFile(filename, null);
+    folder =
+      defaultFolder && defaultFolder.trim()
+        ? defaultSavePathForCapture(defaultFolder, selectedCategory, filename)
+        : "";
     errorMsg = null;
     busy = false;
   }
