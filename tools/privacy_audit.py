@@ -102,7 +102,7 @@ URL_REGEX = re.compile(r'https?://[^\s"\'`<>)]+')
 
 # Allowed URL patterns in application code
 ALLOWED_URL_HOST_PATTERNS = [
-    r"^https?://(?:127\.0\.0\.1|localhost|\[::1\]|0\.0\.0\.0)(?::\d+)?(?:/.*)?$",
+    r"^https?://(?:127\.0\.0\.1|localhost|\[::1\]|0\.0\.0\.0)(?::(?:\d+|\{[A-Za-z0-9_]*\}))?(?:/.*)?$",
     r"^http://ipc\.localhost(?:/.*)?$",
     r"^https?://github\.com(?:/.*)?$",
     r"^https?://raw\.githubusercontent\.com(?:/.*)?$",
