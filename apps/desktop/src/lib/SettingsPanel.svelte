@@ -473,6 +473,23 @@
             <div class="section-pane">
               <h4 id="section-heading" class="section-heading">{$t("settings.navNotifications")}</h4>
 
+              <!-- Download complete window -->
+              <div class="setting-row">
+                <div class="setting-meta">
+                  <span class="setting-title">{$t("settings.showDownloadCompleteWindow")}</span>
+                  <p class="setting-desc">{$t("settings.showDownloadCompleteWindowDesc")}</p>
+                </div>
+                <div class="setting-control">
+                  <label class="switch-toggle">
+                    <input
+                      type="checkbox"
+                      bind:checked={localSettings.show_download_complete_window}
+                    />
+                    <span class="switch-slider"></span>
+                  </label>
+                </div>
+              </div>
+
               <!-- Floating Progress Window -->
               <div class="setting-row">
                 <div class="setting-meta">

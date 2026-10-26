@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS = {
   sidebar_collapsed: false,
   prevent_sleep: true,
   show_download_window: true,
+  show_download_complete_window: true,
   close_download_window_on_finish: false,
   close_action: "background",
   run_at_startup: false,
@@ -30,6 +31,7 @@ export const SETTINGS_KEYS = [
   "sidebar_collapsed",
   "prevent_sleep",
   "show_download_window",
+  "show_download_complete_window",
   "close_download_window_on_finish",
   "close_action",
   "run_at_startup",
@@ -85,6 +87,10 @@ export function normalizeSettings(settings = {}) {
       typeof s.show_download_window === "boolean"
         ? s.show_download_window
         : DEFAULT_SETTINGS.show_download_window,
+    show_download_complete_window:
+      typeof s.show_download_complete_window === "boolean"
+        ? s.show_download_complete_window
+        : DEFAULT_SETTINGS.show_download_complete_window,
     close_download_window_on_finish:
       typeof s.close_download_window_on_finish === "boolean"
         ? s.close_download_window_on_finish

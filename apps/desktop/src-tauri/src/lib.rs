@@ -7,6 +7,7 @@ pub mod autostart;
 pub mod browsers;
 pub mod capture_diagnostics;
 pub mod capture_server;
+pub mod completion;
 pub mod clipboard;
 pub mod delete;
 pub mod duplicates;
@@ -66,6 +67,8 @@ pub struct Settings {
     pub sidebar_collapsed: bool,
     pub prevent_sleep: bool,
     pub show_download_window: bool,
+    #[serde(default = "default_true")]
+    pub show_download_complete_window: bool,
     pub close_download_window_on_finish: bool,
     #[serde(default = "default_close_action")]
     pub close_action: String,
@@ -89,6 +92,7 @@ impl Default for Settings {
             sidebar_collapsed: false,
             prevent_sleep: true,
             show_download_window: true,
+            show_download_complete_window: true,
             close_download_window_on_finish: false,
             close_action: "background".to_string(),
             run_at_startup: false,
@@ -218,6 +222,8 @@ pub struct TaskView {
     pub created_at: Option<String>,
     #[serde(default)]
     pub completed_at: Option<String>,
+    #[serde(default)]
+    pub folder: String,
 }
 
 impl TaskView {
@@ -262,6 +268,7 @@ impl TaskView {
             connections,
             created_at: Some(rec.created_at.to_rfc3339()),
             completed_at,
+            folder: rec.save_path.to_string_lossy().into_owned(),
         }
     }
 }
@@ -1024,6 +1031,26 @@ pub mod commands {
         let _ = app_handle.emit("sayl://window-closed", &id);
         Ok(())
     }
+
+    #[tauri::command]
+    pub async fn open_complete_window(
+        app_handle: tauri::AppHandle,
+        state: State<'_, AppState>,
+        id: String,
+    ) -> Result<(), String> {
+        let settings = state
+            .settings
+            .read()
+            .map_err(|_| "Settings lock poisoned".to_string())?
+            .clone();
+        completion::open_complete_window(&app_handle, &id, &settings)
+    }
+
+    #[tauri::command]
+    pub fn close_complete_window(app_handle: tauri::AppHandle, id: String) -> Result<(), String> {
+        completion::close_complete_window(&app_handle, &id);
+        Ok(())
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -1132,6 +1159,8 @@ pub fn run() {
             commands::open_browser_extensions,
             commands::open_download_window,
             commands::close_download_window,
+            commands::open_complete_window,
+            commands::close_complete_window,
             commands::prepare_capture_task,
             commands::extension_diagnostics
         ])
@@ -1398,7 +1427,14 @@ pub fn run() {
                                     };
                                     let _ = app_handle.emit("sayl://progress", &progress);
                                 }
-                                sayl_core::event::EventPayload::StateChanged { to, .. } => {
+                                sayl_core::event::EventPayload::StateChanged { from, to, .. } => {
+                                    if *to == DownloadState::Completed && *from != DownloadState::Completed {
+                                        completion::handle_download_completed(
+                                            app_handle.clone(),
+                                            engine.clone(),
+                                            task_id,
+                                        );
+                                    }
                                     if to.is_terminal() || *to == DownloadState::Paused {
                                         if let Ok(mut stats) = live_stats.lock() {
                                             stats.remove(&task_id);
@@ -1650,6 +1686,7 @@ mod tests {
         assert!(!settings.sidebar_collapsed);
         assert!(settings.prevent_sleep);
         assert!(settings.show_download_window);
+        assert!(settings.show_download_complete_window);
         assert!(!settings.close_download_window_on_finish);
         assert_eq!(settings.close_action, "background");
         assert!(!settings.run_at_startup);
@@ -1658,7 +1695,7 @@ mod tests {
 
         let val: serde_json::Value = serde_json::to_value(&settings).expect("serializes");
         let obj = val.as_object().expect("object");
-        assert_eq!(obj.len(), 14);
+        assert_eq!(obj.len(), 15);
         let expected_keys = [
             "download_dir",
             "max_concurrent_tasks",
@@ -1669,6 +1706,7 @@ mod tests {
             "sidebar_collapsed",
             "prevent_sleep",
             "show_download_window",
+            "show_download_complete_window",
             "close_download_window_on_finish",
             "close_action",
             "run_at_startup",
@@ -1723,6 +1761,7 @@ mod tests {
                     connections: None,
                     created_at: None,
                     completed_at: None,
+                    folder: String::new(),
                 }]
             },
         );
@@ -1754,6 +1793,7 @@ mod tests {
                     connections: None,
                     created_at: None,
                     completed_at: None,
+                    folder: String::new(),
                 })
             },
             Vec::new,

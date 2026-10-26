@@ -153,6 +153,15 @@ export default {
     downloadAgain: "Download again",
     cancel: "Cancel",
   },
+  completeWindow: {
+    title: "Download complete",
+    file: "File",
+    size: "Size",
+    folder: "Folder",
+    openFile: "Open file",
+    openFolder: "Open folder",
+    close: "Close",
+  },
   downloadWindow: {
     title: "Download Window",
     size: "Size",
@@ -310,6 +319,9 @@ export default {
 
     showDownloadWindow: "Show download window when download starts",
     showDownloadWindowDesc: "Open a compact floating progress window whenever a download begins.",
+
+    showDownloadCompleteWindow: "Show download complete window",
+    showDownloadCompleteWindowDesc: "Small window when a download finishes (name, size, folder). When disabled or minimized to tray, a Windows toast is shown instead.",
 
     closeDownloadWindowOnFinish: "Close window automatically when finished",
     closeDownloadWindowOnFinishDesc: "Automatically dismiss floating progress windows once tasks complete.",

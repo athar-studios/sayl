@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { DEFAULT_SETTINGS, SETTINGS_KEYS, SETTINGS_SECTIONS, normalizeSettings } from "./settings.js";
 
 describe("Settings contract & defaults (settings.js)", () => {
-  it("has exactly the 14 documented keys in SETTINGS_KEYS", () => {
-    expect(SETTINGS_KEYS).toHaveLength(14);
+  it("has exactly the 15 documented keys in SETTINGS_KEYS", () => {
+    expect(SETTINGS_KEYS).toHaveLength(15);
     expect(SETTINGS_KEYS).toEqual([
       "download_dir",
       "max_concurrent_tasks",
@@ -14,6 +14,7 @@ describe("Settings contract & defaults (settings.js)", () => {
       "sidebar_collapsed",
       "prevent_sleep",
       "show_download_window",
+      "show_download_complete_window",
       "close_download_window_on_finish",
       "close_action",
       "run_at_startup",
@@ -22,7 +23,7 @@ describe("Settings contract & defaults (settings.js)", () => {
     ]);
   });
 
-  it("default settings object contains exactly the 14 documented keys", () => {
+  it("default settings object contains exactly the 15 documented keys", () => {
     const keys = Object.keys(DEFAULT_SETTINGS).sort();
     const expectedKeys = [...SETTINGS_KEYS].sort();
     expect(keys).toEqual(expectedKeys);
@@ -37,6 +38,7 @@ describe("Settings contract & defaults (settings.js)", () => {
     expect(DEFAULT_SETTINGS.sidebar_collapsed).toBe(false);
     expect(DEFAULT_SETTINGS.prevent_sleep).toBe(true);
     expect(DEFAULT_SETTINGS.show_download_window).toBe(true);
+    expect(DEFAULT_SETTINGS.show_download_complete_window).toBe(true);
     expect(DEFAULT_SETTINGS.close_download_window_on_finish).toBe(false);
     expect(DEFAULT_SETTINGS.close_action).toBe("background");
     expect(DEFAULT_SETTINGS.run_at_startup).toBe(false);
@@ -57,6 +59,7 @@ describe("Settings contract & defaults (settings.js)", () => {
     expect(partial.sidebar_collapsed).toBe(true);
     expect(partial.prevent_sleep).toBe(false);
     expect(partial.show_download_window).toBe(true);
+    expect(partial.show_download_complete_window).toBe(true);
     expect(partial.close_download_window_on_finish).toBe(false);
     expect(partial.close_action).toBe("background");
     expect(partial.run_at_startup).toBe(false);

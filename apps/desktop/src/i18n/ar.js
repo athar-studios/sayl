@@ -153,6 +153,15 @@ export default {
     downloadAgain: "تحميله مرة أخرى",
     cancel: "إلغاء",
   },
+  completeWindow: {
+    title: "اكتمل التحميل",
+    file: "الملف",
+    size: "الحجم",
+    folder: "المجلد",
+    openFile: "فتح الملف",
+    openFolder: "فتح المجلد",
+    close: "إغلاق",
+  },
   downloadWindow: {
     title: "نافذة التحميل",
     size: "الحجم",
@@ -310,6 +319,9 @@ export default {
 
     showDownloadWindow: "إظهار نافذة التحميل عند بدء كل تحميل",
     showDownloadWindowDesc: "فتح نافذة صغيرة عائمة لمتابعة تقدم التنزيل فور بدئه.",
+
+    showDownloadCompleteWindow: "إظهار نافذة انتهاء التحميل",
+    showDownloadCompleteWindowDesc: "نافذة صغيرة عند اكتمال التنزيل (الاسم، الحجم، المجلد). عند الإيقاف أو التصغير إلى الصينية يُعرض إشعار Windows بدلاً منها أو معها.",
 
     closeDownloadWindowOnFinish: "إغلاق النافذة تلقائيًا عند انتهاء التحميل",
     closeDownloadWindowOnFinishDesc: "إغلاق نافذة المتابعة العائمة تلقائياً بمجرد اكتمال تنزيل الملف بنجاح.",
