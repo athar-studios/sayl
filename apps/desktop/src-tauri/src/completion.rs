@@ -16,7 +16,10 @@ pub struct CompletionUiPlan {
 }
 
 /// Pure policy: toast when the completion window setting is off or the main window is hidden (tray).
-pub fn plan_completion_ui(show_complete_window: bool, main_window_visible: bool) -> CompletionUiPlan {
+pub fn plan_completion_ui(
+    show_complete_window: bool,
+    main_window_visible: bool,
+) -> CompletionUiPlan {
     let in_tray = !main_window_visible;
     let show_window = show_complete_window && !in_tray;
     let show_toast = !show_complete_window || in_tray;
@@ -69,10 +72,7 @@ fn notification_copy(language: &str, filename: &str, bytes: u64) -> (String, Str
             format!("{filename} ({size})"),
         )
     } else {
-        (
-            "اكتمل التحميل".to_string(),
-            format!("{filename} ({size})"),
-        )
+        ("اكتمل التحميل".to_string(), format!("{filename} ({size})"))
     }
 }
 
@@ -96,7 +96,11 @@ fn window_background(app: &AppHandle, settings: &Settings) -> tauri::window::Col
     }
 }
 
-pub fn open_complete_window(app: &AppHandle, task_id: &str, settings: &Settings) -> Result<(), String> {
+pub fn open_complete_window(
+    app: &AppHandle,
+    task_id: &str,
+    settings: &Settings,
+) -> Result<(), String> {
     let trimmed = task_id.trim();
     if trimmed.is_empty() {
         return Err("Task ID cannot be empty".into());
@@ -137,12 +141,7 @@ pub fn close_complete_window(app: &AppHandle, task_id: &str) {
 }
 
 fn show_completion_toast(app: &AppHandle, title: &str, body: &str) {
-    let _ = app
-        .notification()
-        .builder()
-        .title(title)
-        .body(body)
-        .show();
+    let _ = app.notification().builder().title(title).body(body).show();
 }
 
 /// Called when a task transitions to `Completed` (live download, not startup recovery).
@@ -155,7 +154,13 @@ pub fn handle_download_completed(app: AppHandle, engine: Engine, task_id: TaskId
 
         let (show_complete_window, language) = app
             .try_state::<crate::AppState>()
-            .and_then(|state| state.settings.read().ok().map(|s| (s.show_download_complete_window, s.language.clone())))
+            .and_then(|state| {
+                state
+                    .settings
+                    .read()
+                    .ok()
+                    .map(|s| (s.show_download_complete_window, s.language.clone()))
+            })
             .unwrap_or((true, "ar".to_string()));
 
         let settings_snapshot = app
