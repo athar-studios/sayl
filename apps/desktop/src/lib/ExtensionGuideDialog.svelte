@@ -1,11 +1,17 @@
 <script>
-  import { onMount, onDestroy, createEventDispatcher } from "svelte";
+  import { onDestroy, createEventDispatcher } from "svelte";
   import { t } from "./i18n.js";
   import { safeInvoke } from "./tauri.js";
   import { DEFAULT_EXTENSION_PATH } from "./browsers.js";
+  import {
+    EXTENSION_GUIDE_TOTAL_STEPS,
+    buildStepCounterLabel,
+    mapPingResultToStatus,
+    resolveExtensionGuideDisplay,
+  } from "./extensionGuide.js";
 
   export let open = false;
-  export let browser = { id: "chrome", name: "Google Chrome", connected: false };
+  export let browser = { id: "chrome", name: "" };
   export let extensionPath = "";
 
   const dispatch = createEventDispatcher();
@@ -17,10 +23,27 @@
   let dialogElement = null;
   let previousActiveElement = null;
   let resolvedPath = extensionPath || DEFAULT_EXTENSION_PATH;
+  /** @type {{ ok?: boolean, message?: string } | null} */
+  let pingResult = null;
+  let pingLoaded = false;
+  /** @type {number | null} */
+  let extensionSeenAgeMs = null;
+  let seenAgeLoaded = false;
 
   $: if (extensionPath) {
     resolvedPath = extensionPath;
   }
+
+  $: browserLabel = browser?.name?.trim() || $t("extension.defaultBrowser");
+  $: stepCounterLabel = buildStepCounterLabel(
+    activeStep,
+    EXTENSION_GUIDE_TOTAL_STEPS,
+    $t("tour.stepCounter")
+  );
+  $: statusDisplay = resolveExtensionGuideDisplay(
+    mapPingResultToStatus(pingLoaded ? pingResult : null),
+    seenAgeLoaded ? extensionSeenAgeMs : null
+  );
 
   $: if (open) {
     initDialog();
@@ -31,9 +54,12 @@
   async function initDialog() {
     activeStep = 1;
     copied = false;
+    pingResult = null;
+    pingLoaded = false;
+    extensionSeenAgeMs = null;
+    seenAgeLoaded = false;
     previousActiveElement = document.activeElement;
 
-    // Resolve path if not provided
     if (!resolvedPath || resolvedPath === DEFAULT_EXTENSION_PATH) {
       try {
         const prep = await safeInvoke("prepare_extension");
@@ -41,13 +67,12 @@
           resolvedPath = prep.trim();
         }
       } catch {
-        // Fallback remains
+        // keep fallback path
       }
     }
 
     startPolling();
 
-    // Trap focus to dialog on next tick
     setTimeout(() => {
       if (dialogElement) {
         const firstBtn = dialogElement.querySelector("button");
@@ -66,12 +91,38 @@
     }
   }
 
+  async function refreshGuideStatus() {
+    try {
+      const res = await safeInvoke("test_native_host");
+      pingResult =
+        res && typeof res === "object"
+          ? res
+          : { ok: false, message: $t("extension.testFailed").replace("{msg}", "") };
+    } catch (err) {
+      pingResult = {
+        ok: false,
+        message: typeof err === "string" ? err : err?.message || String(err),
+      };
+    } finally {
+      pingLoaded = true;
+    }
+
+    try {
+      const age = await safeInvoke("extension_seen_age_ms");
+      extensionSeenAgeMs = typeof age === "number" && Number.isFinite(age) ? age : null;
+    } catch {
+      extensionSeenAgeMs = null;
+    } finally {
+      seenAgeLoaded = true;
+    }
+  }
+
   function startPolling() {
     stopPolling();
-    // Poll every 5 seconds
-    pollInterval = setInterval(checkStatus, 5000);
+    refreshGuideStatus();
+    pollInterval = setInterval(refreshGuideStatus, 5000);
     if (typeof window !== "undefined") {
-      window.addEventListener("focus", checkStatus);
+      window.addEventListener("focus", refreshGuideStatus);
     }
     if (typeof document !== "undefined") {
       document.addEventListener("visibilitychange", handleVisibility);
@@ -84,7 +135,7 @@
       pollInterval = null;
     }
     if (typeof window !== "undefined") {
-      window.removeEventListener("focus", checkStatus);
+      window.removeEventListener("focus", refreshGuideStatus);
     }
     if (typeof document !== "undefined") {
       document.removeEventListener("visibilitychange", handleVisibility);
@@ -93,12 +144,8 @@
 
   function handleVisibility() {
     if (document.visibilityState === "visible") {
-      checkStatus();
+      refreshGuideStatus();
     }
-  }
-
-  function checkStatus() {
-    dispatch("pollStatus");
   }
 
   async function handleCopyPath() {
@@ -107,7 +154,6 @@
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(resolvedPath);
       } else {
-        // Fallback
         const textarea = document.createElement("textarea");
         textarea.value = resolvedPath;
         textarea.style.position = "fixed";
@@ -181,10 +227,10 @@
 <svelte:window on:keydown={handleKeydown} />
 
 {#if open}
-  <div class="guide-backdrop" on:click={handleClose} on:keydown={handleKeydown} role="presentation">
+  <div class="dialog-backdrop" on:click={handleClose} on:keydown={handleKeydown} role="presentation">
     <div
       bind:this={dialogElement}
-      class="guide-dialog"
+      class="dialog-card"
       on:click|stopPropagation
       on:keydown|stopPropagation
       role="dialog"
@@ -192,15 +238,16 @@
       aria-modal="true"
       aria-labelledby="guide-title"
     >
-      <!-- Dialog Header -->
-      <div class="guide-header">
-        <div class="header-titles">
-          <span class="guide-badge">2 {$t("tour.stepCounter").replace("{current}", activeStep).replace("{total}", "2")}</span>
-          <h3 id="guide-title" class="guide-title">
-            {$t("extension.dialogTitle").replace("{browser}", browser?.name || "Chromium")}
-          </h3>
-        </div>
-        <button class="guide-close-btn" on:click={handleClose} aria-label={$t("settings.close")}>
+      <div class="dialog-header">
+        <h3 id="guide-title" class="dialog-title">
+          {$t("extension.dialogTitle").replace("{browser}", browserLabel)}
+        </h3>
+        <button
+          type="button"
+          class="close-btn"
+          on:click={handleClose}
+          aria-label={$t("settings.close")}
+        >
           <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18" aria-hidden="true">
             <path
               fill-rule="evenodd"
@@ -211,194 +258,103 @@
         </button>
       </div>
 
-      <!-- Step Navigation Tabs -->
-      <div class="guide-steps-nav" role="tablist">
-        <button
-          class="step-tab"
-          class:active={activeStep === 1}
-          role="tab"
-          aria-selected={activeStep === 1}
-          on:click={() => (activeStep = 1)}
-        >
-          <span class="step-num">1</span>
-          <span class="step-label">{$t("extension.step1Title")}</span>
-        </button>
-        <button
-          class="step-tab"
-          class:active={activeStep === 2}
-          role="tab"
-          aria-selected={activeStep === 2}
-          on:click={() => (activeStep = 2)}
-        >
-          <span class="step-num">2</span>
-          <span class="step-label">{$t("extension.step2Title")}</span>
-        </button>
-      </div>
+      <div class="dialog-body">
+        <div class="step-meta">
+          <span class="step-counter">{stepCounterLabel}</span>
+          <h4 class="step-title">
+            {activeStep === 1 ? $t("extension.step1Title") : $t("extension.step2Title")}
+          </h4>
+        </div>
 
-      <!-- Step Content Area -->
-      <div class="guide-body">
         {#if activeStep === 1}
-          <div class="step-content">
-            <p class="step-instruction">
-              {$t("extension.step1Desc")}
-            </p>
-
-            <!-- Inline Illustrative SVG Panel: Developer Mode Toggle -->
-            <div class="illustrative-panel" aria-hidden="true">
-              <svg viewBox="0 0 460 140" class="panel-svg" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <!-- Browser Header Background -->
-                <rect width="460" height="140" rx="8" fill="#0c193c" stroke="#1d2e5a" stroke-width="1.5" />
-                <rect x="0" y="0" width="460" height="34" rx="8" fill="#14244d" />
-                <!-- Window dots -->
-                <circle cx="20" cy="17" r="4.5" fill="#f87171" opacity="0.8" />
-                <circle cx="34" cy="17" r="4.5" fill="#fbbf24" opacity="0.8" />
-                <circle cx="48" cy="17" r="4.5" fill="#34d399" opacity="0.8" />
-                <!-- Search bar fake -->
-                <rect x="75" y="9" width="160" height="16" rx="4" fill="#0c193c" opacity="0.7" />
-                <rect x="85" y="14" width="70" height="6" rx="2" fill="#586f9c" />
-
-                <!-- Extensions Title / Breadcrumb -->
-                <text x="24" y="66" fill="#f1f5f9" font-size="14" font-weight="600" font-family="system-ui, sans-serif">
-                  Extensions / الإضافات
-                </text>
-                <text x="24" y="86" fill="#8197c0" font-size="11" font-family="system-ui, sans-serif">
-                  Manage installed browser extensions
-                </text>
-
-                <!-- Developer Mode Toggle Card (Highlighted) -->
-                <g transform="translate(240, 52)">
-                  <rect width="195" height="50" rx="6" fill="#162958" stroke="#01b2bb" stroke-width="1.5" stroke-dasharray="4 2" />
-                  <text x="14" y="30" fill="#e2e8f0" font-size="12" font-weight="600" font-family="system-ui, sans-serif">
-                    Developer mode
-                  </text>
-                  <!-- Switch Track ON -->
-                  <rect x="140" y="16" width="42" height="20" rx="10" fill="#01b2bb" />
-                  <!-- Switch Knob Right -->
-                  <circle cx="169" cy="26" r="7.5" fill="#ffffff" />
-                </g>
-
-                <!-- Instruction pointer arrow -->
-                <path d="M 390 115 L 375 90" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" />
-                <polygon points="375,90 384,93 378,100" fill="#00e5ff" />
-              </svg>
-            </div>
-          </div>
+          <p class="step-instruction">{$t("extension.step1Desc")}</p>
         {:else}
-          <div class="step-content">
-            <p class="step-instruction">
-              {$t("extension.step2Desc")}
-            </p>
+          <p class="step-instruction">{$t("extension.step2Desc")}</p>
 
-            <!-- Inline Illustrative SVG Panel: Load Unpacked Button -->
-            <div class="illustrative-panel" aria-hidden="true">
-              <svg viewBox="0 0 460 140" class="panel-svg" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <!-- Browser Action Bar Background -->
-                <rect width="460" height="140" rx="8" fill="#0c193c" stroke="#1d2e5a" stroke-width="1.5" />
-
-                <!-- Action Button 1: Load unpacked (Highlighted) -->
-                <g transform="translate(20, 20)">
-                  <rect width="145" height="36" rx="6" fill="#01b2bb" fill-opacity="0.2" stroke="#01b2bb" stroke-width="1.8" />
-                  <text x="16" y="23" fill="#00e5ff" font-size="12" font-weight="700" font-family="system-ui, sans-serif">
-                    Load unpacked
-                  </text>
-                </g>
-
-                <!-- Action Button 2 & 3: Inactive -->
-                <rect x="175" y="20" width="115" height="36" rx="6" fill="#14244d" stroke="#263a6a" stroke-width="1" />
-                <text x="190" y="43" fill="#64748b" font-size="11" font-family="system-ui, sans-serif">
-                  Pack extension
-                </text>
-
-                <rect x="300" y="20" width="85" height="36" rx="6" fill="#14244d" stroke="#263a6a" stroke-width="1" />
-                <text x="325" y="43" fill="#64748b" font-size="11" font-family="system-ui, sans-serif">
-                  Update
-                </text>
-
-                <!-- Folder Selection Box Representation -->
-                <g transform="translate(20, 72)">
-                  <rect width="420" height="48" rx="6" fill="#112046" stroke="#263a6a" stroke-width="1" />
-                  <!-- Folder icon -->
-                  <path d="M 18 16 L 30 16 L 36 22 L 54 22 A 2 2 0 0 1 56 24 L 56 36 A 2 2 0 0 1 54 38 L 18 38 A 2 2 0 0 1 16 36 L 16 18 A 2 2 0 0 1 18 16 Z" fill="#f59e0b" opacity="0.9" />
-                  <text x="68" y="26" fill="#e2e8f0" font-size="11" font-weight="600" font-family="system-ui, sans-serif">
-                    SAYL Browser Integration
-                  </text>
-                  <text x="68" y="40" fill="#718bb8" font-size="9" font-family="monospace">
-                    %LOCALAPPDATA%\Sayl\extension\chromium
-                  </text>
-                </g>
-              </svg>
-            </div>
-
-            <!-- Absolute Path Box and Actions -->
-            <div class="path-display-box">
-              <label for="ext-path-input" class="path-label">{$t("extension.folderPath")}</label>
-              <div class="path-input-group">
-                <input
-                  id="ext-path-input"
-                  type="text"
-                  readonly
-                  dir="ltr"
-                  class="path-input"
-                  value={resolvedPath}
-                  on:click={(e) => e.target.select()}
-                />
-                <button
-                  type="button"
-                  class="btn-copy"
-                  class:copied
-                  on:click={handleCopyPath}
-                  title={$t("extension.copyPath")}
-                >
-                  {#if copied}
-                    <span>{$t("extension.pathCopied")}</span>
-                  {:else}
-                    <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15" aria-hidden="true">
-                      <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-                      <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
-                    </svg>
-                    <span>{$t("extension.copyPath")}</span>
-                  {/if}
-                </button>
-              </div>
+          <div class="path-display-box">
+            <label for="ext-path-input" class="path-label">{$t("extension.folderPath")}</label>
+            <div class="path-input-group">
+              <input
+                id="ext-path-input"
+                type="text"
+                readonly
+                dir="ltr"
+                class="path-input"
+                value={resolvedPath}
+                on:click={(e) => e.target.select()}
+              />
+              <button
+                type="button"
+                class="btn-copy"
+                class:copied
+                on:click={handleCopyPath}
+                title={$t("extension.copyPath")}
+              >
+                {#if copied}
+                  <span>{$t("extension.pathCopied")}</span>
+                {:else}
+                  <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15" aria-hidden="true">
+                    <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                    <path
+                      d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"
+                    />
+                  </svg>
+                  <span>{$t("extension.copyPath")}</span>
+                {/if}
+              </button>
             </div>
           </div>
         {/if}
 
-        <!-- Browser Actions Row -->
         <div class="guide-actions-bar">
           <button type="button" class="btn btn-secondary" on:click={handleOpenBrowserExtensions}>
             <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true">
-              <path fill-rule="evenodd" d="M4.25 2A2.25 2.25 0 002 4.25v11.5A2.25 2.25 0 004.25 18h11.5A2.25 2.25 0 0018 15.75V4.25A2.25 2.25 0 0015.75 2H4.25zm4.03 6.28a.75.75 0 00-1.06-1.06L4.97 9.47a.75.75 0 000 1.06l2.25 2.25a.75.75 0 001.06-1.06L6.81 10.25h6.44a.75.75 0 000-1.5H6.81l1.47-1.47z" clip-rule="evenodd" />
+              <path
+                fill-rule="evenodd"
+                d="M4.25 2A2.25 2.25 0 002 4.25v11.5A2.25 2.25 0 004.25 18h11.5A2.25 2.25 0 0018 15.75V4.25A2.25 2.25 0 0015.75 2H4.25zm4.03 6.28a.75.75 0 00-1.06-1.06L4.97 9.47a.75.75 0 000 1.06l2.25 2.25a.75.75 0 001.06-1.06L6.81 10.25h6.44a.75.75 0 000-1.5H6.81l1.47-1.47z"
+                clip-rule="evenodd"
+              />
             </svg>
             <span>{$t("extension.openBrowserPage")}</span>
           </button>
 
           <button type="button" class="btn btn-secondary" on:click={handleOpenFolder}>
             <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true">
-              <path fill-rule="evenodd" d="M2 4.75C2 3.784 2.784 3 3.75 3h4.836c.464 0 .909.184 1.237.513l1.414 1.414a1.75 1.75 0 001.237.513H16.25c.966 0 1.75.784 1.75 1.75v7.06c0 .966-.784 1.75-1.75 1.75H3.75A1.75 1.75 0 012 14.31V4.75z" clip-rule="evenodd" />
+              <path
+                fill-rule="evenodd"
+                d="M2 4.75C2 3.784 2.784 3 3.75 3h4.836c.464 0 .909.184 1.237.513l1.414 1.414a1.75 1.75 0 001.237.513H16.25c.966 0 1.75.784 1.75 1.75v7.06c0 .966-.784 1.75-1.75 1.75H3.75A1.75 1.75 0 012 14.31V4.75z"
+                clip-rule="evenodd"
+              />
             </svg>
             <span>{$t("extension.openFolder")}</span>
           </button>
         </div>
 
-        <!-- Live Status Hint -->
         <div class="status-return-hint">
-          {#if browser?.connected}
+          {#if statusDisplay.variant === "success"}
             <span class="status-indicator-badge success">
               <span class="pulse-dot"></span>
-              {$t("extension.statusConnected")} ✓
+              {$t(statusDisplay.statusKey)} ✓
+            </span>
+          {:else if statusDisplay.variant === "error"}
+            <span class="status-indicator-badge error">
+              {statusDisplay.message}
+            </span>
+          {:else if statusDisplay.variant === "checking" || statusDisplay.variant === "ready"}
+            <span class="status-indicator-badge checking">
+              <span class="spin-dot"></span>
+              {$t(statusDisplay.statusKey)}
             </span>
           {:else}
             <span class="status-indicator-badge checking">
               <span class="spin-dot"></span>
-              {$t("extension.returnInstruction")}
+              {$t(statusDisplay.statusKey)}
             </span>
           {/if}
         </div>
       </div>
 
-      <!-- Dialog Footer -->
-      <div class="guide-footer">
+      <div class="dialog-footer">
         {#if activeStep === 1}
           <button type="button" class="btn btn-primary" on:click={() => (activeStep = 2)}>
             <span>{$t("tour.next")}</span>
@@ -419,10 +375,10 @@
 {/if}
 
 <style>
-  .guide-backdrop {
+  .dialog-backdrop {
     position: fixed;
     inset: 0;
-    background-color: rgba(6, 14, 38, 0.72);
+    background: rgba(11, 26, 78, 0.72);
     backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
@@ -431,139 +387,89 @@
     padding: 1rem;
   }
 
-  .guide-dialog {
-    background: #0f1d46;
-    border: 1px solid #23386e;
-    border-radius: 12px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.55);
+  .dialog-card {
+    background: var(--color-bg-card, #0f1d46);
+    color: var(--color-text, #e2e8f0);
+    border: 1px solid var(--color-border, #23386e);
+    border-radius: var(--radius-lg, 12px);
+    box-shadow: var(--shadow-lg, 0 20px 40px rgba(0, 0, 0, 0.55));
     width: 100%;
-    max-width: 540px;
+    max-width: 520px;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    color: #e2e8f0;
+    max-height: min(90vh, 640px);
   }
 
-  .guide-header {
+  .dialog-header {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
-    padding: 1.25rem 1.5rem 1rem;
-    border-bottom: 1px solid #1c2e5c;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--color-border, #1c2e5c);
   }
 
-  .guide-badge {
-    font-size: 0.75rem;
+  .dialog-title {
+    font-size: 1.05rem;
     font-weight: 700;
-    color: #00e5ff;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    margin-bottom: 0.25rem;
-    display: block;
-  }
-
-  .guide-title {
-    font-size: 1.15rem;
-    font-weight: 700;
-    color: #ffffff;
     margin: 0;
+    flex: 1;
+    color: var(--color-text, #ffffff);
   }
 
-  .guide-close-btn {
+  .close-btn {
     background: transparent;
     border: none;
-    color: #8b9fc7;
+    color: var(--color-text-muted, #8b9fc7);
     cursor: pointer;
-    padding: 0.25rem;
+    padding: 0.35rem;
     border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
   }
 
-  .guide-close-btn:hover {
-    background: #192a56;
-    color: #ffffff;
+  .close-btn:hover {
+    background: var(--color-bg-hover, #192a56);
+    color: var(--color-text, #ffffff);
   }
 
-  .guide-steps-nav {
-    display: flex;
-    border-bottom: 1px solid #1c2e5c;
-    background: #0b173b;
-  }
-
-  .step-tab {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    background: transparent;
-    border: none;
-    border-bottom: 2px solid transparent;
-    color: #8197c0;
-    font-size: 0.85rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 150ms ease;
-  }
-
-  .step-tab:hover {
-    color: #cad8f3;
-  }
-
-  .step-tab.active {
-    color: #00e5ff;
-    border-bottom-color: #00e5ff;
-    background: #0f1d46;
-  }
-
-  .step-num {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: #1a2c5a;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-  }
-
-  .step-tab.active .step-num {
-    background: #01b2bb;
-    color: #ffffff;
-  }
-
-  .guide-body {
-    padding: 1.25rem 1.5rem;
+  .dialog-body {
+    padding: 1.15rem 1.25rem;
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 1rem;
+    overflow-y: auto;
+  }
+
+  .step-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .step-counter {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #00b6bd;
+    letter-spacing: 0.02em;
+  }
+
+  .step-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-text, #f8fafc);
   }
 
   .step-instruction {
     font-size: 0.95rem;
     line-height: 1.55;
-    color: #d1dff8;
-    margin: 0 0 1rem;
-  }
-
-  .illustrative-panel {
-    width: 100%;
-    border-radius: 8px;
-    overflow: hidden;
-    background: #0c193c;
-  }
-
-  .panel-svg {
-    width: 100%;
-    height: auto;
-    display: block;
+    color: var(--color-text-muted, #d1dff8);
+    margin: 0;
   }
 
   .path-display-box {
-    margin-top: 1rem;
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
@@ -572,20 +478,22 @@
   .path-label {
     font-size: 0.8rem;
     font-weight: 600;
-    color: #8ea5d0;
+    color: var(--color-text-muted, #8ea5d0);
   }
 
   .path-input-group {
     display: flex;
     gap: 0.5rem;
+    flex-wrap: wrap;
   }
 
   .path-input {
     flex: 1;
+    min-width: 0;
     background: #08112c;
     border: 1px solid #23396c;
     border-radius: 6px;
-    color: #38bdf8;
+    color: #00b6bd;
     font-family: monospace;
     font-size: 0.82rem;
     padding: 0.5rem 0.75rem;
@@ -605,7 +513,7 @@
     gap: 0.4rem;
     cursor: pointer;
     white-space: nowrap;
-    transition: all 150ms ease;
+    transition: background 150ms ease;
   }
 
   .btn-copy:hover {
@@ -627,7 +535,7 @@
   }
 
   .status-return-hint {
-    background: #0b1535;
+    background: rgba(11, 26, 78, 0.45);
     border: 1px dashed #203362;
     border-radius: 6px;
     padding: 0.65rem 0.9rem;
@@ -650,6 +558,10 @@
     color: #8da4d2;
   }
 
+  .status-indicator-badge.error {
+    color: #fca5a5;
+  }
+
   .pulse-dot {
     width: 8px;
     height: 8px;
@@ -662,7 +574,7 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    border: 2px solid #00e5ff;
+    border: 2px solid #00b6bd;
     border-top-color: transparent;
     animation: spin 1s linear infinite;
   }
@@ -673,14 +585,14 @@
     }
   }
 
-  .guide-footer {
+  .dialog-footer {
     display: flex;
     align-items: center;
     justify-content: flex-end;
     gap: 0.75rem;
-    padding: 1rem 1.5rem;
-    background: #0b173b;
-    border-top: 1px solid #1c2e5c;
+    padding: 0.85rem 1.25rem;
+    background: rgba(11, 26, 78, 0.35);
+    border-top: 1px solid var(--color-border, #1c2e5c);
   }
 
   .btn {
@@ -698,12 +610,13 @@
   }
 
   .btn-primary {
-    background: #01b2bb;
-    color: #ffffff;
+    background: #00b6bd;
+    color: #0b1a4e;
   }
 
   .btn-primary:hover {
     background: #0299a1;
+    color: #ffffff;
   }
 
   .btn-secondary {

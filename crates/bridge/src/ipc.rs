@@ -47,6 +47,28 @@ pub fn capture_ipc_path(data_dir: Option<&Path>) -> PathBuf {
     }
 }
 
+/// Resolves the absolute path to `extension-seen.json` (extension health probe marker).
+pub fn extension_seen_path(data_dir: Option<&Path>) -> PathBuf {
+    match data_dir {
+        Some(dir) => dir.join("extension-seen.json"),
+        None => default_data_dir().join("extension-seen.json"),
+    }
+}
+
+/// Records that the browser extension sent a native `Health` request (unix ms only).
+pub fn write_extension_seen_marker(data_dir: Option<&Path>) {
+    let path = extension_seen_path(data_dir);
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    let body = format!(r#"{{"unix_ms":{now_ms}}}"#);
+    let _ = std::fs::write(path, body);
+}
+
 /// Resolves the absolute path to `capture.log`.
 pub fn capture_log_path(data_dir: Option<&Path>) -> PathBuf {
     match data_dir {

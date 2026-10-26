@@ -25,7 +25,8 @@ pub use dispatch::EngineDispatcher;
 pub use forward::{build_app_launch_command, AppLaunchCommand, ForwardingDispatcher};
 pub use host::{serve, CommandLine, Dispatcher, EchoDispatcher};
 pub use ipc::{
-    capture_ipc_path, capture_log_path, default_data_dir, read_ipc_info, CaptureIpcInfo,
+    capture_ipc_path, capture_log_path, default_data_dir, extension_seen_path,
+    read_ipc_info, write_extension_seen_marker, CaptureIpcInfo,
 };
 pub use log::{append_log, sanitize_detail, sanitize_url};
 pub use message::{BrowserCookie, Request, Response, PROTOCOL_VERSION};

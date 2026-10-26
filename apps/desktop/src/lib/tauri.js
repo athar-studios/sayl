@@ -362,6 +362,9 @@ function handleBrowserMock(command, args) {
     case "test_native_host":
       return { ok: true, roundtrip_ms: 12, message: "OK" };
 
+    case "extension_seen_age_ms":
+      return null;
+
     case "open_extension_folder":
     case "open_browser_extensions":
     case "register_native_host":

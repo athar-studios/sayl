@@ -903,7 +903,6 @@
     guideBrowser = null;
     loadExtensionStatus();
   }}
-  on:pollStatus={loadExtensionStatus}
 />
 
 <style>

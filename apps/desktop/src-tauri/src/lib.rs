@@ -933,6 +933,23 @@ pub mod commands {
     }
 
     #[tauri::command]
+    pub fn extension_seen_age_ms() -> Option<u64> {
+        #[derive(serde::Deserialize)]
+        struct ExtensionSeenRecord {
+            unix_ms: u64,
+        }
+
+        let path = default_data_dir().join("extension-seen.json");
+        let contents = std::fs::read_to_string(&path).ok()?;
+        let record: ExtensionSeenRecord = serde_json::from_str(&contents).ok()?;
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()?
+            .as_millis() as u64;
+        Some(now_ms.saturating_sub(record.unix_ms))
+    }
+
+    #[tauri::command]
     pub fn open_extension_folder() -> Result<(), String> {
         native_host::cmd_open_extension_folder()
     }
@@ -1110,6 +1127,7 @@ pub fn run() {
             commands::register_native_host,
             commands::unregister_native_host,
             commands::test_native_host,
+            commands::extension_seen_age_ms,
             commands::open_extension_folder,
             commands::open_browser_extensions,
             commands::open_download_window,

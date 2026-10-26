@@ -210,6 +210,8 @@ function sendCaptureToHost(payload) {
   });
 }
 
+const HEALTH_PROBE_INTERVAL_MS = 15_000;
+
 // Native Health probe (never starts the desktop app)
 function checkHealth() {
   chrome.runtime.sendNativeMessage(
@@ -236,6 +238,16 @@ function checkHealth() {
       }
     }
   );
+}
+
+let healthProbeInterval = null;
+
+function startHealthProbes() {
+  checkHealth();
+  if (healthProbeInterval != null) {
+    return;
+  }
+  healthProbeInterval = setInterval(checkHealth, HEALTH_PROBE_INTERVAL_MS);
 }
 
 /** @type {Map<number, { suggestedFilename?: string, captureInFlight?: boolean, accepted?: boolean }>} */
@@ -395,12 +407,14 @@ chrome.runtime.onInstalled.addListener(() => {
       consumeLastError();
     }
   );
-  checkHealth();
+  startHealthProbes();
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  checkHealth();
+  startHealthProbes();
 });
+
+startHealthProbes();
 
 // Handle context menu clicks
 chrome.contextMenus.onClicked.addListener(async (info) => {

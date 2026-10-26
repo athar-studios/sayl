@@ -13,7 +13,7 @@ use url::Url;
 
 use crate::app_finder::find_app_exe;
 use crate::host::Dispatcher;
-use crate::ipc::{capture_ipc_path, read_ipc_info, CaptureIpcInfo};
+use crate::ipc::{capture_ipc_path, read_ipc_info, write_extension_seen_marker, CaptureIpcInfo};
 use crate::log::{append_log, sanitize_url};
 use crate::message::{Request, Response, PROTOCOL_VERSION};
 
@@ -466,6 +466,8 @@ impl Dispatcher for ForwardingDispatcher {
                         format!("host speaks version {PROTOCOL_VERSION}"),
                     );
                 }
+
+                write_extension_seen_marker(self.data_dir.as_deref());
 
                 // Health must NEVER start the app
                 match self.read_ipc() {
