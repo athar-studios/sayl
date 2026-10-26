@@ -8,7 +8,7 @@
     "description": "Extension description as shown in the browser"
   },
   "context_menu_download": {
-    "message": "Download with Sayl",
+    "message": "Download with SAYL",
     "description": "Right-click menu item on links (English UI)"
   },
   "action_title": {
@@ -30,5 +30,45 @@
   "notify_error_title": {
     "message": "Could not reach SAYL",
     "description": "Notification title for host errors"
+  },
+  "status_checking": {
+    "message": "Checking connection...",
+    "description": "Status text while checking connection"
+  },
+  "status_connected": {
+    "message": "SAYL connected and ready",
+    "description": "Status text when app is connected successfully"
+  },
+  "status_app_disconnected": {
+    "message": "App not connected",
+    "description": "Status text when host is reachable but app is disconnected"
+  },
+  "status_host_disconnected": {
+    "message": "Native host not connected",
+    "description": "Status text when native host cannot be reached"
+  },
+  "btn_test": {
+    "message": "Test",
+    "description": "Test connection button label"
+  },
+  "settings_title": {
+    "message": "Settings",
+    "description": "Settings section title"
+  },
+  "setting_enabled": {
+    "message": "Enable auto-interception",
+    "description": "Toggle to enable download interception"
+  },
+  "setting_min_size": {
+    "message": "Minimum size (MB)",
+    "description": "Minimum file size threshold in megabytes"
+  },
+  "setting_extensions": {
+    "message": "Intercepted file extensions",
+    "description": "List of intercepted file extensions"
+  },
+  "setting_saved": {
+    "message": "Saved",
+    "description": "Confirmation message that settings were saved"
   }
 }

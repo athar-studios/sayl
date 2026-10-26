@@ -206,6 +206,7 @@ export default {
     emptyUrl: "URL cannot be empty",
   },
   task: {
+    connecting: "Connecting…",
     openFile: "Open File",
     revealFolder: "Show in Folder",
     pause: "Pause",
@@ -275,6 +276,9 @@ export default {
 
     runAtStartup: "Start SAYL with Windows",
     runAtStartupDesc: "Starts SAYL silently in the system tray when Windows boots so downloads are intercepted.",
+
+    clipboardMonitor: "Monitor clipboard",
+    clipboardMonitorDesc: "Automatically open the Add Download dialog when a valid download link is copied. Turning this off stops clipboard monitoring.",
 
     downloadDir: "Download Folder",
     downloadDirDesc: "Default folder on your drive where downloaded files are saved.",

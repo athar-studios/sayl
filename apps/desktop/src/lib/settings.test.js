@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { DEFAULT_SETTINGS, SETTINGS_KEYS, SETTINGS_SECTIONS, normalizeSettings } from "./settings.js";
 
 describe("Settings contract & defaults (settings.js)", () => {
-  it("has exactly the 13 documented keys in SETTINGS_KEYS", () => {
-    expect(SETTINGS_KEYS).toHaveLength(13);
+  it("has exactly the 14 documented keys in SETTINGS_KEYS", () => {
+    expect(SETTINGS_KEYS).toHaveLength(14);
     expect(SETTINGS_KEYS).toEqual([
       "download_dir",
       "max_concurrent_tasks",
@@ -18,10 +18,11 @@ describe("Settings contract & defaults (settings.js)", () => {
       "close_action",
       "run_at_startup",
       "close_notice_shown",
+      "clipboard_monitor",
     ]);
   });
 
-  it("default settings object contains exactly the 13 documented keys", () => {
+  it("default settings object contains exactly the 14 documented keys", () => {
     const keys = Object.keys(DEFAULT_SETTINGS).sort();
     const expectedKeys = [...SETTINGS_KEYS].sort();
     expect(keys).toEqual(expectedKeys);
@@ -40,6 +41,7 @@ describe("Settings contract & defaults (settings.js)", () => {
     expect(DEFAULT_SETTINGS.close_action).toBe("background");
     expect(DEFAULT_SETTINGS.run_at_startup).toBe(false);
     expect(DEFAULT_SETTINGS.close_notice_shown).toBe(false);
+    expect(DEFAULT_SETTINGS.clipboard_monitor).toBe(true);
   });
 
   it("normalizeSettings populates missing keys with valid defaults", () => {
@@ -59,6 +61,18 @@ describe("Settings contract & defaults (settings.js)", () => {
     expect(partial.close_action).toBe("background");
     expect(partial.run_at_startup).toBe(false);
     expect(partial.close_notice_shown).toBe(false);
+    expect(partial.clipboard_monitor).toBe(true);
+  });
+
+  it("normalizes and preserves clipboard_monitor boolean values", () => {
+    const disabled = normalizeSettings({ clipboard_monitor: false });
+    expect(disabled.clipboard_monitor).toBe(false);
+
+    const enabled = normalizeSettings({ clipboard_monitor: true });
+    expect(enabled.clipboard_monitor).toBe(true);
+
+    const invalid = normalizeSettings({ clipboard_monitor: "yes" });
+    expect(invalid.clipboard_monitor).toBe(true);
   });
 
   it("rejects invalid view_mode in normalizeSettings and falls back to 'table'", () => {

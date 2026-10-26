@@ -81,6 +81,11 @@ impl CoreError {
         }
     }
 
+    /// Creates a timeout error.
+    pub fn timeout(message: impl Into<String>) -> Self {
+        Self::http(None, format!("timeout: {}", message.into()), None)
+    }
+
     /// Creates an I/O error with context.
     pub fn io_with_context(source: io::Error, context: impl Into<String>) -> Self {
         Self::Io {

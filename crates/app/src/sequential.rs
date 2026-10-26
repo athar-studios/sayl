@@ -34,6 +34,8 @@ pub async fn run_sequential_download(
     pause_token: CancellationToken,
     event_sender: &EventSender,
     store: &Store,
+    stall_timeout: std::time::Duration,
+    custom_headers: Option<&[(String, String)]>,
 ) -> Result<DownloadOutcome, CoreError> {
     if cancel_token.is_cancelled() {
         return Ok(DownloadOutcome::Cancelled {
@@ -48,6 +50,12 @@ pub async fn run_sequential_download(
 
     let mut req_builder = client.get(url.clone());
     req_builder = req_builder.header(reqwest::header::ACCEPT_ENCODING, "identity");
+
+    if let Some(headers) = custom_headers {
+        if let Ok(hdr_map) = sayl_http::headers::build_request_headers(headers) {
+            req_builder = req_builder.headers(hdr_map);
+        }
+    }
 
     if resume_from > 0 {
         req_builder = req_builder.header(
@@ -70,9 +78,19 @@ pub async fn run_sequential_download(
     let mut attempts = 0u32;
     let res = loop {
         attempts += 1;
-        let send_result = client
-            .execute(built_req.try_clone().expect("GET request is cloneable"))
-            .await;
+        let send_result = match tokio::time::timeout(
+            stall_timeout,
+            client.execute(built_req.try_clone().expect("GET request is cloneable")),
+        )
+        .await
+        {
+            Ok(res) => res,
+            Err(_) => {
+                return Err(CoreError::timeout(
+                    "connection stalled: no response received within timeout",
+                ));
+            }
+        };
         match send_result {
             Ok(r) => {
                 let status = r.status();
@@ -127,7 +145,33 @@ pub async fn run_sequential_download(
 
     let status = res.status();
     let is_partial = status == reqwest::StatusCode::PARTIAL_CONTENT;
-    let (mut file, mut current_written) = if resume_from > 0 && is_partial {
+    let mut valid_partial = is_partial;
+
+    if is_partial {
+        if let Some(cr_val) = res.headers().get(reqwest::header::CONTENT_RANGE) {
+            if let Ok(cr_str) = cr_val.to_str() {
+                if let Ok(cr) = sayl_http::range::ContentRange::parse(cr_str) {
+                    if let (Some(expected), Some(total)) = (expected_length, cr.total) {
+                        if expected != total {
+                            return Err(CoreError::validation(
+                                "content_range",
+                                format!(
+                                    "server Content-Range total ({total}) does not match expected ({expected})"
+                                ),
+                            ));
+                        }
+                    }
+                    if let Some(start) = cr.start {
+                        if start != resume_from {
+                            valid_partial = false;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let (mut file, mut current_written) = if resume_from > 0 && valid_partial {
         use tokio::io::AsyncSeekExt;
         let mut f = tokio::fs::OpenOptions::new()
             .write(true)
@@ -237,9 +281,9 @@ pub async fn run_sequential_download(
                 ).await;
                 return Ok(DownloadOutcome::Paused { written: current_written });
             }
-            item = stream.next() => {
+            item = tokio::time::timeout(stall_timeout, stream.next()) => {
                 match item {
-                    Some(Ok(chunk)) => {
+                    Ok(Some(Ok(chunk))) => {
                         if !chunk.is_empty() {
                             use tokio::io::AsyncWriteExt;
                             file.write_all(&chunk)
@@ -287,7 +331,7 @@ pub async fn run_sequential_download(
                             ).await;
                         }
                     }
-                    Some(Err(err)) => {
+                    Ok(Some(Err(err))) => {
                         use tokio::io::AsyncWriteExt;
                         let _ = file.flush().await;
                         let _ = file.sync_all().await;
@@ -301,9 +345,25 @@ pub async fn run_sequential_download(
                         let _ = store.save_checkpoint(&checkpoint);
                         return Err(CoreError::http(None, format!("stream error: {err}"), None));
                     }
-                    None => {
+                    Ok(None) => {
                         // EOF
                         break;
+                    }
+                    Err(_) => {
+                        use tokio::io::AsyncWriteExt;
+                        let _ = file.flush().await;
+                        let _ = file.sync_all().await;
+                        drop(file);
+                        let checkpoint = Checkpoint::new(
+                            task_id,
+                            current_written,
+                            expected_length,
+                            vec![(0, current_written)],
+                        );
+                        let _ = store.save_checkpoint(&checkpoint);
+                        return Err(CoreError::timeout(
+                            "sequential transfer stalled: no bytes received within timeout",
+                        ));
                     }
                 }
             }

@@ -10,6 +10,7 @@
   export let selectedIds = [];
   export let totalTasksCount = 0;
   export let viewMode = "table"; // Requirement 4: default view_mode is "table"
+  export let pendingStart = null;
 
   const dispatch = createEventDispatcher();
 
@@ -68,6 +69,7 @@
       {#each tasks as task (task.id)}
         <TaskCard
           {task}
+          {pendingStart}
           selected={isSelected(task.id)}
           on:select={(e) => dispatch("select", e.detail)}
           on:pause={(e) => dispatch("pause", e.detail)}
@@ -87,6 +89,7 @@
         {tasks}
         {selectedId}
         {selectedIds}
+        {pendingStart}
         on:select={(e) => dispatch("select", e.detail)}
         on:pause={(e) => dispatch("pause", e.detail)}
         on:resume={(e) => dispatch("resume", e.detail)}

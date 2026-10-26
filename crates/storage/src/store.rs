@@ -67,6 +67,7 @@ struct StoreInner {
     journal: Option<Journal>,
     tasks: BTreeMap<TaskId, TaskRecord>,
     checkpoints: BTreeMap<TaskId, Checkpoint>,
+    deleted: HashSet<TaskId>,
     seq: u64,
 }
 
@@ -163,6 +164,7 @@ impl Store {
         let mut journal = Journal::open(&journal_path)?;
         let (entries, _stats) = journal.replay()?;
 
+        let mut deleted = HashSet::new();
         for entry in entries {
             if entry.seq <= snapshot_seq {
                 // Already folded into snapshot
@@ -175,14 +177,19 @@ impl Store {
 
             match entry.op {
                 JournalOp::UpsertTask(task) => {
-                    tasks.insert(task.id, task);
+                    if !deleted.contains(&task.id) {
+                        tasks.insert(task.id, task);
+                    }
                 }
                 JournalOp::DeleteTask(id) => {
+                    deleted.insert(id);
                     tasks.remove(&id);
                     checkpoints.remove(&id);
                 }
                 JournalOp::SaveCheckpoint(cp) => {
-                    checkpoints.insert(cp.task_id, cp);
+                    if !deleted.contains(&cp.task_id) {
+                        checkpoints.insert(cp.task_id, cp);
+                    }
                 }
             }
         }
@@ -192,6 +199,7 @@ impl Store {
             journal: Some(journal),
             tasks,
             checkpoints,
+            deleted,
             seq,
         };
 
@@ -208,6 +216,7 @@ impl Store {
             journal: None,
             tasks: BTreeMap::new(),
             checkpoints: BTreeMap::new(),
+            deleted: HashSet::new(),
             seq: 0,
         };
 
@@ -223,6 +232,11 @@ impl Store {
             .inner
             .lock()
             .map_err(|_| StoreError::Other("Store mutex poisoned".to_string()))?;
+
+        // Late upsert guard: if task was deleted, ignore to prevent resurrection
+        if inner.deleted.contains(&record.id) {
+            return Ok(());
+        }
 
         inner.seq += 1;
         let seq = inner.seq;
@@ -269,12 +283,15 @@ impl Store {
             return Err(StoreError::NotFound(id));
         }
 
+        inner.deleted.insert(id);
+
         inner.seq += 1;
         let seq = inner.seq;
 
         if let Some(journal) = inner.journal.as_mut() {
             let entry = Entry::delete_task(seq, id);
             journal.append(&entry)?;
+            journal.flush()?; // Hardware fsync the tombstone
         }
 
         inner.tasks.remove(&id);
@@ -290,6 +307,10 @@ impl Store {
             .inner
             .lock()
             .map_err(|_| StoreError::Other("Store mutex poisoned".to_string()))?;
+
+        if inner.deleted.contains(&checkpoint.task_id) {
+            return Ok(());
+        }
 
         if !inner.tasks.contains_key(&checkpoint.task_id) {
             return Err(StoreError::NotFound(checkpoint.task_id));
@@ -541,5 +562,45 @@ mod tests {
         // After dropping store1, opening again must succeed
         let store2 = Store::open(dir.path());
         assert!(store2.is_ok());
+    }
+
+    #[test]
+    fn test_delete_durability_and_late_upsert_guard() {
+        let dir = test_temp_dir();
+        let task = TaskRecord::new("http://example.com/failed.bin", "C:\\dl", "failed.bin");
+        let task_id = task.id;
+
+        {
+            let store = Store::open(dir.path()).unwrap();
+            store.upsert_task(&task).unwrap();
+            let checkpoint = Checkpoint::new(task_id, 100, Some(1000), vec![(0, 100)]);
+            store.save_checkpoint(&checkpoint).unwrap();
+            assert!(store.get_task(task_id).unwrap().is_some());
+            assert!(store.load_checkpoint(task_id).unwrap().is_some());
+
+            // Delete task: fsyncs tombstone and records in-memory tombstone
+            store.delete_task(task_id).unwrap();
+            assert!(store.get_task(task_id).unwrap().is_none());
+            assert!(store.load_checkpoint(task_id).unwrap().is_none());
+
+            // Late upsert must be silently ignored by tombstone guard
+            store.upsert_task(&task).unwrap();
+            assert!(store.get_task(task_id).unwrap().is_none());
+
+            // Late checkpoint save must also be ignored
+            let _ = store.save_checkpoint(&checkpoint);
+            assert!(store.load_checkpoint(task_id).unwrap().is_none());
+        }
+
+        // Reopen store from disk: replay must retain tombstone and task must stay deleted
+        {
+            let store = Store::open(dir.path()).unwrap();
+            assert!(store.get_task(task_id).unwrap().is_none());
+            assert!(store.load_checkpoint(task_id).unwrap().is_none());
+
+            // Late upsert after reopen must still be ignored
+            store.upsert_task(&task).unwrap();
+            assert!(store.get_task(task_id).unwrap().is_none());
+        }
     }
 }

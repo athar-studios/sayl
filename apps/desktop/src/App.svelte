@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import { t, currentLang, setLanguage, toggleLanguage } from "./lib/i18n.js";
   import { safeInvoke, toasts, removeToast, showToast } from "./lib/tauri.js";
-  import { canPauseTask, canResumeTask, formatSpeed } from "./lib/format.js";
+  import { canPauseTask, canResumeTask, formatSpeed, isTaskPending } from "./lib/format.js";
   import { DEFAULT_SETTINGS, normalizeSettings } from "./lib/settings.js";
   import { getCategoryCounts } from "./lib/classify.js";
   import {
@@ -88,6 +88,56 @@
   let unlistenProgress = null;
   let unlistenShutdown = null;
   let unlistenDragDrop = null;
+  let unlistenClipboardUrl = null;
+
+  // Pending start/resume state keyed by task id (Item 3)
+  let pendingStart = new Set();
+  const pendingTimeouts = new Map();
+
+  function clearPendingStart(id) {
+    if (pendingTimeouts.has(id)) {
+      clearTimeout(pendingTimeouts.get(id));
+      pendingTimeouts.delete(id);
+    }
+    if (pendingStart.has(id)) {
+      const next = new Set(pendingStart);
+      next.delete(id);
+      pendingStart = next;
+    }
+  }
+
+  function markPendingStart(id) {
+    if (pendingTimeouts.has(id)) {
+      clearTimeout(pendingTimeouts.get(id));
+      pendingTimeouts.delete(id);
+    }
+    pendingStart = new Set(pendingStart).add(id);
+
+    const timer = setTimeout(() => {
+      if (pendingStart.has(id)) {
+        clearPendingStart(id);
+        const timeoutMsg = $t("errors.timeout.title") || ($currentLang === "ar" ? "انتهت مهلة الاتصال" : "Connection Timed Out");
+        showToast(timeoutMsg, "error");
+      }
+    }, 15000);
+    pendingTimeouts.set(id, timer);
+  }
+
+  async function openAddDialog(explicitUrl = "") {
+    if (explicitUrl) {
+      droppedUrl = explicitUrl;
+      addDialogOpen = true;
+      return;
+    }
+    let prefill = "";
+    try {
+      prefill = await invoke("get_clipboard_url");
+    } catch {
+      prefill = "";
+    }
+    droppedUrl = prefill || "";
+    addDialogOpen = true;
+  }
 
   let settings = { ...DEFAULT_SETTINGS, view_mode: "table" };
 
@@ -181,16 +231,31 @@
 
     if (payload.full) {
       tasks = Array.isArray(payload.upsert) ? payload.upsert : [];
+      for (const t of tasks) {
+        if (pendingStart.has(t.id)) {
+          clearPendingStart(t.id);
+        }
+      }
     } else {
       let next = [...tasks];
 
       if (Array.isArray(payload.removed) && payload.removed.length > 0) {
         const removedSet = new Set(payload.removed);
+        for (const rid of payload.removed) {
+          if (pendingStart.has(rid)) {
+            clearPendingStart(rid);
+          }
+        }
         next = next.filter((t) => !removedSet.has(t.id));
       }
 
       if (Array.isArray(payload.upsert) && payload.upsert.length > 0) {
         const upsertMap = new Map(payload.upsert.map((t) => [t.id, t]));
+        for (const [uid, _] of upsertMap) {
+          if (pendingStart.has(uid)) {
+            clearPendingStart(uid);
+          }
+        }
         next = next.map((t) => {
           if (upsertMap.has(t.id)) {
             const updated = { ...t, ...upsertMap.get(t.id) };
@@ -270,8 +335,7 @@
     if (!url) return;
     const trimmed = url.trim();
     if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-      droppedUrl = trimmed;
-      addDialogOpen = true;
+      openAddDialog(trimmed);
     }
   }
 
@@ -352,24 +416,30 @@
   }
 
   async function handleResumeTask(id) {
+    if (!id) return;
+    markPendingStart(id);
     const start = startClick();
     try {
       await invoke("start_task", { id });
-      tasks = tasks.map((t) => (t.id === id ? { ...t, state: "Downloading" } : t));
-    } catch {
-      // Handled by safeInvoke toast
+      // Do not set state to "Downloading" optimistically
+    } catch (err) {
+      clearPendingStart(id);
+      showToast(err ? String(err) : ($currentLang === "ar" ? "فشل بدء التنزيل" : "Failed to start download"), "error");
     } finally {
       endClick(start, "resume-task");
     }
   }
 
   async function handleRetryTask(id) {
+    if (!id) return;
+    markPendingStart(id);
     const start = startClick();
     try {
       await invoke("start_task", { id });
-      tasks = tasks.map((t) => (t.id === id ? { ...t, state: "Downloading" } : t));
-    } catch {
-      // Handled by safeInvoke toast
+      // Do not set state to "Downloading" optimistically
+    } catch (err) {
+      clearPendingStart(id);
+      showToast(err ? String(err) : ($currentLang === "ar" ? "فشل بدء التنزيل" : "Failed to start download"), "error");
     } finally {
       endClick(start, "retry-task");
     }
@@ -648,8 +718,7 @@
 
     if ((e.ctrlKey || e.metaKey) && (e.key === "n" || e.key === "N")) {
       e.preventDefault();
-      droppedUrl = "";
-      addDialogOpen = true;
+      openAddDialog();
       return;
     }
 
@@ -765,12 +834,20 @@
         unlistenTrayAction = await listen("sayl://tray-action", (event) => {
           const action = event.payload;
           if (action === "add") {
-            droppedUrl = "";
-            addDialogOpen = true;
+            openAddDialog();
           } else if (action === "pause-all") {
             handlePauseAll();
           } else if (action === "resume-all") {
             handleResumeAll();
+          }
+        });
+
+        // Clipboard URL listener (Item 2)
+        unlistenClipboardUrl = await listen("sayl://clipboard-url", (event) => {
+          const url = event.payload?.url;
+          if (url) {
+            droppedUrl = url;
+            addDialogOpen = true;
           }
         });
 
@@ -792,6 +869,10 @@
         unlistenProgress = await listen("sayl://progress", (event) => {
           const payload = event.payload;
           if (!payload || !payload.id) return;
+
+          if (pendingStart.has(payload.id)) {
+            clearPendingStart(payload.id);
+          }
 
           tasks = tasks.map((t) => {
             if (t.id === payload.id) {
@@ -889,11 +970,16 @@
   onDestroy(() => {
     if (unlistenTasksChanged) unlistenTasksChanged();
     if (unlistenTrayAction) unlistenTrayAction();
+    if (unlistenClipboardUrl) unlistenClipboardUrl();
     if (unlistenOpenSettings) unlistenOpenSettings();
     if (unlistenWindowClosed) unlistenWindowClosed();
     if (unlistenProgress) unlistenProgress();
     if (unlistenDragDrop) unlistenDragDrop();
     if (unlistenShutdown) unlistenShutdown();
+    for (const timer of pendingTimeouts.values()) {
+      clearTimeout(timer);
+    }
+    pendingTimeouts.clear();
     if (mediaQueryList && typeof mediaQueryList.removeEventListener === "function") {
       mediaQueryList.removeEventListener("change", handleOsThemeChange);
     }
@@ -929,13 +1015,10 @@
       showSidebar={!settings.sidebar_collapsed}
       {showToolbar}
       {showStatusbar}
-      canResumeSelected={selectedTask ? canResumeTask(selectedTask.state) : canResumeAny}
+      canResumeSelected={selectedTask ? (canResumeTask(selectedTask.state) && !pendingStart.has(selectedTask.id)) : canResumeAny}
       canPauseSelected={selectedTask ? canPauseTask(selectedTask.state) : canPauseAny}
       hasSelected={selectedIds.length > 0 || !!selectedId}
-      on:add={() => {
-        droppedUrl = "";
-        addDialogOpen = true;
-      }}
+      on:add={() => openAddDialog()}
       on:openFolder={() => invoke("open_download_folder")}
       on:exit={() => invoke("quit_app")}
       on:resume={() => selectedId && handleResumeTask(selectedId)}
@@ -971,13 +1054,11 @@
         selectedCount={selectedIds.length}
         {canPauseAny}
         {canResumeAny}
+        {pendingStart}
         bind:searchQuery
         theme={settings.theme}
         {autoShutdown}
-        on:add={() => {
-          droppedUrl = "";
-          addDialogOpen = true;
-        }}
+        on:add={() => openAddDialog()}
         on:resume={() => selectedId && handleResumeTask(selectedId)}
         on:pause={() => selectedId && handlePauseTask(selectedId)}
         on:pauseAll={handlePauseAll}
@@ -1039,10 +1120,8 @@
           {selectedId}
           {selectedIds}
           viewMode={settings.view_mode || "table"}
-          on:add={() => {
-            droppedUrl = "";
-            addDialogOpen = true;
-          }}
+          {pendingStart}
+          on:add={() => openAddDialog()}
           on:select={(e) => handleSelectTask(e.detail)}
           on:pause={(e) => handlePauseTask(e.detail)}
           on:resume={(e) => handleResumeTask(e.detail)}
@@ -1170,6 +1249,7 @@
       {#each activeFloatingTasks as floatingTask (floatingTask.id)}
         <DownloadWindow
           task={floatingTask}
+          {pendingStart}
           {autoShutdown}
           autoClose={settings.close_download_window_on_finish}
           on:close={(e) => handleCloseDownloadWindow(e.detail)}

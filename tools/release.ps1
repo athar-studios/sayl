@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param (
     [Parameter(Mandatory = $false)]
     [string]$Version,
@@ -181,6 +181,9 @@ if ($DryRun) {
         Copy-Item -LiteralPath (Join-Path $RepoRoot "assets\brand\icon.ico") -Destination (Join-Path $HostStageDir "icon.ico") -Force
         Copy-Item -Path (Join-Path $RepoRoot "extensions\browser\chromium\*") -Destination $ExtStageDir -Recurse -Force
         Copy-Item -Path (Join-Path $RepoRoot "extensions\browser\firefox\*") -Destination $ExtFirefoxStageDir -Recurse -Force
+        # Never ship test artifacts inside the extension payload
+        Get-ChildItem -LiteralPath $ExtStageDir -Recurse -Include "*.test.mjs", "*.test.js" -ErrorAction SilentlyContinue | Remove-Item -Force
+        Get-ChildItem -LiteralPath $ExtFirefoxStageDir -Recurse -Include "*.test.mjs", "*.test.js" -ErrorAction SilentlyContinue | Remove-Item -Force
 
         # Stage release configuration overlay for Tauri CLI
         $DesktopInstallerDir = Join-Path $DesktopDir "installer"

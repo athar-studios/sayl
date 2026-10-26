@@ -291,6 +291,23 @@
                   </label>
                 </div>
               </div>
+
+              <!-- Clipboard Monitor -->
+              <div class="setting-row">
+                <div class="setting-meta">
+                  <span class="setting-title">{$t("settings.clipboardMonitor")}</span>
+                  <p class="setting-desc">{$t("settings.clipboardMonitorDesc")}</p>
+                </div>
+                <div class="setting-control">
+                  <label class="switch-toggle">
+                    <input
+                      type="checkbox"
+                      bind:checked={localSettings.clipboard_monitor}
+                    />
+                    <span class="switch-slider"></span>
+                  </label>
+                </div>
+              </div>
             </div>
 
           <!-- 2. DOWNLOADS -->

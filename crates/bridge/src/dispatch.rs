@@ -101,6 +101,8 @@ impl EngineDispatcher {
                 Response::Pong {
                     version: PROTOCOL_VERSION,
                     app_version: env!("CARGO_PKG_VERSION").to_string(),
+                    app_connected: None,
+                    app_error: None,
                 }
             }
             Request::Download {
@@ -125,6 +127,32 @@ impl EngineDispatcher {
                     Err(e) => Response::error("add_failed", e.to_string()),
                 }
             }
+            Request::Capture { url, filename, .. } => {
+                if let Err(err) = validate_request_url(&url, self.allow_private_hosts) {
+                    return Response::error("invalid_url", err.to_string());
+                }
+
+                if let Some(ref name) = filename {
+                    if let Err(err) = validate_suggested_filename(name) {
+                        return Response::error("invalid_url", err.to_string());
+                    }
+                }
+
+                match self.runtime.block_on(self.engine.add(&url)) {
+                    Ok(id) => Response::Accepted {
+                        task_id: id.to_string(),
+                    },
+                    Err(e) => Response::error("add_failed", e.to_string()),
+                }
+            }
+            Request::Health { .. } => Response::Health {
+                version: PROTOCOL_VERSION,
+                app_connected: true,
+                app_version: Some(env!("CARGO_PKG_VERSION").to_string()),
+                app_protocol: Some(1),
+                app_error: None,
+            },
+            Request::Log { .. } => Response::Ok,
             Request::Status { task_id } => {
                 let parsed_id = match task_id.parse::<sayl_core::id::TaskId>() {
                     Ok(id) => id,
@@ -210,6 +238,7 @@ mod tests {
             Response::Pong {
                 version,
                 app_version,
+                ..
             } => {
                 assert_eq!(version, 1);
                 assert_eq!(app_version, env!("CARGO_PKG_VERSION"));

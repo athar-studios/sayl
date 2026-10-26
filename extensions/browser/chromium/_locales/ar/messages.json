@@ -30,5 +30,45 @@
   "notify_error_title": {
     "message": "تعذر الاتصال بسيل",
     "description": "عنوان الإشعار عند حدوث خطأ في المضيف"
+  },
+  "status_checking": {
+    "message": "جاري فحص الاتصال...",
+    "description": "نص جاري فحص الاتصال"
+  },
+  "status_connected": {
+    "message": "سيل متصل وجاهز",
+    "description": "نص الحالة عند اتصال التطبيق بنجاح"
+  },
+  "status_app_disconnected": {
+    "message": "التطبيق غير متصل",
+    "description": "نص الحالة عندما يكون المضيف يعمل لكن التطبيق غير متصل"
+  },
+  "status_host_disconnected": {
+    "message": "المضيف غير متصل",
+    "description": "نص الحالة عندما يتعذر الوصول إلى المضيف الأصلي"
+  },
+  "btn_test": {
+    "message": "اختبار",
+    "description": "زر اختبار الاتصال"
+  },
+  "settings_title": {
+    "message": "الإعدادات",
+    "description": "عنوان قسم الإعدادات"
+  },
+  "setting_enabled": {
+    "message": "تفعيل الاعتراض التلقائي",
+    "description": "تفعيل اعتراض التنزيلات تلقائيًا"
+  },
+  "setting_min_size": {
+    "message": "الحد الأدنى للحجم (ميجابايت)",
+    "description": "حقل الحد الأدنى لحجم الملف بالميجابايت"
+  },
+  "setting_extensions": {
+    "message": "صيغ الملفات المعترضة",
+    "description": "قائمة صيغ الملفات المعترضة"
+  },
+  "setting_saved": {
+    "message": "تم الحفظ",
+    "description": "رسالة تأكيد حفظ الإعدادات"
   }
 }

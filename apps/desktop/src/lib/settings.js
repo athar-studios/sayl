@@ -17,6 +17,7 @@ export const DEFAULT_SETTINGS = {
   close_action: "background",
   run_at_startup: false,
   close_notice_shown: false,
+  clipboard_monitor: true,
 };
 
 export const SETTINGS_KEYS = [
@@ -33,6 +34,7 @@ export const SETTINGS_KEYS = [
   "close_action",
   "run_at_startup",
   "close_notice_shown",
+  "clipboard_monitor",
 ];
 
 export const SETTINGS_SECTIONS = [
@@ -99,5 +101,9 @@ export function normalizeSettings(settings = {}) {
       typeof s.close_notice_shown === "boolean"
         ? s.close_notice_shown
         : DEFAULT_SETTINGS.close_notice_shown,
+    clipboard_monitor:
+      typeof s.clipboard_monitor === "boolean"
+        ? s.clipboard_monitor
+        : DEFAULT_SETTINGS.clipboard_monitor,
   };
 }

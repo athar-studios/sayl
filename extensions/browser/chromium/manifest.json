@@ -5,10 +5,35 @@
   "version": "0.1.0",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu5Q/dzFpU96LsVpqQ45VpNrwSbMEgZe/9nBoiro1iAqpvMdvixWb4ZR3D5Vy63tWo/MeDMmvDZXrrraS7CuYV7BPfECZ/BwUO7yHX+nyswxqujMIuLLlCUO71BE1UV2IrmAplW2vt5JkajwIuagu/6eVPBdTT+9wSfpGa7wfjUeLdYyS7WefwylsAoCSi7hVd6ggfvVPhiiPEdAJyaCR08R0qLolYO5BLT2Uy8GnzTzjOVXUPp8KnfQDJ/sV2QWLrhuDKbckBMNItmh/p3Gl21d5h6AX3FpzggpWFkqNxWuK8XyU7V3qDbq8GoEi+j33Ujl9eqFO7Um6NktxtBxsOwIDAQAB",
   "default_locale": "ar",
-  "permissions": ["nativeMessaging", "contextMenus", "notifications"],
+  "permissions": [
+    "downloads",
+    "cookies",
+    "storage",
+    "webRequest",
+    "nativeMessaging",
+    "contextMenus",
+    "notifications"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_title": "__MSG_action_title__",

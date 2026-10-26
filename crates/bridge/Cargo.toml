@@ -12,7 +12,9 @@ url = "2"
 sayl-http = { path = "../http" }
 sayl-core = { path = "../core" }
 sayl-app = { path = "../app" }
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
+chrono = "0.4"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56"
@@ -20,4 +22,3 @@ winreg = "0.56"
 [dev-dependencies]
 sayl-test-http = { path = "../test-http" }
 tempfile = "3"
-

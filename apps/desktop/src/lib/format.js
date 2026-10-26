@@ -261,3 +261,25 @@ export function canCancel(state) {
 export function isTerminal(state) {
   return state === "Completed" || state === "Cancelled" || state === "Failed";
 }
+
+/**
+ * Returns true if a task is currently in pending start/resume state.
+ * Supports pendingStart being a Set, an Array, or an Object/map.
+ */
+export function isTaskPending(pendingStart, taskId) {
+  if (!pendingStart || !taskId) return false;
+  if (pendingStart instanceof Set) {
+    return pendingStart.has(taskId);
+  }
+  if (Array.isArray(pendingStart)) {
+    return pendingStart.includes(taskId);
+  }
+  return Boolean(pendingStart[taskId]);
+}
+
+/**
+ * Returns the effective translation key for a task's state or connecting label.
+ */
+export function getTaskStateKey(state, isPending = false) {
+  return isPending ? "task.connecting" : `state.${state}`;
+}

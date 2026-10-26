@@ -82,7 +82,7 @@ impl DownloadState {
     /// Returns `true` if this state can be paused by user or policy request.
     #[inline]
     pub const fn can_pause(&self) -> bool {
-        matches!(self, Self::Probing | Self::Downloading)
+        matches!(self, Self::Queued | Self::Probing | Self::Downloading)
     }
 
     /// Returns `true` if this state can be resumed.
@@ -100,7 +100,13 @@ impl DownloadState {
     /// Returns a slice of valid destination states from the current state.
     pub const fn valid_destinations(&self) -> &'static [DownloadState] {
         match self {
-            Self::Queued => &[Self::Probing, Self::Cancelling, Self::Failed],
+            Self::Queued => &[
+                Self::Probing,
+                Self::Downloading,
+                Self::Pausing,
+                Self::Cancelling,
+                Self::Failed,
+            ],
             Self::Probing => &[
                 Self::Downloading,
                 Self::Pausing,
@@ -116,7 +122,12 @@ impl DownloadState {
             Self::Verifying => &[Self::Finalizing, Self::Cancelling, Self::Failed],
             Self::Finalizing => &[Self::Completed, Self::Cancelling, Self::Failed],
             Self::Pausing => &[Self::Paused, Self::Cancelling, Self::Failed],
-            Self::Paused => &[Self::Probing, Self::Cancelling, Self::Failed],
+            Self::Paused => &[
+                Self::Probing,
+                Self::Downloading,
+                Self::Cancelling,
+                Self::Failed,
+            ],
             Self::Cancelling => &[Self::Cancelled, Self::Failed],
             Self::Completed => &[],
             Self::Cancelled => &[],
@@ -202,6 +213,25 @@ pub fn transition(
     } else {
         Err(StateTransitionError { from, to })
     }
+}
+
+/// Attempts an explicit transition from `from` state to `to` state for a specific task.
+///
+/// In addition to the basic state machine rules enforced by [`transition`], this guarded
+/// form rejects transitions to [`DownloadState::Probing`] when the task already has a known
+/// size and recorded progress (`total_size.is_some() && written > 0`).
+/// It permits direct resume from [`DownloadState::Paused`] to [`DownloadState::Downloading`].
+pub fn transition_for_task(
+    from: DownloadState,
+    to: DownloadState,
+    total_size: Option<u64>,
+    written: u64,
+) -> Result<DownloadState, StateTransitionError> {
+    if to == DownloadState::Probing && total_size.is_some() && written > 0 {
+        return Err(StateTransitionError { from, to });
+    }
+
+    transition(from, to)
 }
 
 #[cfg(test)]
@@ -361,21 +391,69 @@ mod tests {
 
         assert_eq!(valid_count + invalid_count, 121);
         // Valid transitions:
-        // Queued: 3 (Probing, Cancelling, Failed)
+        // Queued: 5 (Probing, Downloading, Pausing, Cancelling, Failed)
         // Probing: 4 (Downloading, Pausing, Cancelling, Failed)
         // Downloading: 4 (Verifying, Pausing, Cancelling, Failed)
         // Verifying: 3 (Finalizing, Cancelling, Failed)
         // Finalizing: 3 (Completed, Cancelling, Failed)
         // Pausing: 3 (Paused, Cancelling, Failed)
-        // Paused: 3 (Probing, Cancelling, Failed)
+        // Paused: 4 (Probing, Downloading, Cancelling, Failed)
         // Cancelling: 2 (Cancelled, Failed)
         // Completed: 0
         // Cancelled: 0
         // Failed: 2 (Queued, Probing)
-        // Total valid = 3 + 4 + 4 + 3 + 3 + 3 + 3 + 2 + 2 = 27
-        // Plus 8 nonterminal self-loops (Queued, Probing, Downloading, Verifying, Finalizing, Pausing, Paused, Cancelling) = 35
-        assert_eq!(valid_count, 35);
-        assert_eq!(invalid_count, 86);
+        // Total valid = 5 + 4 + 4 + 3 + 3 + 3 + 4 + 2 + 2 = 30
+        // Plus 8 nonterminal self-loops (Queued, Probing, Downloading, Verifying, Finalizing, Pausing, Paused, Cancelling) = 38
+        assert_eq!(valid_count, 38);
+        assert_eq!(invalid_count, 83);
+    }
+
+    #[test]
+    fn test_no_probing_with_known_size_and_progress() {
+        // A task with known total size and written > 0 must reject transition to Probing
+        assert!(transition_for_task(
+            DownloadState::Paused,
+            DownloadState::Probing,
+            Some(1000),
+            500
+        )
+        .is_err());
+        assert!(transition_for_task(
+            DownloadState::Queued,
+            DownloadState::Probing,
+            Some(1000),
+            500
+        )
+        .is_err());
+
+        // When written == 0, Probing is allowed
+        assert_eq!(
+            transition_for_task(DownloadState::Queued, DownloadState::Probing, Some(1000), 0),
+            Ok(DownloadState::Probing)
+        );
+
+        // When total_size is None, Probing is allowed
+        assert_eq!(
+            transition_for_task(DownloadState::Paused, DownloadState::Probing, None, 500),
+            Ok(DownloadState::Probing)
+        );
+    }
+
+    #[test]
+    fn test_paused_to_downloading_allowed() {
+        assert_eq!(
+            transition(DownloadState::Paused, DownloadState::Downloading),
+            Ok(DownloadState::Downloading)
+        );
+        assert_eq!(
+            transition_for_task(
+                DownloadState::Paused,
+                DownloadState::Downloading,
+                Some(1000),
+                500
+            ),
+            Ok(DownloadState::Downloading)
+        );
     }
 
     #[test]

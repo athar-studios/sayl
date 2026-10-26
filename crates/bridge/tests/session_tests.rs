@@ -25,6 +25,8 @@ impl Dispatcher for HostLike {
             Request::Ping { version } => Response::Pong {
                 version,
                 app_version: "test".into(),
+                app_connected: None,
+                app_error: None,
             },
             Request::Download {
                 url,
@@ -50,6 +52,23 @@ impl Dispatcher for HostLike {
                     Err(err) => Response::error("path_escape", err.to_string()),
                 }
             }
+            Request::Capture { url, .. } => {
+                if let Err(err) = validate_request_url(&url, self.allow_private_hosts) {
+                    return Response::error("invalid_url", err.to_string());
+                }
+                let task_id = format!("task-{}", self.accepted.len() + 1);
+                self.accepted
+                    .push((task_id.clone(), self.download_dir.join("download.bin")));
+                Response::Accepted { task_id }
+            }
+            Request::Health { .. } => Response::Health {
+                version: 1,
+                app_connected: true,
+                app_version: Some("test".into()),
+                app_protocol: Some(1),
+                app_error: None,
+            },
+            Request::Log { .. } => Response::Ok,
             Request::Status { task_id } => Response::Status {
                 state: format!("unknown:{task_id}"),
                 bytes: 0,

@@ -26,4 +26,4 @@ pub use id::TaskId;
 pub use idempotency::{
     IdempotencyKey, IdempotencyRecord, IdempotencyStore, DEFAULT_IDEMPOTENCY_TTL,
 };
-pub use state::{transition, DownloadState, StateTransitionError};
+pub use state::{transition, transition_for_task, DownloadState, StateTransitionError};

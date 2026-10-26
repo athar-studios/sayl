@@ -7,6 +7,7 @@
     :root {
       --bg: #0f172a;
       --card-bg: #1e293b;
+      --border: #334155;
       --text-main: #f8fafc;
       --text-muted: #94a3b8;
       --accent: #38bdf8;
@@ -21,20 +22,21 @@
       padding: 0;
     }
     body {
-      width: 320px;
+      width: 340px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       background: var(--bg);
       color: var(--text-main);
-      padding: 16px;
+      padding: 14px;
       user-select: none;
+      font-size: 13px;
     }
     .header {
       display: flex;
       align-items: center;
       gap: 10px;
-      margin-bottom: 14px;
-      border-bottom: 1px solid #334155;
-      padding-bottom: 10px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
     }
     .header img {
       width: 28px;
@@ -43,29 +45,23 @@
     .header-titles {
       flex: 1;
     }
-    .title-ar {
-      font-size: 15px;
+    .title-main {
+      font-size: 14px;
       font-weight: 700;
       color: var(--text-main);
     }
-    .title-en {
-      font-size: 11px;
-      color: var(--text-muted);
-      direction: ltr;
-      text-align: right;
-    }
-    .status-card {
+    .card {
       background: var(--card-bg);
       border-radius: 8px;
       padding: 12px;
-      margin-bottom: 12px;
-      border: 1px solid #334155;
+      margin-bottom: 10px;
+      border: 1px solid var(--border);
     }
     .status-header {
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
     .dot {
       width: 10px;
@@ -82,33 +78,31 @@
     .dot.error {
       background: var(--red);
     }
-    .status-ar {
+    .status-text {
       font-size: 13px;
       font-weight: 600;
-    }
-    .status-en {
-      font-size: 11px;
-      color: var(--text-muted);
-      direction: ltr;
-      text-align: left;
-      padding-inline-start: 18px;
+      flex: 1;
     }
     .details {
-      margin-top: 8px;
-      font-size: 10px;
+      margin-top: 6px;
+      margin-bottom: 8px;
+      font-size: 11px;
       color: var(--text-muted);
       background: #090d16;
       border-radius: 4px;
       padding: 6px 8px;
       direction: ltr;
       word-break: break-all;
+      white-space: pre-wrap;
+      max-height: 120px;
+      overflow-y: auto;
     }
     .hidden {
-      display: none;
+      display: none !important;
     }
     .btn {
       width: 100%;
-      padding: 8px 12px;
+      padding: 7px 10px;
       background: var(--accent);
       color: #0f172a;
       border: none;
@@ -120,10 +114,77 @@
       justify-content: center;
       align-items: center;
       gap: 6px;
+      transition: background 0.15s ease;
     }
     .btn:hover {
       background: var(--accent-hover);
       color: #ffffff;
+    }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+    }
+    .btn-outline:hover {
+      background: var(--accent);
+      color: #0f172a;
+    }
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+    .switch-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    .switch-row input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: var(--accent);
+    }
+    .field-row {
+      margin-bottom: 10px;
+    }
+    .field-row label {
+      display: block;
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .field-row input[type="number"],
+    .field-row textarea {
+      width: 100%;
+      background: #090d16;
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      border-radius: 4px;
+      padding: 6px 8px;
+      font-size: 11px;
+      font-family: inherit;
+    }
+    .field-row input[type="number"]:focus,
+    .field-row textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .field-row textarea {
+      resize: vertical;
+      direction: ltr;
+    }
+    .saved-notice {
+      font-size: 11px;
+      color: var(--green);
+      text-align: center;
+      margin-top: 4px;
+      font-weight: 600;
     }
   </style>
 </head>
@@ -131,22 +192,39 @@
   <div class="header">
     <img src="icons/32x32.png" alt="SAYL Logo">
     <div class="header-titles">
-      <div class="title-ar">سيل — مدير التنزيلات</div>
-      <div class="title-en">SAYL Download Manager</div>
+      <div id="title-main" class="title-main">سيل — مدير التنزيلات</div>
     </div>
   </div>
 
-  <div class="status-card">
+  <div class="card status-card">
     <div class="status-header">
       <div id="status-dot" class="dot pending"></div>
-      <div id="status-ar" class="status-ar">جاري فحص الاتصال...</div>
+      <div id="status-text" class="status-text">...</div>
     </div>
-    <div id="status-en" class="status-en">Checking connection...</div>
-    <div id="host-details" class="details hidden"></div>
+    <div id="status-details" class="details hidden"></div>
+    <button id="test-btn" class="btn btn-outline" type="button">اختبار</button>
   </div>
 
-  <button id="recheck-btn" class="btn">إعادة الفحص / Recheck</button>
+  <div class="card settings-card">
+    <div id="settings-title" class="section-title">الإعدادات</div>
+    <label class="switch-row">
+      <input type="checkbox" id="setting-enabled" checked>
+      <span id="lbl-enabled">تفعيل الاعتراض التلقائي</span>
+    </label>
 
-  <script src="popup.js"></script>
+    <div class="field-row">
+      <label for="setting-min-size" id="lbl-min-size">الحد الأدنى للحجم (ميجابايت)</label>
+      <input type="number" id="setting-min-size" min="0" step="1" value="1">
+    </div>
+
+    <div class="field-row">
+      <label for="setting-extensions" id="lbl-extensions">صيغ الملفات المعترضة</label>
+      <textarea id="setting-extensions" rows="3" spellcheck="false"></textarea>
+    </div>
+
+    <div id="saved-notice" class="saved-notice hidden">تم الحفظ</div>
+  </div>
+
+  <script type="module" src="popup.js"></script>
 </body>
 </html>

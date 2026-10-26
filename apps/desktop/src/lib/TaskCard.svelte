@@ -8,6 +8,7 @@
     canPauseTask,
     canResumeTask,
     canCancel,
+    isTaskPending,
   } from "./format.js";
   import { friendlyError } from "./errors.js";
   import { classifyFile } from "./classify.js";
@@ -16,8 +17,11 @@
 
   export let task;
   export let selected = false;
+  export let pendingStart = null;
 
   const dispatch = createEventDispatcher();
+
+  $: isPending = isTaskPending(pendingStart, task.id);
 
   $: fileCategory = classifyFile(task.filename, task.mime);
   $: writtenFormatted = formatBytes(task.written, $currentLang);
@@ -103,7 +107,7 @@
     </div>
 
     <div class="card-status-actions">
-      <StatusPill state={task.state} />
+      <StatusPill state={task.state} isConnecting={isPending} />
 
       <div class="action-buttons">
         {#if isCompleted}
@@ -136,8 +140,10 @@
         {#if allowResume && !isFailed}
           <button
             class="icon-btn icon-btn-accent"
-            title={$t("toolbar.resume")}
-            aria-label="{$t('toolbar.resume')}: {task.filename}"
+            class:disabled={isPending}
+            disabled={isPending}
+            title={isPending ? $t("task.connecting") : $t("toolbar.resume")}
+            aria-label="{isPending ? $t('task.connecting') : $t('toolbar.resume')}: {task.filename}"
             on:click|stopPropagation={() => dispatch("resume", task.id)}
           >
             <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true">
@@ -149,8 +155,10 @@
         {#if isFailed}
           <button
             class="icon-btn icon-btn-accent"
-            title={$t("toolbar.retry")}
-            aria-label="{$t('toolbar.retry')}: {task.filename}"
+            class:disabled={isPending}
+            disabled={isPending}
+            title={isPending ? $t("task.connecting") : $t("toolbar.retry")}
+            aria-label="{isPending ? $t('task.connecting') : $t('toolbar.retry')}: {task.filename}"
             on:click|stopPropagation={() => dispatch("retry", task.id)}
           >
             <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true">

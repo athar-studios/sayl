@@ -5,6 +5,8 @@
 
 pub mod autostart;
 pub mod browsers;
+pub mod capture_server;
+pub mod clipboard;
 pub mod delete;
 pub mod duplicates;
 pub mod native_host;
@@ -25,7 +27,7 @@ pub use shutdown::{
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 
 use sayl_app::{Engine, EngineConfig};
@@ -44,6 +46,10 @@ pub struct LiveTaskStats {
 
 fn default_close_action() -> String {
     "background".to_string()
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// User configurable settings.
@@ -66,6 +72,8 @@ pub struct Settings {
     pub run_at_startup: bool,
     #[serde(default)]
     pub close_notice_shown: bool,
+    #[serde(default = "default_true")]
+    pub clipboard_monitor: bool,
 }
 
 impl Default for Settings {
@@ -84,6 +92,7 @@ impl Default for Settings {
             close_action: "background".to_string(),
             run_at_startup: false,
             close_notice_shown: false,
+            clipboard_monitor: true,
         }
     }
 }
@@ -334,6 +343,7 @@ pub struct AppState {
     pub settings_path: PathBuf,
     pub sleep_inhibitor: Arc<SleepInhibitor>,
     pub shutdown_controller: Arc<ShutdownController>,
+    pub clipboard_monitor: Arc<AtomicBool>,
 }
 
 impl AppState {
@@ -344,6 +354,7 @@ impl AppState {
         sleep_inhibitor: Arc<SleepInhibitor>,
         shutdown_controller: Arc<ShutdownController>,
     ) -> Self {
+        let clipboard_monitor = Arc::new(AtomicBool::new(settings.clipboard_monitor));
         Self {
             engine,
             settings: RwLock::new(settings),
@@ -353,6 +364,7 @@ impl AppState {
             settings_path,
             sleep_inhibitor,
             shutdown_controller,
+            clipboard_monitor,
         }
     }
 }
@@ -724,10 +736,19 @@ pub mod commands {
             let _ = std::fs::write(&state.settings_path, json);
         }
 
+        state
+            .clipboard_monitor
+            .store(settings.clipboard_monitor, Ordering::Relaxed);
+
         let active = state.active_count.load(Ordering::Relaxed);
         update_sleep_inhibition_with_count(&state.settings, &state.sleep_inhibitor, active);
 
         Ok(settings)
+    }
+
+    #[tauri::command]
+    pub fn get_clipboard_url() -> Option<String> {
+        clipboard::read_clipboard_text().and_then(|text| clipboard::extract_download_url(&text))
     }
 
     #[tauri::command]
@@ -1051,6 +1072,7 @@ pub fn run() {
             commands::list_tasks,
             commands::get_settings,
             commands::set_settings,
+            commands::get_clipboard_url,
             commands::open_download_folder,
             commands::reveal_task,
             commands::open_task_file,
@@ -1151,6 +1173,56 @@ pub fn run() {
             let active_count_atomic = Arc::clone(&state.active_count);
             let app_handle = app.handle().clone();
             let sleep_inhibitor = Arc::clone(&state.sleep_inhibitor);
+
+            // Start clipboard poller thread
+            let app_handle_for_clip = app.handle().clone();
+            let clip_enabled = Arc::clone(&state.clipboard_monitor);
+            std::thread::Builder::new()
+                .name("clipboard-poller".to_string())
+                .spawn(move || {
+                    let mut monitor_state = clipboard::ClipboardMonitorState::new();
+                    loop {
+                        std::thread::sleep(std::time::Duration::from_millis(500));
+                        let enabled = clip_enabled.load(Ordering::Relaxed);
+                        if !enabled {
+                            continue;
+                        }
+                        // Only read the clipboard while enabled is true
+                        let current_text = clipboard::read_clipboard_text();
+                        if let Some(url) = monitor_state.tick(enabled, current_text) {
+                            // Surface the main window so AddTaskDialog is visible (Gap 1)
+                            if let Some(window) = app_handle_for_clip.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.unminimize();
+                                let _ = window.set_focus();
+                            }
+
+                            #[derive(Serialize, Clone)]
+                            struct ClipboardUrlPayload {
+                                url: String,
+                            }
+                            let _ = app_handle_for_clip.emit(
+                                "sayl://clipboard-url",
+                                ClipboardUrlPayload { url },
+                            );
+                        }
+                    }
+                })
+                .expect("failed to spawn clipboard poller thread");
+
+            // Start loopback IPC capture server
+            let capture_engine = engine.clone();
+            let capture_data_dir = default_data_dir();
+            tauri::async_runtime::spawn(async move {
+                match capture_server::start_capture_server(capture_engine, capture_data_dir, None).await {
+                    Ok(handle) => {
+                        Box::leak(Box::new(handle));
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to start capture loopback server: {e}");
+                    }
+                }
+            });
 
             tauri::async_runtime::spawn(async move {
                 // Recover non-terminal tasks from durable storage
@@ -1395,6 +1467,8 @@ pub fn run() {
         .run(|_app_handle, event| {
             if let tauri::RunEvent::Exit = event {
                 perf::log_event("exit");
+                let ipc_file = default_data_dir().join("capture-ipc.json");
+                let _ = std::fs::remove_file(ipc_file);
             }
         });
 }
@@ -1528,10 +1602,11 @@ mod tests {
         assert_eq!(settings.close_action, "background");
         assert!(!settings.run_at_startup);
         assert!(!settings.close_notice_shown);
+        assert!(settings.clipboard_monitor);
 
         let val: serde_json::Value = serde_json::to_value(&settings).expect("serializes");
         let obj = val.as_object().expect("object");
-        assert_eq!(obj.len(), 13);
+        assert_eq!(obj.len(), 14);
         let expected_keys = [
             "download_dir",
             "max_concurrent_tasks",
@@ -1546,10 +1621,25 @@ mod tests {
             "close_action",
             "run_at_startup",
             "close_notice_shown",
+            "clipboard_monitor",
         ];
         for key in expected_keys {
             assert!(obj.contains_key(key), "missing key: {key}");
         }
+    }
+
+    #[test]
+    fn test_settings_clipboard_monitor_default_and_backward_compat() {
+        let default_settings = Settings::default();
+        assert!(default_settings.clipboard_monitor);
+
+        let json_without = r#"{"download_dir":"C:\\Downloads"}"#;
+        let s1: Settings = serde_json::from_str(json_without).expect("deserializes without field");
+        assert!(s1.clipboard_monitor);
+
+        let json_false = r#"{"download_dir":"C:\\Downloads","clipboard_monitor":false}"#;
+        let s2: Settings = serde_json::from_str(json_false).expect("deserializes with false");
+        assert!(!s2.clipboard_monitor);
     }
 
     #[test]

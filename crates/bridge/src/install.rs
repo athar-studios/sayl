@@ -711,6 +711,7 @@ mod tests {
             Response::Pong {
                 version,
                 app_version,
+                ..
             } => {
                 assert_eq!(version, PROTOCOL_VERSION);
                 assert_eq!(app_version, env!("CARGO_PKG_VERSION"));

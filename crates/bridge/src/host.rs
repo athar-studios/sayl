@@ -30,6 +30,8 @@ impl Dispatcher for EchoDispatcher {
                 Response::Pong {
                     version: PROTOCOL_VERSION,
                     app_version: env!("CARGO_PKG_VERSION").to_string(),
+                    app_connected: None,
+                    app_error: None,
                 }
             }
             _ => Response::error("not_implemented", "this dispatcher only answers Ping"),

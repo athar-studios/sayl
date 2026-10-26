@@ -11,6 +11,8 @@ import {
   canResume,
   canPauseTask,
   canResumeTask,
+  isTaskPending,
+  getTaskStateKey,
 } from "./format.js";
 
 describe("Formatting helpers", () => {
@@ -223,6 +225,35 @@ describe("Formatting helpers", () => {
       expect(canPause("Queued")).toBe(false);
       expect(canResume("Paused")).toBe(true);
       expect(canResume("Downloading")).toBe(false);
+    });
+
+    it("evaluates isTaskPending correctly across Set, Array, and Object inputs", () => {
+      const set = new Set(["task-1", "task-2"]);
+      expect(isTaskPending(set, "task-1")).toBe(true);
+      expect(isTaskPending(set, "task-3")).toBe(false);
+
+      const arr = ["task-1", "task-2"];
+      expect(isTaskPending(arr, "task-2")).toBe(true);
+      expect(isTaskPending(arr, "task-3")).toBe(false);
+
+      const map = { "task-1": true, "task-2": false };
+      expect(isTaskPending(map, "task-1")).toBe(true);
+      expect(isTaskPending(map, "task-2")).toBe(false);
+      expect(isTaskPending(map, "task-3")).toBe(false);
+
+      expect(isTaskPending(null, "task-1")).toBe(false);
+      expect(isTaskPending(undefined, "task-1")).toBe(false);
+      expect(isTaskPending(set, null)).toBe(false);
+    });
+
+    it("returns correct translation key with getTaskStateKey for pending and normal states", () => {
+      expect(getTaskStateKey("Paused", true)).toBe("task.connecting");
+      expect(getTaskStateKey("Downloading", true)).toBe("task.connecting");
+      expect(getTaskStateKey("Failed", true)).toBe("task.connecting");
+
+      expect(getTaskStateKey("Paused", false)).toBe("state.Paused");
+      expect(getTaskStateKey("Downloading", false)).toBe("state.Downloading");
+      expect(getTaskStateKey("Completed", false)).toBe("state.Completed");
     });
   });
 });

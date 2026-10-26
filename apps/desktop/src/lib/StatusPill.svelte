@@ -2,6 +2,7 @@
   import { t } from "./i18n.js";
 
   export let state = "Queued";
+  export let isConnecting = false;
 
   const stateClassMap = {
     // Running / active: turquoise #00b6bd
@@ -26,8 +27,8 @@
     Cancelled: "pill-queued",
   };
 
-  $: pillClass = stateClassMap[state] || "pill-queued";
-  $: label = $t("state." + state);
+  $: pillClass = isConnecting ? "pill-running" : (stateClassMap[state] || "pill-queued");
+  $: label = isConnecting ? $t("task.connecting") : $t("state." + state);
 </script>
 
 <span class="status-pill {pillClass}">

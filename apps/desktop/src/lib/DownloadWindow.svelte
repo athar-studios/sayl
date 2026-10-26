@@ -8,6 +8,7 @@
     canPauseTask,
     canResumeTask,
     canCancel,
+    isTaskPending,
   } from "./format.js";
   import { friendlyError } from "./errors.js";
   import StatusPill from "./StatusPill.svelte";
@@ -18,9 +19,11 @@
   export let autoShutdown = false;
   export let autoClose = false;
   export let isNativeWindow = false;
+  export let pendingStart = null;
 
   const dispatch = createEventDispatcher();
 
+  $: isPending = isTaskPending(pendingStart, task?.id);
   $: isCompleted = task.state === "Completed";
   $: isDownloading = task.state === "Downloading";
   $: isFailed = task.state === "Failed";
@@ -63,7 +66,7 @@
     </div>
 
     <div class="header-end">
-      <StatusPill state={task.state} />
+      <StatusPill state={task.state} isConnecting={isPending} />
       {#if !isNativeWindow}
         <button
           class="close-btn"
@@ -175,20 +178,24 @@
         {#if allowResume && !isFailed}
           <button
             class="action-btn btn-primary"
-            title={$t("toolbar.resume")}
+            class:disabled={isPending}
+            disabled={isPending}
+            title={isPending ? $t("task.connecting") : $t("toolbar.resume")}
             on:click={() => dispatch("resume", task.id)}
           >
-            <span>{$t("toolbar.resume")}</span>
+            <span>{isPending ? $t("task.connecting") : $t("toolbar.resume")}</span>
           </button>
         {/if}
 
         {#if isFailed}
           <button
             class="action-btn btn-primary"
-            title={$t("downloadWindow.retry")}
+            class:disabled={isPending}
+            disabled={isPending}
+            title={isPending ? $t("task.connecting") : $t("downloadWindow.retry")}
             on:click={() => dispatch("retry", task.id)}
           >
-            <span>{$t("downloadWindow.retry")}</span>
+            <span>{isPending ? $t("task.connecting") : $t("downloadWindow.retry")}</span>
           </button>
         {/if}
 

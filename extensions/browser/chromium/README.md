@@ -4,8 +4,12 @@
 
 ## هيكل الملفات / File Structure
 - `manifest.json`: Manifest V3 definition.
-- `background.js`: Service worker handling context menu link downloads and native messaging communications.
-- `popup.html` & `popup.js`: Minimal bilingual (Arabic RTL + English LTR) status popup showing bridge host connection health.
+- `background.js`: Service worker handling automatic download interception, context menu downloads, and native messaging communication.
+- `rules.mjs`: Pure decision logic for download interception, file extension matching, size verification, and Alt-click bypass.
+- `rules.test.mjs`: Unit tests for interception rules using `node:test` and `node:assert`.
+- `content.js`: Lightweight content script recording Alt-click events for bypass in session storage.
+- `popup.html` & `popup.js`: Bilingual status and settings popup showing end-to-end connection health and configuration.
+- `_locales/`: Localization catalogs (Arabic `ar` default, English `en`).
 - `icons/`: Extension icons.
 
 ## ملاحظة حول الأيقونات / Icons Note

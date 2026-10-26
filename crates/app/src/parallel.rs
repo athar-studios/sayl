@@ -510,9 +510,9 @@ pub async fn run_parallel_download_with_options(
                             tbl.release(lease);
                             break;
                         }
-                        item = stream.next() => {
+                        item = tokio::time::timeout(crate::config::DEFAULT_STALL_TIMEOUT, stream.next()) => {
                             match item {
-                                Some(Ok(chunk_bytes)) => {
+                                Ok(Some(Ok(chunk_bytes))) => {
                                     if !chunk_bytes.is_empty() {
                                         if worker_offset + (chunk_bytes.len() as u64) > expected_end {
                                             let mut tbl = table.lock().await;
@@ -555,7 +555,7 @@ pub async fn run_parallel_download_with_options(
                                             .fetch_add(chunk_bytes.len() as u64, Ordering::Relaxed);
                                     }
                                 }
-                                Some(Err(err)) => {
+                                Ok(Some(Err(err))) => {
                                     stream_err = Some(CoreError::http(
                                         None,
                                         format!("worker {worker_id} stream error: {err}"),
@@ -563,7 +563,13 @@ pub async fn run_parallel_download_with_options(
                                     ));
                                     break;
                                 }
-                                None => {
+                                Ok(None) => {
+                                    break;
+                                }
+                                Err(_) => {
+                                    stream_err = Some(CoreError::timeout(format!(
+                                        "worker {worker_id} stalled: no bytes received within timeout"
+                                    )));
                                     break;
                                 }
                             }
@@ -742,6 +748,19 @@ pub async fn run_parallel_download_with_options(
     // Did not complete all chunks
     let _ = shared_file.sync_all();
     drop(shared_file);
+
+    // Save partial progress from completed chunks so fallback can resume from it
+    let completed_ranges: Vec<(u64, u64)> = report
+        .completed_ranges
+        .iter()
+        .map(|&(s, e)| (s, e + 1))
+        .collect();
+    let current_written: u64 = completed_ranges.iter().map(|&(s, e)| e - s).sum();
+    if !completed_ranges.is_empty() {
+        let checkpoint =
+            Checkpoint::new(task_id, current_written, Some(total_size), completed_ranges);
+        let _ = store_for_final.save_checkpoint(&checkpoint);
+    }
 
     // If any worker detected that the server ignores Range requests (200 for Range),
     // return a range_unsupported error so the engine can fall back to sequential.

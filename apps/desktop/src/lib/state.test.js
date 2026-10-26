@@ -33,6 +33,14 @@ describe("State mapping & action guards", () => {
     }
   });
 
+  it("has translations for task.connecting in Arabic and English", () => {
+    const arLabel = resolveTranslation("ar", "task.connecting");
+    expect(arLabel).toBe("جارٍ الاتصال...");
+
+    const enLabel = resolveTranslation("en", "task.connecting");
+    expect(enLabel).toBe("Connecting…");
+  });
+
   it("correctly identifies pausable states", () => {
     expect(canPause("Downloading")).toBe(true);
     expect(canPause("Probing")).toBe(true);

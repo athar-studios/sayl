@@ -1,6 +1,6 @@
 <script>
   import { t, toggleLanguage } from "./i18n.js";
-  import { canPauseTask, canResumeTask } from "./format.js";
+  import { canPauseTask, canResumeTask, isTaskPending } from "./format.js";
   import { createEventDispatcher } from "svelte";
 
   export let selectedTask = null;
@@ -10,13 +10,15 @@
   export let searchQuery = "";
   export let theme = "system";
   export let autoShutdown = false;
+  export let pendingStart = null;
 
   $: void theme;
   $: void autoShutdown;
 
   const dispatch = createEventDispatcher();
 
-  $: canResumeSelected = selectedTask ? canResumeTask(selectedTask.state) : false;
+  $: isConnecting = selectedTask ? isTaskPending(pendingStart, selectedTask.id) : false;
+  $: canResumeSelected = selectedTask ? (canResumeTask(selectedTask.state) && !isConnecting) : false;
   $: canPauseSelected = selectedTask ? canPauseTask(selectedTask.state) : false;
   $: canResume = selectedTask ? canResumeSelected : canResumeAny;
   $: canPause = selectedTask ? canPauseSelected : canPauseAny;
@@ -51,10 +53,10 @@
     <!-- 2. استئناف (Resume) -->
     <button
       class="toolbar-btn"
-      class:disabled={!canResume}
-      disabled={!canResume}
-      title="{$t('toolbar.resume')} (F5)"
-      aria-label="{$t('toolbar.resume')} (F5)"
+      class:disabled={!canResume || isConnecting}
+      disabled={!canResume || isConnecting}
+      title="{isConnecting ? $t('task.connecting') : $t('toolbar.resume')} (F5)"
+      aria-label="{isConnecting ? $t('task.connecting') : $t('toolbar.resume')} (F5)"
       on:click={() => dispatch("resume")}
     >
       <div class="toolbar-icon icon-resume" aria-hidden="true">
@@ -62,7 +64,7 @@
           <path d="M8 5.14v13.72a1 1 0 001.5.86l11-6.86a1 1 0 000-1.72l-11-6.86A1 1 0 008 5.14z" />
         </svg>
       </div>
-      <span class="toolbar-label">{$t("toolbar.resume")}</span>
+      <span class="toolbar-label">{isConnecting ? $t("task.connecting") : $t("toolbar.resume")}</span>
     </button>
 
     <!-- 3. إيقاف (Stop) -->

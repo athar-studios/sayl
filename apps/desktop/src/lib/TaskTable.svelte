@@ -8,6 +8,7 @@
     formatDate,
     canPauseTask,
     canResumeTask,
+    isTaskPending,
   } from "./format.js";
   import { friendlyError } from "./errors.js";
   import { createEventDispatcher, onMount } from "svelte";
@@ -15,6 +16,7 @@
   export let tasks = [];
   export let selectedId = null;
   export let selectedIds = [];
+  export let pendingStart = null;
 
   const dispatch = createEventDispatcher();
 
@@ -389,6 +391,7 @@
       {#each sortedTasks as task (task.id)}
         {@const percent = getPercent(task)}
         {@const isSelected = isRowSelected(task.id)}
+        {@const isPending = isTaskPending(pendingStart, task.id)}
         {@const isCompleted = task.state === "Completed"}
         {@const isFailed = task.state === "Failed"}
         {@const isDownloading = task.state === "Downloading" || task.state === "Probing" || task.state === "Verifying" || task.state === "Finalizing"}
@@ -451,7 +454,22 @@
 
           <!-- 3. الحالة / التقدم -->
           <td class="col-status cell-status">
-            {#if isDownloading}
+            {#if isPending}
+              <div class="cell-progress-container">
+                <div class="cell-progress-bar" role="progressbar" aria-valuenow={percent ?? 0} aria-valuemin="0" aria-valuemax="100">
+                  <div
+                    class="cell-progress-fill"
+                    style="width: {percent !== null ? percent + '%' : '100%'};"
+                  ></div>
+                </div>
+                <div class="cell-progress-text">
+                  <span class="cell-state-label">{$t("task.connecting")}</span>
+                  {#if percent !== null}
+                    <span class="cell-percent-label"><bdi dir="ltr">{percent}%</bdi></span>
+                  {/if}
+                </div>
+              </div>
+            {:else if isDownloading}
               <div class="cell-progress-container">
                 <div class="cell-progress-bar" role="progressbar" aria-valuenow={percent ?? 0} aria-valuemin="0" aria-valuemax="100">
                   <div
@@ -563,6 +581,7 @@
   {@const allowPause = canPauseTask(contextMenuTask.state)}
   {@const isCompleted = contextMenuTask.state === "Completed"}
   {@const isFailed = contextMenuTask.state === "Failed"}
+  {@const isPendingCtx = isTaskPending(pendingStart, contextMenuTask.id)}
 
   <div
     class="context-menu-popup"
@@ -599,10 +618,10 @@
     <button
       class="ctx-item"
       role="menuitem"
-      disabled={!allowResume}
+      disabled={!allowResume || isPendingCtx}
       on:click={() => handleCtxAction("resume")}
     >
-      <span class="ctx-label">{$t("contextMenu.resume")}</span>
+      <span class="ctx-label">{isPendingCtx ? $t("task.connecting") : $t("contextMenu.resume")}</span>
     </button>
 
     <!-- Pause -->

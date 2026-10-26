@@ -11,13 +11,26 @@
 
   const dispatch = createEventDispatcher();
 
+  let wasOpen = false;
+  let prevInitialUrl = "";
+
   $: if (open) {
-    if (initialUrl) {
+    const newlyOpened = !wasOpen;
+    const urlChanged = initialUrl !== prevInitialUrl;
+    if ((newlyOpened && initialUrl) || (urlChanged && initialUrl)) {
       urlInput = initialUrl;
+      errorMsg = null;
     }
-    setTimeout(() => {
-      inputElement?.focus();
-    }, 50);
+    if (newlyOpened || (urlChanged && initialUrl)) {
+      setTimeout(() => {
+        inputElement?.focus();
+      }, 50);
+    }
+    wasOpen = true;
+    prevInitialUrl = initialUrl;
+  } else {
+    wasOpen = false;
+    prevInitialUrl = "";
   }
 
   function validateUrl(str) {
