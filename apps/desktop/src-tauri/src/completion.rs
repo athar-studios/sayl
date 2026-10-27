@@ -5,7 +5,6 @@ use sayl_core::id::TaskId;
 use sayl_core::state::DownloadState;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_notification::NotificationExt;
-use tracing;
 
 use crate::Settings;
 

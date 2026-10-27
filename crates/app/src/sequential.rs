@@ -59,6 +59,7 @@ async fn reprobe_on_resume(
 /// 1. Original request (with Range, cookies, referrer, UA)
 /// 2. Retry without Range header
 /// 3. Retry without cookies/referrer/UA
+#[allow(clippy::too_many_arguments)]
 async fn attempt_download_with_fallbacks(
     client: &reqwest::Client,
     url: &Url,
@@ -221,6 +222,7 @@ pub async fn run_sequential_download(
 }
 
 /// Internal helper to perform a single download attempt with given header flags
+#[allow(clippy::too_many_arguments)]
 async fn attempt_download_attempt(
     client: &reqwest::Client,
     url: &Url,

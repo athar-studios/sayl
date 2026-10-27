@@ -38,7 +38,6 @@ use sayl_core::state::DownloadState;
 use sayl_storage::TaskRecord;
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager, State};
-use tracing;
 
 /// Live stats for active tasks, tracking instantaneous transfer rate and ETA.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
