@@ -117,6 +117,38 @@ export function filterTasks(tasks, { category = "all", state = "all", query = ""
 }
 
 /**
+ * Decides which sidebar filters must change so a just-added task is visible.
+ *
+ * Capture, Ctrl+V and manual adds all land here: a new download must never be
+ * added silently behind a filter that hides it. When the current filters would
+ * hide the task, they are widened to "الكل"/"All" and the search is cleared —
+ * the widest possible view. The caller is then responsible for selecting and
+ * scrolling to the row.
+ *
+ * @param {{ filename?: string, url?: string, state?: string }} task
+ * @param {{ category?: string, state?: string, query?: string }} [filters]
+ * @returns {{ visible: boolean, category: string, state: string, query: string }}
+ *   `visible` is true when the task passes the *current* filters; otherwise
+ *   `category`/`state`/`query` hold the widened values to apply.
+ */
+export function resolveNewTaskVisibility(task, filters = {}) {
+  const category = filters.category || "all";
+  const state = filters.state || "all";
+  const query = filters.query || "";
+
+  const visible =
+    matchesCategory(task, category) &&
+    matchesStateFilter(task?.state, state) &&
+    matchesQuery(task, query);
+
+  if (visible) return { visible: true, category, state, query };
+
+  // "الكل" (all) is the widest view; reset the free-text search too, which hides
+  // rows by substring match that the new task may not satisfy.
+  return { visible: false, category: "all", state: "all", query: "" };
+}
+
+/**
  * Computes state counts for the state filter row badges.
  *
  * @param {Array<{ state?: string }>} tasks

@@ -674,3 +674,104 @@ async fn test_recovery_partial_file_shorter_than_checkpoint() {
     // Silence the unused-import warning the original template carried.
     let _ = HashSet::<u64>::new();
 }
+
+// ============================================================================
+// Scenario: parallel crash with preallocated .part and no valid checkpoint
+// must NOT be treated as complete (holes would be counted as downloaded).
+// ============================================================================
+#[tokio::test]
+async fn test_recovery_parallel_preallocated_part_without_checkpoint_not_complete() {
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    let size = 16 * 1024 * 1024; // 16 MiB
+    server.set_resource_size(size);
+    server.set_delay(Duration::from_millis(50));
+    let addr = server.start().await.expect("start fixture server");
+
+    let config = EngineConfig {
+        max_connections: 4,
+        ..Default::default()
+    };
+
+    let task_id;
+    let part_path;
+    {
+        let engine =
+            Engine::new(dl_dir.path(), store_dir.path(), config.clone()).expect("create engine");
+        let url = format!("http://{addr}/test_par_prealloc.bin");
+        task_id = engine.add(&url).await.expect("add task");
+        part_path = dl_dir.path().join("test_par_prealloc.bin.part");
+        let handle = engine.spawn_start(task_id);
+
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while Instant::now() < deadline {
+            let task = engine.get_task(task_id).unwrap().unwrap();
+            if task.state == DownloadState::Downloading {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        // Abort to simulate crash
+        handle.abort();
+        drop(engine);
+        let _ = handle.await;
+    }
+
+    // Make the parallel-style precondition explicit: .part preallocated to total_size.
+    {
+        let f = fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(false)
+            .open(&part_path)
+            .expect("open part file");
+        f.set_len(size as u64).expect("preallocate part file");
+    }
+
+    // No valid checkpoint: write a corrupt one so recovery discards it.
+    {
+        // Detached parallel workers may still hold the store briefly after abort.
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let store = loop {
+            match Store::open(store_dir.path()) {
+                Ok(s) => break s,
+                Err(e) if Instant::now() < deadline => {
+                    let _ = e;
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+                Err(e) => panic!("open store: {e:?}"),
+            }
+        };
+        let garbage = Checkpoint::new(task_id, u64::MAX / 2, Some(size as u64), vec![(0, 1)]);
+        store
+            .save_checkpoint(&garbage)
+            .expect("save garbage checkpoint");
+    }
+
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("reopen engine");
+    let _ = engine.recover().await.expect("recover must not panic");
+    let recovered = engine.get_task(task_id).unwrap().unwrap();
+    assert_ne!(
+        recovered.state,
+        DownloadState::Completed,
+        "preallocated part without checkpoint must not be marked complete"
+    );
+    assert!(
+        recovered.written < size as u64,
+        "recovery must not trust a preallocated part length as written bytes: {}",
+        recovered.written
+    );
+
+    engine.start(task_id).await.expect("resume download");
+    let done = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(done.state, DownloadState::Completed);
+    let final_path = dl_dir.path().join(&done.filename);
+    let bytes = tokio::fs::read(&final_path).await.expect("read final file");
+    assert_eq!(
+        bytes,
+        generate_bytes(size),
+        "final file must be byte-identical after recovery"
+    );
+}

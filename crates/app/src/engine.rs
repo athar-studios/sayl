@@ -547,10 +547,6 @@ impl Engine {
             0
         };
 
-        let is_already_finished = record.total_size.is_some()
-            && (final_len == record.total_size.unwrap()
-                || (disk_len == record.total_size.unwrap() && disk_len > 0));
-
         let checkpoint = self
             .inner
             .store
@@ -569,18 +565,48 @@ impl Engine {
             (0u64, Vec::new())
         };
 
+        // CRITICAL: a `.part` file is preallocated to `total_size` by the parallel engine
+        // (`set_len(total_size)`), so `disk_len == total_size` is TRUE from the very first
+        // moment of every parallel download and says nothing about real progress.
+        // Completion must be proven by DURABLE evidence, never by file length alone:
+        //   * the final (renamed) file is present and full-length, or
+        //   * durable checkpoint ranges actually cover the whole `[0, total_size)` span.
+        // Otherwise a paused task (part file preallocated, only 12% written) would look
+        // "already finished" on the next `start()` and be marked Completed at 12.6%.
+        let total_known = record.total_size.filter(|t| *t > 0);
+        let checkpoint_covers_all = match total_known {
+            Some(total) => {
+                let contiguous = if checkpoint_ranges.is_empty() {
+                    0
+                } else {
+                    contiguous_prefix(&checkpoint_ranges)
+                };
+                contiguous == total
+            }
+            None => false,
+        };
+
+        let is_already_finished = match total_known {
+            Some(total) => {
+                (final_len == total) || (disk_len == total && disk_len > 0 && checkpoint_covers_all)
+            }
+            None => false,
+        };
+
         let contiguous_cp = if checkpoint_ranges.is_empty() {
             checkpoint_written
         } else {
             contiguous_prefix(&checkpoint_ranges)
         };
 
+        // `disk_len` is NOT usable as a progress signal for preallocated `.part` files
+        // (the parallel engine calls `set_len(total_size)` up front, so the file is
+        // full-length on disk while holding almost no real data). Only durable
+        // checkpoint evidence counts; `disk_len` merely caps what we claim as durable.
         let covered_bytes = if is_already_finished {
             record.total_size.unwrap()
         } else if contiguous_cp > 0 {
             contiguous_cp.min(disk_len)
-        } else if disk_len > 0 {
-            disk_len
         } else {
             0
         };
@@ -594,6 +620,35 @@ impl Engine {
             && record.total_size.is_some()
             && covered_bytes > 0
             && has_progress;
+
+        // A parallel pause can leave completed chunks scattered with a HOLE at the start,
+        // so the contiguous prefix is 0 even though real bytes exist. Such a task cannot
+        // "fast resume" (we need a contiguous prefix to resume from), and it must not walk
+        // into the Probing path while `written > 0` because `transition_for_task` rejects
+        // Probing once progress is recorded. Honest recovery: restart this task from zero.
+        let needs_restart_from_zero = !can_fast_resume
+            && record.total_size.is_some()
+            && record.written > 0
+            && covered_bytes == 0
+            && matches!(record.state, DownloadState::Paused | DownloadState::Queued);
+
+        if needs_restart_from_zero {
+            let f = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(&part_path)
+                .map_err(|e| CoreError::io_with_context(e, "truncate part file for restart"))?;
+            drop(f);
+            record.written = 0;
+            let _ = self.inner.store.upsert_task(&record);
+            let _ = self.inner.store.save_checkpoint(&Checkpoint::new(
+                task_id,
+                0,
+                record.total_size,
+                Vec::new(),
+            ));
+        }
 
         let custom_headers = self.get_task_headers(task_id);
         let custom_headers_ref = if custom_headers.is_empty() {
@@ -624,6 +679,16 @@ impl Engine {
 
             let already_complete = is_already_finished || record.total_size == Some(resume_from);
             let mut outcome_status = QueueTaskStatus::Finished;
+
+            // When recovery decides the transfer is already complete, record the verified
+            // byte count so `complete_download` has honest evidence to validate against.
+            // Without this the completion gate would see a stale `written` (e.g. a task that
+            // crashed after its final byte but before the state was persisted) and refuse.
+            if already_complete {
+                if let Some(total) = record.total_size {
+                    record.written = record.written.max(total);
+                }
+            }
 
             self.transition_and_persist(&mut record, DownloadState::Downloading)
                 .await?;
@@ -974,6 +1039,12 @@ impl Engine {
                 }
                 ResumeDecision::AlreadyComplete => {
                     already_complete = true;
+                    // Record verified bytes as completion evidence for the guard in
+                    // `complete_download` (which refuses to mark Completed on a short count).
+                    if let Some(total) = record.total_size {
+                        record.written = record.written.max(total);
+                        let _ = self.inner.store.upsert_task(&record);
+                    }
                 }
                 ResumeDecision::Reject(reason) => {
                     let _ = self
@@ -1041,15 +1112,25 @@ impl Engine {
                         self.inner.store.upsert_task(&record)?;
                         QueueTaskStatus::Finished
                     }
-                    Ok((DownloadOutcome::Paused { written }, _report)) => {
+                    Ok((DownloadOutcome::Paused { written }, report)) => {
                         record.written = written;
-                        let checkpoint = Checkpoint::new(
-                            task_id,
-                            written,
-                            record.total_size,
-                            checkpoint_ranges.clone(),
-                        );
-                        let _ = self.inner.store.save_checkpoint(&checkpoint);
+                        // `parallel.rs` already persisted an accurate checkpoint built from
+                        // the lease table's completed ranges. Do NOT overwrite it with the
+                        // stale pre-run `checkpoint_ranges`: for a parallel transfer the
+                        // completed ranges are NOT a contiguous prefix, so replacing them
+                        // would make the next resume treat unwritten holes as downloaded
+                        // and corrupt the file.
+                        // LeaseReport stores (start, end_inclusive); Checkpoint expects (start, end_exclusive)
+                        let paused_ranges: Vec<(u64, u64)> = report
+                            .completed_ranges
+                            .iter()
+                            .map(|&(s, e)| (s, e + 1)) // inclusive → exclusive
+                            .collect();
+                        if !paused_ranges.is_empty() {
+                            let checkpoint =
+                                Checkpoint::new(task_id, written, record.total_size, paused_ranges);
+                            let _ = self.inner.store.save_checkpoint(&checkpoint);
+                        }
                         self.transition_and_persist(&mut record, DownloadState::Pausing)
                             .await?;
                         self.transition_and_persist(&mut record, DownloadState::Paused)
@@ -1468,6 +1549,27 @@ impl Engine {
             }
         }
 
+        // INVARIANT: `Completed` requires downloaded == total.
+        //
+        // `actual_len` alone is NOT sufficient proof: the parallel engine preallocates
+        // the `.part` file to `total_size`, so a 12.6%-complete file already reports the
+        // full length. The only trustworthy counter is `record.written`, which each caller
+        // sets from the transfer's own `DownloadOutcome::Completed { written }` (or from a
+        // durably-verified recovery). Refuse completion whenever that counter falls short.
+        let completion_provable = match record.total_size {
+            Some(total) => total > 0 && record.written >= total,
+            None => record.written > 0 || actual_len > 0,
+        };
+        if !completion_provable {
+            let _ = self
+                .transition_and_persist(record, DownloadState::Failed)
+                .await;
+            record.error = Some("completion refused: incomplete body".to_string());
+            record.error_kind = Some("integrity".to_string());
+            let _ = self.inner.store.upsert_task(record);
+            return Ok(QueueTaskStatus::Failed);
+        }
+
         // Finalizing
         self.transition_and_persist(record, DownloadState::Finalizing)
             .await?;
@@ -1870,6 +1972,33 @@ impl Engine {
                 checkpoint_written = 0;
                 task.written = 0;
                 self.inner.store.upsert_task(&task)?;
+            }
+
+            // If no valid checkpoint exists but part file has data (e.g., sequential crash mid-transfer),
+            // create a checkpoint assuming contiguous data from 0. This enables proper resume with Range header.
+            // Guard: the parallel engine preallocates `.part` to `total_size`, so a file that
+            // already spans the full size is NOT proof of a contiguous prefix (it may contain
+            // unwritten holes). Only trust `part_len` when it is strictly shorter than total.
+            let part_is_sequential_prefix = task.total_size.is_none_or(|t| part_len < t);
+            if !checkpoint_valid && part_len > 0 && !final_complete && part_is_sequential_prefix {
+                let new_checkpoint = Checkpoint::new(
+                    task.id,
+                    part_len,
+                    task.total_size,
+                    vec![(0, part_len)], // Sequential downloads always write contiguously from 0
+                );
+                self.inner
+                    .store
+                    .save_checkpoint(&new_checkpoint)
+                    .map_err(CoreError::from)?;
+                checkpoint_valid = true;
+                checkpoint_written = part_len;
+                _checkpoint_ranges = vec![(0, part_len)];
+                // Also update task.written so it matches the checkpoint
+                if part_len > task.written {
+                    task.written = part_len;
+                    self.inner.store.upsert_task(&task)?;
+                }
             }
 
             let is_corrupt = task.url.is_empty()

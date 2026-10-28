@@ -3,7 +3,9 @@
 export const DEFAULT_EXTENSIONS = [
   "zip", "rar", "7z", "tar", "gz", "bz2", "xz", "iso", "img", "dmg",
   "exe", "msi", "msix", "apk", "pkg", "bin", "dat", "mp4", "mkv", "avi",
-  "mov", "wmv", "flv", "webm", "mp3", "flac", "wav", "pdf"
+  "mov", "wmv", "flv", "webm", "mp3", "flac", "wav", "pdf",
+  "docx", "xlsx", "pptx", "epub", "tgz", "zst", "deb", "rpm",
+  "appimage", "jar", "csv", "doc", "xls", "ppt", "odt", "ods", "odp"
 ];
 
 export const DEFAULT_MIN_SIZE_MB = 1;
@@ -12,8 +14,7 @@ export const DEFAULT_MIN_SIZE_MB = 1;
 export const TEMP_DOWNLOAD_EXTENSIONS = new Set([
   "crdownload",
   "tmp",
-  "partial",
-  ""
+  "partial"
 ]);
 
 /**
@@ -194,6 +195,172 @@ export function isGithubRedirectUrl(rawUrl) {
 }
 
 /**
+ * URLs whose last path segment is frequently extensionless but that always serve a file:
+ * GitHub release downloads, source archives, and the signed CDN hosts they redirect to.
+ * @param {string} rawUrl
+ * @returns {boolean}
+ */
+export function isGithubReleaseUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== "string") return false;
+  // Signed release/archive CDNs (objects.githubusercontent.com,
+  // release-assets.githubusercontent.com, codeload.github.com).
+  if (isGithubRedirectUrl(rawUrl)) return true;
+  try {
+    const parsed = new URL(rawUrl);
+    const host = parsed.hostname.toLowerCase();
+    if (host !== "github.com" && host !== "www.github.com") return false;
+    const path = parsed.pathname;
+    // github.com/<owner>/<repo>/releases/download/<tag>/<asset>
+    // github.com/<owner>/<repo>/archive/<ref>.zip|tar.gz
+    return /^\/[^/]+\/[^/]+\/(releases\/download|archive)\//i.test(path);
+  } catch {
+    return false;
+  }
+}
+
+/** Google hosts that return a file only after a confirm step. */
+const GOOGLE_DRIVE_HOSTS = new Set([
+  "drive.usercontent.google.com",
+  "drive.google.com",
+  "docs.google.com"
+]);
+
+/**
+ * Google Drive / Docs download URLs, including the `uc?export=download` confirm endpoint.
+ * @param {string} rawUrl
+ * @returns {boolean}
+ */
+export function isGoogleDriveUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== "string") return false;
+  try {
+    const parsed = new URL(rawUrl);
+    const host = parsed.hostname.toLowerCase();
+    if (!GOOGLE_DRIVE_HOSTS.has(host)) return false;
+    if (host === "drive.usercontent.google.com") return true;
+    // drive.google.com/... and docs.google.com/uc?export=download are confirm endpoints.
+    const exportParam = parsed.searchParams.get("export");
+    if (exportParam && exportParam.toLowerCase() === "download") return true;
+    if (host === "docs.google.com") {
+      return parsed.pathname === "/uc" || parsed.pathname.startsWith("/uc/");
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** MIME types that always mean "this is a file, not a page". */
+export const BINARY_MIME_TYPES = new Set([
+  "application/octet-stream",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/x-rar-compressed",
+  "application/vnd.rar",
+  "application/x-7z-compressed",
+  "application/x-tar",
+  "application/gzip",
+  "application/x-gzip",
+  "application/x-bzip2",
+  "application/x-xz",
+  "application/zstd",
+  "application/x-msdownload",
+  "application/x-msi",
+  "application/vnd.microsoft.portable-executable",
+  "application/vnd.android.package-archive",
+  "application/x-apple-diskimage",
+  "application/x-debian-package",
+  "application/x-rpm",
+  "application/java-archive",
+  "application/x-iso9660-image",
+  "application/appimage",
+  "application/pdf",
+  "application/epub+zip",
+  "application/msword",
+  "application/vnd.ms-excel",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+]);
+
+/** Prefixes (before the `/`) that always mean binary media payloads. */
+const BINARY_MIME_PREFIXES = ["video/", "audio/"];
+
+/**
+ * Normalizes a Content-Type value to `type/subtype` in lowercase.
+ * @param {string} mime
+ * @returns {string}
+ */
+export function normalizeMime(mime) {
+  if (!mime || typeof mime !== "string") return "";
+  return mime.split(";")[0].trim().toLowerCase();
+}
+
+/**
+ * @param {string} mime
+ * @returns {boolean}
+ */
+export function isBinaryMime(mime) {
+  const type = normalizeMime(mime);
+  if (!type) return false;
+  if (BINARY_MIME_TYPES.has(type)) return true;
+  return BINARY_MIME_PREFIXES.some((prefix) => type.startsWith(prefix));
+}
+
+/**
+ * True when the server answered with an HTML page instead of a file
+ * (login wall, Drive virus-scan confirm page, expired link).
+ * @param {string} mime
+ * @returns {boolean}
+ */
+export function isHtmlMime(mime) {
+  const type = normalizeMime(mime);
+  return type === "text/html" || type === "application/xhtml+xml";
+}
+
+/** Arabic message shown when a link serves an HTML page instead of a file. */
+export const HTML_RESPONSE_MESSAGE_AR =
+  "الرابط أعاد صفحة HTML بدلًا من ملف. غالبًا انتهت صلاحية الرابط أو يتطلب تسجيل الدخول. لم يُنشأ أي تنزيل.";
+
+/** Host error codes that mean "the server returned HTML, not a file". */
+export const HTML_FAILURE_ERROR_CODES = new Set([
+  "html_response",
+  "not_a_file",
+  "invalid_content_type",
+  "content_type_html"
+]);
+
+/**
+ * Determines whether a download item should bypass the extension allowlist
+ * and minimum-size check (when size is unknown). Covers:
+ * - GitHub releases, source archives, and their signed CDN redirects
+ * - Google Drive / Docs confirm-download endpoints
+ * - Responses with a binary MIME (application/octet-stream, video/*, audio/*, etc.)
+ * @param {object} item
+ * @returns {boolean}
+ */
+export function isForceCaptureItem(item) {
+  if (!item) return false;
+  const urls = [item.finalUrl, item.url].filter(Boolean);
+  if (urls.some(isGithubReleaseUrl)) return true;
+  if (urls.some(isGoogleDriveUrl)) return true;
+  return isBinaryMime(item.mime);
+}
+
+/** Schemes that must never be handed to the download engine. */
+const BLOCKED_URL_SCHEMES = ["blob:", "data:", "filesystem:", "chrome-extension:"];
+
+/**
+ * @param {string} rawUrl
+ * @returns {boolean}
+ */
+export function isBlockedUrlScheme(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== "string") return false;
+  const lower = rawUrl.trim().toLowerCase();
+  return BLOCKED_URL_SCHEMES.some((scheme) => lower.startsWith(scheme));
+}
+
+/**
  * Picks the best filename for intercept rules when finalUrl is a CDN redirect without an extension.
  * @param {object} item
  * @param {string|undefined} suggestedFilename
@@ -216,15 +383,17 @@ export function resolveInterceptFilename(item, suggestedFilename, allowedExtensi
     }
   };
 
-  pushName(targetUrl);
-  if (sourceUrl && sourceUrl !== targetUrl) {
-    pushName(sourceUrl);
+  // Priority: the name the browser determined (onDeterminingFilename / item.filename),
+  // then the last path segment of the final URL, then of the original URL, then "download".
+  if (item?.filename) {
+    pushName(extractBasename(item.filename) || item.filename);
   }
   if (suggestedFilename) {
     pushName(suggestedFilename);
   }
-  if (item?.filename) {
-    pushName(item.filename);
+  pushName(targetUrl);
+  if (sourceUrl && sourceUrl !== targetUrl) {
+    pushName(sourceUrl);
   }
 
   for (const base of candidates) {
@@ -233,7 +402,13 @@ export function resolveInterceptFilename(item, suggestedFilename, allowedExtensi
     }
   }
 
-  return candidates[0] || "download";
+  if (candidates.length > 0) {
+    return candidates[0];
+  }
+
+  // Last URL path segment, even when it carries no usable extension.
+  const urlBase = extractBasename(targetUrl) || extractBasename(sourceUrl);
+  return urlBase && !isTempDownloadName(urlBase) ? urlBase : "download";
 }
 
 export function sanitizeUrlForLog(rawUrl) {
@@ -250,25 +425,62 @@ export function sanitizeUrlForLog(rawUrl) {
   }
 }
 
-/** URL dedupe cache - module level for testability */
+/**
+ * Dedupe cache keyed by `downloadId::cleanUrl`.
+ * Module level so tests can inspect and reset it.
+ */
 export const urlDedupeCache = new Map();
-export const DEDUPE_WINDOW_MS = 15_000;
+export const DEDUPE_WINDOW_MS = 3_000;
 
-export function isUrlDeduped(url, nowMs = Date.now()) {
-  const lastSeen = urlDedupeCache.get(url);
-  if (lastSeen && nowMs - lastSeen < DEDUPE_WINDOW_MS) {
-    return true;
+/**
+ * Builds the dedupe key for one browser download event.
+ * The download id keeps two independent downloads of the same URL from
+ * cancelling each other; the URL is stripped of fragment/query noise.
+ * @param {string} url
+ * @param {string|number} [downloadId]
+ * @returns {string}
+ */
+export function buildDedupeKey(url, downloadId) {
+  const cleanUrl = String(url || "").split(/[?#]/)[0];
+  if (downloadId === undefined || downloadId === null || downloadId === "") {
+    return cleanUrl;
   }
-  recordUrlDedupe(url, nowMs);
-  return false;
+  return `${downloadId}::${cleanUrl}`;
 }
 
-export function recordUrlDedupe(url, nowMs = Date.now()) {
-  urlDedupeCache.set(url, nowMs);
-  // Prune old entries periodically
+/**
+ * Pure read: reports whether this download was already intercepted recently.
+ * Never records anything — recording happens only after a real intercept.
+ * @param {string} url
+ * @param {number} nowMs
+ * @param {string|number} [downloadId]
+ * @returns {boolean}
+ */
+export function isUrlDeduped(url, nowMs = Date.now(), downloadId) {
+  if (!url) return false;
+  const key = buildDedupeKey(url, downloadId);
+  const lastSeen = urlDedupeCache.get(key);
+  if (typeof lastSeen !== "number") return false;
+  const age = nowMs - lastSeen;
+  return age >= 0 && age < DEDUPE_WINDOW_MS;
+}
+
+/**
+ * Records a successful intercept. Call this only after the capture was accepted
+ * (or at least after the browser download was cancelled), never while deciding.
+ * @param {string} url
+ * @param {number} nowMs
+ * @param {string|number} [downloadId]
+ */
+export function recordUrlDedupe(url, nowMs = Date.now(), downloadId) {
+  if (!url) return;
+  urlDedupeCache.set(buildDedupeKey(url, downloadId), nowMs);
+  // Prune stale entries periodically
   if (urlDedupeCache.size > 1000) {
-    for (const [u, t] of urlDedupeCache.entries()) {
-      if (nowMs - t > DEDUPE_WINDOW_MS) urlDedupeCache.delete(u);
+    for (const [key, t] of urlDedupeCache.entries()) {
+      if (typeof t !== "number" || nowMs - t > DEDUPE_WINDOW_MS) {
+        urlDedupeCache.delete(key);
+      }
     }
   }
 }
@@ -288,7 +500,7 @@ export function resetUrlDedupeCache() {
  * @param {number} [params.nowMs]
  * @param {Set<string>} [params.givenBackUrls]
  * @param {boolean} [params.checkDedupe]
- * @returns {{ intercept: boolean, reason: string, filename: string, size: number, targetUrl: string }}
+ * @returns {{ intercept: boolean, reason: string, filename: string, size: number, targetUrl: string, forced?: boolean, message?: string }}
  */
 export function shouldInterceptDownload({
   item,
@@ -328,7 +540,11 @@ export function shouldInterceptDownload({
   }
 
   const targetUrl = item.finalUrl || item.url || "";
+  // Never hand blob:, data:, filesystem: or any other non-http(s) URL to the engine.
   if (!targetUrl || !/^https?:\/\//i.test(targetUrl)) {
+    return { intercept: false, reason: "non_http_url", filename: "", size: 0, targetUrl };
+  }
+  if (isBlockedUrlScheme(targetUrl) || isBlockedUrlScheme(item.url)) {
     return { intercept: false, reason: "non_http_url", filename: "", size: 0, targetUrl };
   }
 
@@ -337,8 +553,8 @@ export function shouldInterceptDownload({
     return { intercept: false, reason: "given_back_to_browser", filename: "", size: 0, targetUrl };
   }
 
-  // Guard 5: 15s same-URL dedupe
-  if (checkDedupe && isUrlDeduped(targetUrl, nowMs)) {
+  // Guard 5: same-download dedupe (pure read — recording happens after the intercept).
+  if (checkDedupe && isUrlDeduped(targetUrl, nowMs, item.id)) {
     return { intercept: false, reason: "url_deduped", filename: "", size: 0, targetUrl };
   }
 
@@ -346,10 +562,27 @@ export function shouldInterceptDownload({
     return { intercept: false, reason: "alt_bypass", filename: "", size: 0, targetUrl };
   }
 
+  // Guard 6: the server answered with an HTML page, not a file. Never intercept,
+  // and never retry/give back — the caller reports it to the user in Arabic.
+  if (isHtmlMime(item.mime)) {
+    return {
+      intercept: false,
+      reason: "html_response",
+      filename: "",
+      size: 0,
+      targetUrl,
+      message: HTML_RESPONSE_MESSAGE_AR
+    };
+  }
+
   const allowedExtensions = settings?.extensions ?? DEFAULT_EXTENSIONS;
   const filename = resolveInterceptFilename(item, suggestedFilename, allowedExtensions);
 
-  if (!matchesExtension(filename, allowedExtensions)) {
+  // GitHub releases, Drive confirm endpoints and binary MIME do not need a listed
+  // extension: those responses are files even when the URL path has no suffix.
+  const forced = isForceCaptureItem(item);
+
+  if (!forced && !matchesExtension(filename, allowedExtensions)) {
     return { intercept: false, reason: "non_listed_extension", filename, size: 0, targetUrl };
   }
 
@@ -360,11 +593,13 @@ export function shouldInterceptDownload({
       : 0;
 
   const minSizeMb = settings?.minSizeMb ?? DEFAULT_MIN_SIZE_MB;
-  if (!passesSize(size, minSizeMb)) {
+  // For forced captures an unknown size must never block the intercept.
+  const sizeUnknown = !(typeof size === "number") || size <= 0;
+  if (!(forced && sizeUnknown) && !passesSize(size, minSizeMb)) {
     return { intercept: false, reason: "too_small", filename, size, targetUrl };
   }
 
-  return { intercept: true, reason: "allowed", filename, size, targetUrl };
+  return { intercept: true, reason: "allowed", filename, size, targetUrl, forced };
 }
 
 /**
@@ -383,7 +618,10 @@ export async function processDownloadCapture({
   nowMs = Date.now(),
   givenBackUrls = new Set(),
   downloadsApi,
-  sendCaptureFn
+  sendCaptureFn,
+  cookies,
+  userAgent,
+  referrer
 }) {
   const decision = shouldInterceptDownload({
     item,
@@ -401,7 +639,14 @@ export async function processDownloadCapture({
       givenBackUrls.delete(decision.targetUrl);
       if (item.url) givenBackUrls.delete(item.url);
     }
-    return { intercept: false, reason: decision.reason, cancelled: false };
+    return {
+      intercept: false,
+      reason: decision.reason,
+      cancelled: false,
+      // HTML responses are terminal: the caller shows this Arabic message and
+      // never hands the download back to the browser.
+      message: decision.reason === "html_response" ? HTML_RESPONSE_MESSAGE_AR : undefined
+    };
   }
 
   // 1. Immediately cancel and erase browser download so it never runs in both.
@@ -423,25 +668,31 @@ export async function processDownloadCapture({
     erased = true;
   }
 
-  // Record dedupe
-  recordUrlDedupe(decision.targetUrl, nowMs);
+  // Record dedupe only now that the download was really intercepted.
+  recordUrlDedupe(decision.targetUrl, nowMs, item.id);
   if (item.url && item.url !== decision.targetUrl) {
-    recordUrlDedupe(item.url, nowMs);
+    recordUrlDedupe(item.url, nowMs, item.id);
   }
 
   // 2. Send to native host
   let hostResult = null;
   if (sendCaptureFn) {
-    hostResult = await sendCaptureFn({
+    const payload = {
       url: item.url || decision.targetUrl,
       final_url: decision.targetUrl,
       filename: decision.filename,
       size: decision.size
-    });
+    };
+    if (referrer !== undefined) payload.referrer = referrer ?? item.referrer ?? "";
+    if (cookies !== undefined) payload.cookies = Array.isArray(cookies) ? cookies : [];
+    if (userAgent !== undefined) payload.user_agent = userAgent;
+    if (item.mime) payload.mime = item.mime;
+    hostResult = await sendCaptureFn(payload);
   }
 
   // 3. Give back to browser ONLY when the host is unreachable (connect error).
-  // Never on timeout or after any reply from host.
+  // Never on timeout, never after any other reply, and never for an HTML response:
+  // re-downloading an HTML page would just loop.
   let redownloaded = false;
   const isConnectError =
     hostResult &&
@@ -461,6 +712,10 @@ export async function processDownloadCapture({
     }
   }
 
+  const htmlFailure = Boolean(
+    hostResult && !hostResult.ok && HTML_FAILURE_ERROR_CODES.has(String(hostResult.error?.code || ""))
+  );
+
   return {
     intercept: true,
     decision,
@@ -468,6 +723,8 @@ export async function processDownloadCapture({
     removedFile,
     erased,
     hostResult,
-    redownloaded
+    redownloaded,
+    // Terminal HTML failure: show this Arabic message, never give the download back.
+    message: htmlFailure ? HTML_RESPONSE_MESSAGE_AR : undefined
   };
 }

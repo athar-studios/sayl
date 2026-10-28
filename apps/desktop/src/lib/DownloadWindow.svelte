@@ -49,6 +49,7 @@
 
 <div
   class="download-window"
+  data-task-id={task.id}
   class:rtl={isRtl}
   dir={isRtl ? "rtl" : "ltr"}
   role="dialog"
@@ -355,7 +356,7 @@
     background-color: var(--color-success);
   }
 
-  /* 2-Column Grid */
+  /* 2-Column Grid - Fixed width layout to prevent jitter */
   .labels-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -371,7 +372,8 @@
   }
 
   .grid-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto 1fr;
     align-items: center;
     gap: 6px;
     font-size: 0.8125rem;
@@ -384,6 +386,7 @@
   .grid-label {
     color: var(--accent);
     flex-shrink: 0;
+    white-space: nowrap;
   }
 
   .grid-value {
@@ -392,6 +395,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
+    font-variant-numeric: tabular-nums;
+    direction: ltr;
+    unicode-bidi: isolate;
   }
 
   /* Real Error Banner */

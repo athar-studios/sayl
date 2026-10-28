@@ -67,6 +67,10 @@
           <span class="item-label">{$t("menu.fileAdd")}</span>
           <kbd class="item-shortcut">Ctrl+N</kbd>
         </button>
+        <button class="dropdown-item" role="menuitem" on:click={() => handleAction("addFromClipboard")}>
+          <span class="item-label">{$t("menu.fileAddFromClipboard")}</span>
+          <kbd class="item-shortcut">Ctrl+V</kbd>
+        </button>
         <button class="dropdown-item" role="menuitem" on:click={() => handleAction("openFolder")}>
           <span class="item-label">{$t("menu.fileOpenFolder")}</span>
           <kbd class="item-shortcut">Ctrl+O</kbd>

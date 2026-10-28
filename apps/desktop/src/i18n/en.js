@@ -7,6 +7,7 @@ export default {
   menu: {
     file: "File",
     fileAdd: "Add URL...",
+    fileAddFromClipboard: "Add from Clipboard",
     fileOpenFolder: "Open Downloads Folder",
     fileExit: "Exit",
     tasks: "Tasks",
@@ -175,6 +176,30 @@ export default {
     revealFolder: "Show in folder",
     close: "Close window",
     retry: "Retry",
+    // New keys for IDM-style dialog
+    url: "URL",
+    state: "State",
+    fileSize: "File Size",
+    downloaded: "Downloaded",
+    speedLimit: "Speed Limit",
+    speedLimitEnable: "Enable speed limit",
+    speedLimitKbps: "Limit (KB/s)",
+    resumable: "Resumable",
+    showDetails: "Show details",
+    hideDetails: "Hide details",
+    pause: "Pause",
+    resume: "Resume",
+    cancel: "Cancel",
+    connIndex: "#",
+    connDownloaded: "Downloaded",
+    connStatus: "Status",
+    autoCloseOnComplete: "Close window when complete",
+    openFolderOnComplete: "Open folder when complete",
+    tabs: {
+      status: "Status",
+      speedLimit: "Speed Limit",
+      onComplete: "On Complete",
+    },
   },
   shutdown: {
     toggle: "Shut down machine when all downloads finish",
@@ -461,6 +486,9 @@ export default {
   toast: {
     error: "Error",
     success: "Success",
+    clipboardNoUrl: "Clipboard does not contain a valid URL",
+    clipboardBatchAdded: "Added {count} URLs",
+    clipboardError: "Failed to read clipboard",
   },
   errors: {
     details: "Details",

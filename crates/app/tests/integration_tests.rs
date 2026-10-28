@@ -1972,6 +1972,434 @@ async fn test_resume_origin_ignores_range_restarts_from_zero_staying_downloading
 }
 
 #[tokio::test]
+async fn test_pause_does_not_emit_completed() {
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    let size = 65536;
+    server.set_resource_size(size);
+    server.set_chunk_size(1024);
+    server.set_delay(Duration::from_millis(10));
+    let addr = server.start().await.expect("start fixture server");
+
+    let config = EngineConfig {
+        max_connections: 1,
+        ..Default::default()
+    };
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+
+    let url = format!("http://{addr}/test_pause_no_completed.bin");
+    let task_id = engine.add(&url).await.expect("add task");
+
+    let mut event_rx = engine.take_event_receiver().expect("take event receiver");
+
+    // Spawn download in background
+    let engine_clone = engine.clone();
+    let handle = tokio::spawn(async move { engine_clone.start(task_id).await });
+
+    // Wait until transfer has actively started and received progress
+    let mut seen_progress = false;
+    while let Some(ev) = event_rx.recv().await {
+        if let sayl_core::event::EventPayload::Progress {
+            downloaded_bytes, ..
+        } = ev.payload
+        {
+            if downloaded_bytes > 1024 {
+                seen_progress = true;
+                break;
+            }
+        }
+    }
+    assert!(seen_progress, "should have seen progress before pause");
+
+    // Pause download
+    engine.pause(task_id).await.expect("pause task");
+    let _ = handle.await;
+
+    let paused_task = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        paused_task.state,
+        DownloadState::Paused,
+        "pause must leave state Paused, not Completed"
+    );
+    assert!(paused_task.written > 0, "pause must preserve written bytes");
+    assert!(
+        paused_task.written < size as u64,
+        "pause must not have full download"
+    );
+
+    // Verify no Completed event was emitted - check all received events
+    let mut completed_emitted = false;
+    while let Ok(ev) = event_rx.try_recv() {
+        if let sayl_core::event::EventPayload::StateChanged { to, .. } = ev.payload {
+            if to == DownloadState::Completed {
+                completed_emitted = true;
+            }
+        }
+    }
+    assert!(
+        !completed_emitted,
+        "Completed event must NOT be emitted on pause"
+    );
+
+    // Verify .part file exists and has content
+    let part_path = dl_dir.path().join(format!("{}.part", paused_task.filename));
+    assert!(part_path.exists(), ".part file must be preserved on pause");
+    let part_len = tokio::fs::metadata(&part_path).await.unwrap().len();
+    assert!(part_len > 0, "partial file must contain received bytes");
+    assert!(part_len < size as u64, "partial file must be incomplete");
+}
+
+#[tokio::test]
+async fn test_cancel_does_not_emit_completed() {
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    let size = 32768;
+    server.set_resource_size(size);
+    server.set_delay(Duration::from_millis(20));
+    let addr = server.start().await.expect("start fixture server");
+
+    let config = EngineConfig::default();
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+
+    let url = format!("http://{addr}/test_cancel_no_completed.bin");
+    let task_id = engine.add(&url).await.expect("add task");
+
+    let mut event_rx = engine.take_event_receiver().expect("take event receiver");
+
+    let engine_clone = engine.clone();
+    let handle = tokio::spawn(async move { engine_clone.start(task_id).await });
+
+    tokio::time::sleep(Duration::from_millis(30)).await;
+
+    // Cancel download
+    engine.cancel(task_id).await.expect("cancel task");
+    let _ = handle.await;
+
+    let cancelled_task = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        cancelled_task.state,
+        DownloadState::Cancelled,
+        "cancel must leave state Cancelled, not Completed"
+    );
+
+    // Verify no Completed event was emitted
+    let mut completed_emitted = false;
+    while let Ok(ev) = event_rx.try_recv() {
+        if let sayl_core::event::EventPayload::StateChanged { to, .. } = ev.payload {
+            if to == DownloadState::Completed {
+                completed_emitted = true;
+            }
+        }
+    }
+    assert!(
+        !completed_emitted,
+        "Completed event must NOT be emitted on cancel"
+    );
+}
+
+#[tokio::test]
+async fn test_pause_resume_continues_from_same_offset() {
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    let size = 65536;
+    server.set_resource_size(size);
+    server.set_chunk_size(2048);
+    server.set_delay(Duration::from_millis(15));
+    let addr = server.start().await.expect("start fixture server");
+
+    let config = EngineConfig {
+        max_connections: 1,
+        ..Default::default()
+    };
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+
+    let url = format!("http://{addr}/test_pause_resume_offset.bin");
+    let task_id = engine.add(&url).await.expect("add task");
+
+    let mut event_rx = engine.take_event_receiver().expect("take event receiver");
+
+    // Spawn download in background
+    let engine_clone = engine.clone();
+    let handle = tokio::spawn(async move { engine_clone.start(task_id).await });
+
+    // Wait until transfer has actively started and received progress
+    let mut seen_progress = false;
+    while let Some(ev) = event_rx.recv().await {
+        if let sayl_core::event::EventPayload::Progress {
+            downloaded_bytes, ..
+        } = ev.payload
+        {
+            if downloaded_bytes > 0 {
+                seen_progress = true;
+                break;
+            }
+        }
+    }
+    assert!(seen_progress, "should have seen progress before pause");
+
+    // Pause download
+    engine.pause(task_id).await.expect("pause task");
+    let _ = handle.await;
+
+    let paused_task = engine.get_task(task_id).unwrap().unwrap();
+    let paused_offset = paused_task.written;
+    assert!(paused_offset > 0, "pause must have written some bytes");
+
+    let checkpoint = engine
+        .load_checkpoint(task_id)
+        .unwrap()
+        .expect("checkpoint exists");
+    assert_eq!(
+        checkpoint.written, paused_offset,
+        "checkpoint must match written bytes"
+    );
+
+    let part_path = dl_dir.path().join(format!("{}.part", paused_task.filename));
+    assert!(part_path.exists());
+    let part_len = tokio::fs::metadata(&part_path).await.unwrap().len();
+    assert_eq!(
+        part_len, paused_offset,
+        ".part file must match written bytes exactly"
+    );
+
+    // Resume download
+    server.set_delay(Duration::ZERO);
+    engine.start(task_id).await.expect("resume download");
+
+    let completed_task = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(completed_task.state, DownloadState::Completed);
+    assert_eq!(completed_task.written, size as u64);
+
+    let final_path = dl_dir.path().join(&completed_task.filename);
+    let bytes = tokio::fs::read(&final_path).await.expect("read final file");
+    assert_eq!(bytes, generate_bytes(size));
+}
+
+#[tokio::test]
+async fn test_paused_task_with_preallocated_part_is_not_completed_on_resume() {
+    // Regression for the 9.3 GB / 12.6% bug.
+    //
+    // The parallel engine preallocates `.part` to `total_size` via `set_len()`, so
+    // `disk_len == total_size` from the very first byte. A paused task therefore used
+    // to look "already finished" on the next `start()` and jump straight to Completed
+    // (opening the completion dialog with the full file size) despite only ~12% of the
+    // bytes ever being downloaded.
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    let size = 1048576usize; // 1 MiB, chunked so parallel path is used
+    server.set_resource_size(size);
+    server.set_delay(Duration::from_millis(5));
+    let addr = server.start().await.expect("start fixture server");
+
+    let config = EngineConfig {
+        max_connections: 4,
+        chunk_size: 65536,
+        ..Default::default()
+    };
+    let store = std::sync::Arc::new(Store::open(store_dir.path()).expect("open store"));
+    let engine = Engine::with_store(dl_dir.path(), std::sync::Arc::clone(&store), config)
+        .expect("create engine");
+
+    let url = format!("http://{addr}/test_prealloc_pause.bin");
+    let task_id = engine.add(&url).await.expect("add task");
+
+    // Simulate exactly what a parallel pause leaves behind: a FULL-LENGTH `.part`
+    // (preallocated) with only a small contiguous prefix of real bytes, plus a
+    // matching durable checkpoint that covers only that prefix.
+    let record = engine.get_task(task_id).unwrap().unwrap();
+    let filename = record.filename.clone();
+    let part_path = dl_dir.path().join(format!("{filename}.part"));
+
+    let real_prefix = 131072u64; // ~12.5% of 1 MiB
+    let data = generate_bytes(size);
+    let mut preallocated = vec![0u8; size];
+    preallocated[..real_prefix as usize].copy_from_slice(&data[..real_prefix as usize]);
+    tokio::fs::write(&part_path, &preallocated)
+        .await
+        .expect("write preallocated part file");
+
+    // `.part` must be full length on disk - this is the trap.
+    let on_disk = tokio::fs::metadata(&part_path).await.unwrap().len();
+    assert_eq!(
+        on_disk, size as u64,
+        "precondition: preallocated .part must be full length on disk"
+    );
+
+    {
+        let mut rec = engine.get_task(task_id).unwrap().unwrap();
+        rec.total_size = Some(size as u64);
+        rec.written = real_prefix;
+        rec.state = DownloadState::Paused;
+        store.upsert_task(&rec).expect("upsert paused record");
+    }
+    store
+        .save_checkpoint(&sayl_storage::Checkpoint::new(
+            task_id,
+            real_prefix,
+            Some(size as u64),
+            vec![(0, real_prefix)],
+        ))
+        .expect("save checkpoint");
+
+    // Resume: this must NOT be treated as already-complete.
+    let terminal = {
+        let eng = engine.clone();
+        let handle = tokio::spawn(async move { eng.start(task_id).await });
+        let t = wait_for_terminal(&engine, task_id, Duration::from_secs(10)).await;
+        let _ = handle.await;
+        t
+    };
+
+    let final_task = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        terminal,
+        DownloadState::Completed,
+        "a genuine resume of a preallocated-but-partial file must finish by downloading \
+         the remainder, not by declaring completion at 12.5%"
+    );
+    assert_eq!(final_task.written, size as u64);
+
+    // The finished file must be byte-exact - if the holes were treated as downloaded,
+    // the zero-filled regions would survive and this comparison would fail.
+    let final_path = dl_dir.path().join(&final_task.filename);
+    let bytes = tokio::fs::read(&final_path).await.expect("read final file");
+    assert_eq!(
+        bytes, data,
+        "resumed file must be byte-identical; zero-filled preallocated holes must be filled"
+    );
+}
+
+#[tokio::test]
+async fn test_pause_mid_parallel_download_keeps_paused_state_and_partial_bytes() {
+    // Pause during an actual parallel transfer: state must be Paused, bytes < total,
+    // and the completed event must never fire.
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    let size = 2097152; // 2 MiB
+    server.set_resource_size(size);
+    server.set_delay(Duration::from_millis(50));
+    let addr = server.start().await.expect("start fixture server");
+
+    let config = EngineConfig {
+        max_connections: 4,
+        chunk_size: 65536,
+        ..Default::default()
+    };
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+
+    let url = format!("http://{addr}/test_pause_parallel.bin");
+    let task_id = engine.add(&url).await.expect("add task");
+    let mut event_rx = engine.take_event_receiver().expect("take event receiver");
+
+    let eng = engine.clone();
+    let handle = tokio::spawn(async move { eng.start(task_id).await });
+
+    // Wait for real progress (positive bytes), bounded so a missing signal fails
+    // the test instead of hanging it.
+    //
+    // The parallel monitor emits `Progress` on a 500ms interval (first tick at t=0
+    // with 0 bytes). A transfer that finishes before the second tick leaves the
+    // receiver with no further events, so an unbounded `recv().await` would block
+    // forever. The 50ms server delay above keeps the 2 MiB / 4-connection transfer
+    // running for ~800ms, which guarantees a positive tick before completion.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let mut saw_progress = false;
+    while Instant::now() < deadline {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        match tokio::time::timeout(remaining, event_rx.recv()).await {
+            Ok(Some(ev)) => {
+                match ev.payload {
+                    sayl_core::event::EventPayload::Progress {
+                        downloaded_bytes, ..
+                    } if downloaded_bytes > 0 => {
+                        saw_progress = true;
+                        break;
+                    }
+                    sayl_core::event::EventPayload::StateChanged { to, .. } if to.is_terminal() => {
+                        // Finished before we could pause; let the assertions report it.
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            Ok(None) => break, // channel closed
+            Err(_) => break,   // timeout on this iteration
+        }
+    }
+    assert!(
+        saw_progress,
+        "expected positive Progress before pausing; the parallel transfer either \
+         finished too early or emitted no progress"
+    );
+
+    engine.pause(task_id).await.expect("pause");
+    // Bound the join as well so a stuck pause path cannot hang the test.
+    let joined = tokio::time::timeout(Duration::from_secs(10), handle)
+        .await
+        .expect("download task did not stop within 10s of pause");
+    let _ = joined;
+
+    let paused = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        paused.state,
+        DownloadState::Paused,
+        "parallel pause must land in Paused, never Completed"
+    );
+    assert!(
+        paused.written < size as u64,
+        "paused task must not claim the full size, wrote {} of {}",
+        paused.written,
+        size
+    );
+
+    let mut completed_emitted = false;
+    while let Ok(ev) = event_rx.try_recv() {
+        if let sayl_core::event::EventPayload::StateChanged { to, .. } = ev.payload {
+            if to == DownloadState::Completed {
+                completed_emitted = true;
+            }
+        }
+    }
+    assert!(
+        !completed_emitted,
+        "Completed must never be emitted for a paused parallel download"
+    );
+
+    // The durable checkpoint must reflect real bytes, not the preallocated length.
+    let cp = engine
+        .load_checkpoint(task_id)
+        .unwrap()
+        .expect("checkpoint must exist after pause");
+    assert!(
+        cp.written < size as u64,
+        "checkpoint must record partial progress, got {} of {}",
+        cp.written,
+        size
+    );
+
+    // Resume must complete the file byte-exactly.
+    server.set_delay(Duration::ZERO);
+    let terminal = {
+        let eng = engine.clone();
+        let h = tokio::spawn(async move { eng.start(task_id).await });
+        let t = wait_for_terminal(&engine, task_id, Duration::from_secs(15)).await;
+        let _ = h.await;
+        t
+    };
+    assert_eq!(terminal, DownloadState::Completed);
+
+    let final_task = engine.get_task(task_id).unwrap().unwrap();
+    let bytes = tokio::fs::read(dl_dir.path().join(&final_task.filename))
+        .await
+        .expect("read final file");
+    assert_eq!(
+        bytes,
+        generate_bytes(size),
+        "resumed file must be byte-exact"
+    );
+}
+
+#[tokio::test]
 async fn test_fallback_without_range_truncates_partial_to_zero() {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;

@@ -7,6 +7,7 @@ export default {
   menu: {
     file: "ملف",
     fileAdd: "إضافة رابط جديد...",
+    fileAddFromClipboard: "إضافة من الحافظة",
     fileOpenFolder: "فتح مجلد التنزيلات",
     fileExit: "خروج",
     tasks: "المهام",
@@ -175,6 +176,30 @@ export default {
     revealFolder: "فتح المجلد",
     close: "إغلاق النافذة",
     retry: "إعادة",
+    // مفاتيح جديدة لنافذة التحميل بنمط IDM
+    url: "الرابط",
+    state: "الحالة",
+    fileSize: "حجم الملف",
+    downloaded: "تم تحميل",
+    speedLimit: "تحديد السرعة",
+    speedLimitEnable: "تفعيل حد السرعة",
+    speedLimitKbps: "الحد (KB/s)",
+    resumable: "قابلية الاستكمال",
+    showDetails: "عرض التفاصيل",
+    hideDetails: "إخفاء التفاصيل",
+    pause: "إيقاف مؤقت",
+    resume: "استئناف",
+    cancel: "إلغاء",
+    connIndex: "#",
+    connDownloaded: "تم تحميل",
+    connStatus: "الحالة",
+    autoCloseOnComplete: "إغلاق النافذة عند الانتهاء",
+    openFolderOnComplete: "فتح المجلد عند الانتهاء",
+    tabs: {
+      status: "حالة التحميل",
+      speedLimit: "تحديد السرعة",
+      onComplete: "عند الانتهاء",
+    },
   },
   shutdown: {
     toggle: "إيقاف تشغيل الجهاز عند انتهاء كل التحميلات",
@@ -461,6 +486,9 @@ export default {
   toast: {
     error: "خطأ",
     success: "نجاح",
+    clipboardNoUrl: "الحافظة لا تحتوي على رابط",
+    clipboardBatchAdded: "تمت إضافة {count} روابط",
+    clipboardError: "تعذر قراءة الحافظة",
   },
   errors: {
     details: "تفاصيل",

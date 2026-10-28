@@ -15,6 +15,7 @@ const rules = globalThis.SaylRules || {};
 const {
   DEFAULT_EXTENSIONS = [],
   DEFAULT_MIN_SIZE_MB = 1,
+  HTML_RESPONSE_MESSAGE_AR = "الرابط أعاد صفحة HTML بدلًا من ملف. لم يُنشأ أي تنزيل.",
   extractBasename = () => "",
   sanitizeUrlForLog = () => "",
   recordUrlDedupe = () => {},
@@ -103,12 +104,52 @@ try {
   // ignore
 }
 
+/**
+ * Collects cookies for a capture:
+ * - cookies scoped to the final URL (the exact download host, e.g. drive.usercontent.google.com)
+ * - for Google downloads, the shared `.google.com` parent cookies so Drive's
+ *   confirm/download handshake keeps the account session
+ * Returns [{ name, value }], de-duplicated by cookie name (URL scope wins).
+ */
 async function getCookiesForUrl(url) {
   if (!url) return [];
   try {
     if (!browser.cookies || !browser.cookies.getAll) return [];
+    const collected = [];
+
     const cookies = await browser.cookies.getAll({ url });
-    return (cookies || []).map((c) => ({ name: c.name, value: c.value }));
+    for (const c of cookies || []) {
+      collected.push({ name: c.name, value: c.value });
+    }
+
+    // Google Drive confirm downloads need the account cookies from the parent domain.
+    let host = "";
+    try {
+      host = new URL(url).hostname.toLowerCase();
+    } catch (_) {
+      host = "";
+    }
+    const isGoogleHost = host === "google.com" || host.endsWith(".google.com");
+    if (isGoogleHost && browser.cookies?.getAll) {
+      try {
+        const parentCookies = await browser.cookies.getAll({ domain: ".google.com" });
+        for (const c of parentCookies || []) {
+          collected.push({ name: c.name, value: c.value });
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+
+    // De-duplicate by name, keeping the first (most specific URL-scoped) value.
+    const seen = new Set();
+    const result = [];
+    for (const cookie of collected) {
+      if (!cookie.name || seen.has(cookie.name)) continue;
+      seen.add(cookie.name);
+      result.push(cookie);
+    }
+    return result;
   } catch {
     return [];
   }
@@ -227,8 +268,9 @@ async function handleInterceptedDownload(item, decision) {
   }
 
   const captureTargetUrl = decision.targetUrl || item.finalUrl || item.url || "";
-  recordUrlDedupe(captureTargetUrl);
-  if (item.url && item.url !== captureTargetUrl) recordUrlDedupe(item.url);
+  // Record the intercept keyed by download id + URL, only after the real intercept.
+  recordUrlDedupe(captureTargetUrl, Date.now(), id);
+  if (item.url && item.url !== captureTargetUrl) recordUrlDedupe(item.url, Date.now(), id);
 
   const cookies = await getCookiesForUrl(captureTargetUrl);
   const payload = {
@@ -248,6 +290,16 @@ async function handleInterceptedDownload(item, decision) {
 
   if (!captureResult.ok) {
     const errCode = (captureResult.error && captureResult.error.code) || "ERROR";
+
+    // HTML or "not a file" error from the app: never give back, show Arabic message.
+    const htmlFailure = errCode === "html_response" ||
+      errCode === "not_a_file" ||
+      errCode === "invalid_content_type" ||
+      errCode === "content_type_html";
+    if (htmlFailure) {
+      notify(msg("notify_error_title"), HTML_RESPONSE_MESSAGE_AR);
+      return;
+    }
 
     // Give the download back to Firefox ONLY when the host is unreachable.
     // Never on timeout and never after any other reply.
@@ -298,6 +350,12 @@ function handleCapture(item, suggestedFilename) {
       givenBackUrls.delete(decision.targetUrl);
       if (item.url) givenBackUrls.delete(item.url);
     }
+    if (decision.reason === "html_response") {
+      // The server returned an HTML page, not a file. Notify in Arabic and never
+      // hand it back to the browser (no loop, no task).
+      markHandled(item.id);
+      notify(msg("notify_error_title"), HTML_RESPONSE_MESSAGE_AR);
+    }
     return false;
   }
 
@@ -306,8 +364,9 @@ function handleCapture(item, suggestedFilename) {
   return true;
 }
 
-// Firefox has no onDeterminingFilename; when it exists (feature-detected) use it,
-// otherwise decide in onCreated. Either way cancel happens before any other await.
+// Firefox has no onDeterminingFilename; when it is absent (feature-detected) use
+// onCreated as the single decision point. (Chromium decides in onDeterminingFilename
+// and never in onCreated to avoid the race that used to skip GitHub/Drive downloads.)
 try {
   if (downloadsApi && downloadsApi.onDeterminingFilename) {
     downloadsApi.onDeterminingFilename.addListener((item, suggest) => {
@@ -323,25 +382,13 @@ try {
         return true;
       }
       markHandled(item.id);
-      suggest({ filename: item.filename || item.filename || "" });
+      suggest({ filename: item.filename || "" });
       return;
     });
-  }
-} catch {
-  // ignore
-}
-
-try {
-  if (downloadsApi && downloadsApi.onCreated) {
+  } else if (downloadsApi && downloadsApi.onCreated) {
     downloadsApi.onCreated.addListener(async (item) => {
       if (!item || !item.id) return;
       if (handledDownloadIds.has(item.id)) return;
-
-      if (downloadsApi.onDeterminingFilename) {
-        // Give the synchronous determining listener a tick to claim the item.
-        await new Promise((r) => setTimeout(r, 50));
-        if (handledDownloadIds.has(item.id)) return;
-      }
 
       handleCapture(item, extractBasename(item.filename));
     });

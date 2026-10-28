@@ -29,7 +29,7 @@ pub use shutdown::{
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 
 use sayl_app::{Engine, EngineConfig};
@@ -348,10 +348,36 @@ pub struct AppState {
     pub live_stats: Arc<Mutex<HashMap<TaskId, LiveTaskStats>>>,
     pub parts_cache: Arc<RwLock<HashMap<TaskId, Option<u32>>>>,
     pub active_count: Arc<AtomicUsize>,
+    /// Monotonic revision shared by every `sayl://tasks-changed` emitter.
+    pub tasks_revision: Arc<AtomicU64>,
     pub settings_path: PathBuf,
     pub sleep_inhibitor: Arc<SleepInhibitor>,
     pub shutdown_controller: Arc<ShutdownController>,
     pub clipboard_monitor: Arc<AtomicBool>,
+}
+
+/// Revision used by the first (full) `sayl://tasks-changed` emission.
+pub const INITIAL_TASKS_REVISION: u64 = 1;
+
+/// Allocates the next monotonic `sayl://tasks-changed` revision.
+///
+/// Every emitter (coalescing pump, delete command) shares one counter so the
+/// webview never sees a stale or repeated revision, and never a `0`.
+pub fn next_tasks_revision(counter: &AtomicU64) -> u64 {
+    counter.fetch_add(1, Ordering::Relaxed) + 1
+}
+
+/// Builds the `sayl://tasks-changed` payload announcing removed tasks.
+pub fn build_removed_tasks_changed_payload(
+    revision: u64,
+    removed: Vec<String>,
+) -> TasksChangedPayload {
+    TasksChangedPayload {
+        revision,
+        full: false,
+        upsert: Vec::new(),
+        removed,
+    }
 }
 
 impl AppState {
@@ -369,11 +395,17 @@ impl AppState {
             live_stats: Arc::new(Mutex::new(HashMap::new())),
             parts_cache: Arc::new(RwLock::new(HashMap::new())),
             active_count: Arc::new(AtomicUsize::new(0)),
+            tasks_revision: Arc::new(AtomicU64::new(INITIAL_TASKS_REVISION)),
             settings_path,
             sleep_inhibitor,
             shutdown_controller,
             clipboard_monitor,
         }
+    }
+
+    /// Allocates the next revision for a `sayl://tasks-changed` payload.
+    pub fn next_tasks_revision(&self) -> u64 {
+        next_tasks_revision(&self.tasks_revision)
     }
 }
 
@@ -668,12 +700,12 @@ pub mod commands {
 
         let deleted_str_ids: Vec<String> = deleted.into_iter().map(|id| id.to_string()).collect();
 
-        let payload = TasksChangedPayload {
-            revision: 0,
-            full: false,
-            upsert: Vec::new(),
-            removed: deleted_str_ids.clone(),
-        };
+        // Real revision from the shared counter: a deletion is one more change to
+        // the task list, so it must never announce revision 0.
+        let payload = build_removed_tasks_changed_payload(
+            state.next_tasks_revision(),
+            deleted_str_ids.clone(),
+        );
         let _ = app_handle.emit("sayl://tasks-changed", &payload);
 
         Ok(deleted_str_ids)
@@ -780,6 +812,13 @@ pub mod commands {
     #[tauri::command]
     pub fn get_clipboard_url() -> Option<String> {
         clipboard::read_clipboard_text().and_then(|text| clipboard::extract_download_url(&text))
+    }
+
+    #[tauri::command]
+    pub fn get_clipboard_urls() -> Vec<String> {
+        clipboard::read_clipboard_text()
+            .map(|text| clipboard::extract_download_urls(&text))
+            .unwrap_or_default()
     }
 
     #[tauri::command]
@@ -1151,6 +1190,7 @@ pub fn run() {
             commands::get_settings,
             commands::set_settings,
             commands::get_clipboard_url,
+            commands::get_clipboard_urls,
             commands::open_download_folder,
             commands::reveal_task,
             commands::open_task_file,
@@ -1399,9 +1439,15 @@ pub fn run() {
                 }
 
                 // Initial full emission on startup/recovery completion
-                let mut revision: u64 = 1;
+                let tasks_revision = app_handle
+                    .try_state::<AppState>()
+                    .map(|s| Arc::clone(&s.tasks_revision));
+                let initial_revision = match tasks_revision.as_ref() {
+                    Some(counter) => counter.load(Ordering::Relaxed),
+                    None => INITIAL_TASKS_REVISION,
+                };
                 let initial_batch = TasksChangedPayload {
-                    revision,
+                    revision: initial_revision,
                     full: true,
                     upsert: initial_task_views,
                     removed: Vec::new(),
@@ -1422,6 +1468,7 @@ pub fn run() {
                 let mut pending_removed_ids: std::collections::HashSet<String> =
                     std::collections::HashSet::new();
                 let mut ticker_counter: u32 = 0;
+                let mut fallback_revision: u64 = initial_revision;
 
                 loop {
                     tokio::select! {
@@ -1535,7 +1582,15 @@ pub fn run() {
                                 let upsert_ids: Vec<TaskId> = pending_upsert_ids.drain().collect();
                                 let removed_ids: Vec<String> = pending_removed_ids.drain().collect();
 
-                                revision += 1;
+                                // Shared counter, so a concurrent delete command cannot
+                                // hand out the same revision as this batch.
+                                let revision = match tasks_revision.as_ref() {
+                                    Some(counter) => next_tasks_revision(counter),
+                                    None => {
+                                        fallback_revision += 1;
+                                        fallback_revision
+                                    }
+                                };
                                 let eng = engine.clone();
                                 let stats_arc = Arc::clone(&live_stats);
                                 let pc = Arc::clone(&parts_cache);
@@ -1847,6 +1902,41 @@ mod tests {
             inc_batch.removed,
             vec!["rem1".to_string(), "rem2".to_string()]
         );
+    }
+
+    #[test]
+    fn test_delete_payload_uses_real_monotonic_revision() {
+        let counter = AtomicU64::new(INITIAL_TASKS_REVISION);
+
+        // A deletion takes the next revision from the shared counter — never 0,
+        // and never the revision already used by the initial full batch.
+        let first = next_tasks_revision(&counter);
+        assert_eq!(first, INITIAL_TASKS_REVISION + 1);
+
+        let payload = build_removed_tasks_changed_payload(
+            first,
+            vec!["01900000-0000-7000-8000-000000000042".to_string()],
+        );
+        assert_ne!(payload.revision, 0);
+        assert_eq!(payload.revision, first);
+        assert!(!payload.full);
+        assert!(payload.upsert.is_empty());
+        assert_eq!(payload.removed.len(), 1);
+
+        // The next change (delete or coalescing pump) gets a strictly larger revision.
+        let second = next_tasks_revision(&counter);
+        assert!(second > first);
+        assert_eq!(second, first + 1);
+    }
+
+    #[test]
+    fn test_delete_payload_serde_roundtrip_keeps_revision() {
+        let payload = build_removed_tasks_changed_payload(7, vec!["task-a".to_string()]);
+        let json = serde_json::to_string(&payload).expect("serializes");
+        let decoded: TasksChangedPayload = serde_json::from_str(&json).expect("deserializes");
+        assert_eq!(decoded, payload);
+        assert_eq!(decoded.revision, 7);
+        assert_eq!(decoded.removed, vec!["task-a".to_string()]);
     }
 
     #[test]

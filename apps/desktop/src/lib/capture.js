@@ -72,6 +72,49 @@ export function buildPrepareCaptureTaskArgs(input) {
 }
 
 /**
+ * Validates a `sayl://capture-offer` payload (one browser capture → one dialog).
+ * @param {unknown} payload
+ * @returns {boolean}
+ */
+export function isCaptureOfferPayload(payload) {
+  return (
+    !!payload &&
+    typeof payload === "object" &&
+    typeof payload.task_id === "string" &&
+    payload.task_id.trim().length > 0
+  );
+}
+
+/**
+ * Appends a capture offer to the pending queue, dropping duplicates.
+ * One browser capture must produce exactly one dialog, so an offer whose
+ * task_id is already queued (or currently displayed) is ignored.
+ *
+ * @param {Array<object>} queue Pending offers (oldest first).
+ * @param {unknown} payload Incoming `sayl://capture-offer` payload.
+ * @param {(offer: object) => boolean} [isShowing] Tells whether an offer is on screen.
+ * @returns {Array<object>} New queue array (never mutates the input).
+ */
+export function enqueueCaptureOffer(queue, payload, isShowing = () => false) {
+  const current = Array.isArray(queue) ? queue : [];
+  if (!isCaptureOfferPayload(payload)) return current.slice();
+  if (isShowing(payload)) return current.slice();
+  if (current.some((offer) => offer.task_id === payload.task_id)) return current.slice();
+  return [...current, payload];
+}
+
+/**
+ * Splits the queue into the offer to display now and the remaining ones.
+ * @param {Array<object>} queue
+ * @returns {{ next: object | null, rest: Array<object> }}
+ */
+export function dequeueCaptureOffer(queue) {
+  const current = Array.isArray(queue) ? queue : [];
+  if (current.length === 0) return { next: null, rest: [] };
+  return { next: current[0], rest: current.slice(1) };
+}
+
+/**
  * User-facing Arabic/English message; log raw error separately for diagnostics.
  * @param {unknown} err
  * @param {string} [lang="ar"]

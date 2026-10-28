@@ -12,10 +12,20 @@ import {
   sanitizeUrlForLog,
   shouldInterceptDownload,
   isGithubRedirectUrl,
+  isGithubReleaseUrl,
+  isGoogleDriveUrl,
+  isBinaryMime,
+  isHtmlMime,
+  isForceCaptureItem,
+  isBlockedUrlScheme,
+  HTML_RESPONSE_MESSAGE_AR,
   resolveInterceptFilename,
   isUrlDeduped,
+  recordUrlDedupe,
   resetUrlDedupeCache,
+  buildDedupeKey,
   urlDedupeCache,
+  DEDUPE_WINDOW_MS,
   processDownloadCapture
 } from "./rules.mjs";
 
@@ -321,27 +331,38 @@ describe("rules.mjs pure logic", () => {
   });
 });
 
-describe("isUrlDeduped", () => {
-  test("1. same URL within 15s is deduped", () => {
+describe("isUrlDeduped (pure check, 3s window, keyed by downloadId::url)", () => {
+  test("1. the check is pure: it never records by itself", () => {
     resetUrlDedupeCache();
     const url = "https://example.com/file.zip";
-    assert.equal(isUrlDeduped(url), false, "first time should not be deduped");
-    assert.equal(isUrlDeduped(url), true, "second time within 15s should be deduped");
+    assert.equal(isUrlDeduped(url), false);
+    assert.equal(isUrlDeduped(url), false, "a pure check must not make the next check dedupe");
+    assert.equal(urlDedupeCache.size, 0);
   });
 
-  test("2. same URL after 15s is not deduped", () => {
+  test("2. recorded URL is deduped inside the 3s window only", () => {
     resetUrlDedupeCache();
     const url = "https://example.com/file2.zip";
-    assert.equal(isUrlDeduped(url), false);
-    // Simulate time passing by manipulating the cache directly
-    urlDedupeCache.set(url, Date.now() - 20_000);
-    assert.equal(isUrlDeduped(url), false, "after 15s should not be deduped");
+    const t0 = Date.now();
+    recordUrlDedupe(url, t0);
+    assert.equal(isUrlDeduped(url, t0 + 100), true);
+    assert.equal(isUrlDeduped(url, t0 + 2900), true);
+    assert.equal(isUrlDeduped(url, t0 + 3100), false, "after 3s window it must not be deduped");
   });
 
-  test("3. different URLs are not deduped", () => {
+  test("3. different downloads (id) and different URLs are not deduped", () => {
     resetUrlDedupeCache();
-    assert.equal(isUrlDeduped("https://example.com/a.zip"), false);
-    assert.equal(isUrlDeduped("https://example.com/b.zip"), false);
+    const t0 = Date.now();
+    recordUrlDedupe("https://example.com/a.zip", t0, 1);
+    assert.equal(isUrlDeduped("https://example.com/a.zip", t0 + 100, 2), false, "different download id bypasses dedupe");
+    assert.equal(isUrlDeduped("https://example.com/b.zip", t0 + 100, 1), false, "different URL bypasses dedupe");
+    assert.equal(isUrlDeduped("https://example.com/a.zip", t0 + 100, 1), true, "same id + same URL dedupes");
+  });
+
+  test("4. buildDedupeKey combines id and cleaned URL", () => {
+    assert.equal(buildDedupeKey("https://example.com/a.zip?query=1", 123), "123::https://example.com/a.zip");
+    assert.equal(buildDedupeKey("https://example.com/a.zip#frag", 123), "123::https://example.com/a.zip");
+    assert.equal(buildDedupeKey("https://example.com/a.zip", undefined), "https://example.com/a.zip");
   });
 });
 
@@ -490,7 +511,7 @@ describe("extension guards and download capture pipeline", () => {
     assert.equal(res.reason, "old_download");
   });
 
-  test("19. same-URL dedupe within 15s is skipped when checkDedupe is true", () => {
+  test("19. same download is deduped within 3s only after an actual intercept (pure check)", () => {
     resetUrlDedupeCache();
     const now = Date.now();
     const url = "https://example.com/dedupe-file.zip";
@@ -501,6 +522,8 @@ describe("extension guards and download capture pipeline", () => {
       totalBytes: 10 * 1024 * 1024
     };
 
+    // Two decision calls for the SAME download never dedupe each other,
+    // because the check is pure and records nothing.
     const first = shouldInterceptDownload({
       item,
       settings: baseSettings,
@@ -509,18 +532,26 @@ describe("extension guards and download capture pipeline", () => {
     });
     assert.equal(first.intercept, true);
 
-    // Record dedupe for this URL
-    urlDedupeCache.set(url, now);
-
-    // Second download for same URL within 15s
     const second = shouldInterceptDownload({
-      item: { ...item, id: 208 },
+      item,
       settings: baseSettings,
-      nowMs: now + 5000,
+      nowMs: now + 50,
       checkDedupe: true
     });
-    assert.equal(second.intercept, false);
-    assert.equal(second.reason, "url_deduped");
+    // 50 ms is the onCreated/onDeterminingFilename race window.
+    assert.equal(second.intercept, true, "the 50ms race must no longer dedupe");
+
+    // Now simulate the real record that happens after the intercept.
+    recordUrlDedupe(url, now, item.id);
+
+    const third = shouldInterceptDownload({
+      item: { ...item, id: 207 },
+      settings: baseSettings,
+      nowMs: now + 1000,
+      checkDedupe: true
+    });
+    assert.equal(third.intercept, false);
+    assert.equal(third.reason, "url_deduped");
   });
 
   test("20. intercepted => cancel before any other await, suggest not called", async () => {
@@ -683,5 +714,321 @@ describe("extension guards and download capture pipeline", () => {
     assert.equal(res.intercept, true);
     assert.equal(res.removedFile, true);
     assert.deepEqual(callOrder, ["cancel:304", "removeFile:304", "erase:304"]);
+  });
+});
+
+describe("GitHub / Google Drive / binary capture (no listed extension required)", () => {
+  const baseSettings = { enabled: true, minSizeMb: 1, extensions: DEFAULT_EXTENSIONS };
+
+  test("24. GitHub release URL with a UUID asset and no extension is captured", () => {
+    resetUrlDedupeCache();
+    const uuid = "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d";
+    const releaseUrl = `https://github.com/athar-studios/sayl/releases/download/v0.2.0/${uuid}`;
+    const item = {
+      id: 401,
+      url: releaseUrl,
+      filename: "Unconfirmed 71009.crdownload",
+      totalBytes: 0
+    };
+
+    assert.equal(isGithubReleaseUrl(releaseUrl), true, "release URL must be recognized");
+
+    const res = shouldInterceptDownload({ item, settings: baseSettings, checkDedupe: true });
+    assert.equal(res.intercept, true);
+    assert.equal(res.reason, "allowed");
+    assert.equal(res.filename, uuid, "filename falls back to the last URL path segment");
+    assert.equal(res.targetUrl, releaseUrl);
+  });
+
+  test("25. codeload.github.com zip with no size is captured", () => {
+    resetUrlDedupeCache();
+    const archiveUrl = "https://codeload.github.com/athar-studios/sayl/zip/refs/heads/main";
+    const item = {
+      id: 402,
+      url: archiveUrl,
+      filename: "main",
+      totalBytes: 0,
+      fileSize: 0
+    };
+
+    assert.equal(isGithubReleaseUrl(archiveUrl), true, "codeload is a GitHub release/archive host");
+
+    const res = shouldInterceptDownload({ item, settings: baseSettings, checkDedupe: true });
+    assert.equal(res.intercept, true);
+    assert.equal(res.reason, "allowed", "unknown size must not block a forced capture");
+    assert.equal(res.size, 0);
+  });
+
+  test("26. drive.usercontent.google.com download is captured (unknown size, no extension)", () => {
+    resetUrlDedupeCache();
+    const finalUrl =
+      "https://drive.usercontent.google.com/download?id=1AbCdEfGhIjKlMnOp&export=download&confirm=t";
+    const sourceUrl = "https://drive.google.com/file/d/1AbCdEfGhIjKlMnOp/view";
+    const item = {
+      id: 403,
+      url: sourceUrl,
+      finalUrl,
+      filename: "Unconfirmed 55231.crdownload",
+      totalBytes: 0
+    };
+
+    assert.equal(isGoogleDriveUrl(finalUrl), true);
+    assert.equal(isGoogleDriveUrl(sourceUrl), true);
+
+    const res = shouldInterceptDownload({
+      item,
+      settings: baseSettings,
+      suggestedFilename: "quarterly-report.pdf",
+      checkDedupe: true
+    });
+    assert.equal(res.intercept, true);
+    assert.equal(res.reason, "allowed");
+    assert.equal(res.filename, "quarterly-report.pdf", "onDeterminingFilename name wins");
+    assert.equal(res.targetUrl, finalUrl);
+  });
+
+  test("27. docs.google.com uc?export=download is captured, plain docs page is not", () => {
+    const ucUrl = "https://docs.google.com/uc?export=download&id=1AbCdEfGhIjKlMnOp";
+    assert.equal(isGoogleDriveUrl(ucUrl), true);
+
+    const docPage = "https://docs.google.com/document/d/1AbCdEfGhIjKlMnOp/edit";
+    assert.equal(isGoogleDriveUrl(docPage), false);
+
+    const ucItem = { id: 404, url: ucUrl, totalBytes: 0 };
+    const ucRes = shouldInterceptDownload({ item: ucItem, settings: baseSettings });
+    assert.equal(ucRes.intercept, true);
+
+    const docItem = {
+      id: 405,
+      url: docPage,
+      filename: "edit",
+      totalBytes: 0,
+      mime: "text/html"
+    };
+    const docRes = shouldInterceptDownload({ item: docItem, settings: baseSettings });
+    assert.equal(docRes.intercept, false);
+    assert.equal(docRes.reason, "html_response");
+  });
+
+  test("28. binary MIME bypasses the extension allowlist", () => {
+    const item = {
+      id: 406,
+      url: "https://cdn.example.com/download/8f3c2b1a",
+      filename: "8f3c2b1a",
+      totalBytes: 0,
+      mime: "application/octet-stream"
+    };
+
+    assert.equal(isBinaryMime("application/octet-stream"), true);
+    assert.equal(isBinaryMime("application/x-msdownload"), true);
+    assert.equal(isBinaryMime("application/zip"), true);
+    assert.equal(isBinaryMime("application/x-rar-compressed"), true);
+    assert.equal(isBinaryMime("video/mp4"), true);
+    assert.equal(isBinaryMime("text/html"), false);
+    assert.equal(isBinaryMime(""), false);
+
+    const res = shouldInterceptDownload({ item, settings: baseSettings });
+    assert.equal(res.intercept, true);
+    assert.equal(res.reason, "allowed");
+    assert.equal(res.forced, true);
+  });
+
+  test("29. HTML response is never intercepted and never loops", () => {
+    const item = {
+      id: 407,
+      url: "https://drive.google.com/file/d/1AbCdEfGhIjKlMnOp/view",
+      filename: "file",
+      totalBytes: 0,
+      mime: "text/html; charset=utf-8"
+    };
+
+    assert.equal(isHtmlMime("text/html; charset=utf-8"), true);
+
+    const res = shouldInterceptDownload({ item, settings: baseSettings });
+    assert.equal(res.intercept, false);
+    assert.equal(res.reason, "html_response");
+    assert.equal(res.message, HTML_RESPONSE_MESSAGE_AR);
+  });
+
+  test("30. blob:, data: and filesystem: URLs are never intercepted", () => {
+    const settings = { enabled: true, minSizeMb: 1, extensions: DEFAULT_EXTENSIONS };
+
+    for (const url of [
+      "blob:https://example.com/6f1a2b3c-4d5e-6f70-8192-a3b4c5d6e7f8",
+      "data:application/octet-stream;base64,AAAA",
+      "filesystem:https://example.com/temporary/file.zip"
+    ]) {
+      assert.equal(isBlockedUrlScheme(url), true, `${url} must be a blocked scheme`);
+      const res = shouldInterceptDownload({
+        item: { id: 408, url, filename: "file.zip", totalBytes: 50 * 1024 * 1024 },
+        settings
+      });
+      assert.equal(res.intercept, false, `${url} must not be intercepted`);
+      assert.equal(res.reason, "non_http_url");
+    }
+
+    assert.equal(isBlockedUrlScheme("https://example.com/file.zip"), false);
+  });
+
+  test("31. a blob: source URL with an http finalUrl is still not intercepted", () => {
+    const res = shouldInterceptDownload({
+      item: {
+        id: 409,
+        url: "blob:https://example.com/abc-123",
+        finalUrl: "https://example.com/file.zip",
+        filename: "file.zip",
+        totalBytes: 50 * 1024 * 1024
+      },
+      settings: { enabled: true, minSizeMb: 1, extensions: DEFAULT_EXTENSIONS }
+    });
+    assert.equal(res.intercept, false);
+    assert.equal(res.reason, "non_http_url");
+  });
+
+  test("32. onCreated/onDeterminingFilename race no longer dedupes", () => {
+    resetUrlDedupeCache();
+    const now = Date.now();
+    const item = {
+      id: 410,
+      url: "https://github.com/athar-studios/sayl/releases/download/v0.2.0/sayl-setup.exe",
+      filename: "Unconfirmed 33119.crdownload",
+      totalBytes: 0,
+      mime: "application/octet-stream"
+    };
+
+    const fromDetermining = shouldInterceptDownload({
+      item,
+      settings: baseSettings,
+      nowMs: now,
+      checkDedupe: true
+    });
+    const fromCreated = shouldInterceptDownload({
+      item,
+      settings: baseSettings,
+      nowMs: now + 50,
+      checkDedupe: true
+    });
+
+    assert.equal(fromDetermining.intercept, true);
+    assert.equal(fromCreated.intercept, true, "the 50ms onCreated race must not dedupe");
+    assert.equal(fromCreated.reason, "allowed");
+
+    // After the real intercept is recorded, a third event for the same download is deduped.
+    recordUrlDedupe(fromDetermining.targetUrl, now, item.id);
+    const afterIntercept = shouldInterceptDownload({
+      item,
+      settings: baseSettings,
+      nowMs: now + 100,
+      checkDedupe: true
+    });
+    assert.equal(afterIntercept.intercept, false);
+    assert.equal(afterIntercept.reason, "url_deduped");
+  });
+
+  test("33. the same URL twice more than 3s apart is captured both times", () => {
+    resetUrlDedupeCache();
+    const url = "https://example.com/installer.exe";
+    const firstItem = { id: 411, url, filename: "installer.exe", totalBytes: 20 * 1024 * 1024 };
+    const t0 = Date.now();
+
+    const first = shouldInterceptDownload({
+      item: firstItem,
+      settings: baseSettings,
+      nowMs: t0,
+      checkDedupe: true
+    });
+    assert.equal(first.intercept, true);
+    recordUrlDedupe(url, t0, firstItem.id);
+
+    // Same download id, just past the 3s window.
+    const later = shouldInterceptDownload({
+      item: firstItem,
+      settings: baseSettings,
+      nowMs: t0 + DEDUPE_WINDOW_MS + 100,
+      checkDedupe: true
+    });
+    assert.equal(later.intercept, true, ">3s later must be captured again");
+
+    // A second, genuinely new download of the same URL is never deduped either.
+    const second = shouldInterceptDownload({
+      item: { ...firstItem, id: 412 },
+      settings: baseSettings,
+      nowMs: t0 + 200,
+      checkDedupe: true
+    });
+    assert.equal(second.intercept, true);
+  });
+
+  test("34. forced captures still respect a known size below the minimum", () => {
+    const item = {
+      id: 413,
+      url: "https://github.com/org/repo/releases/download/v1.0/tiny.txtasset",
+      filename: "tiny.txtasset",
+      totalBytes: 2 * 1024,
+      mime: "application/octet-stream"
+    };
+    const res = shouldInterceptDownload({
+      item,
+      settings: { enabled: true, minSizeMb: 1, extensions: DEFAULT_EXTENSIONS }
+    });
+    assert.equal(res.intercept, false);
+    assert.equal(res.reason, "too_small");
+  });
+
+  test("35. isForceCaptureItem covers releases, Drive and binary MIME only", () => {
+    assert.equal(
+      isForceCaptureItem({ url: "https://github.com/org/repo/archive/refs/tags/v1.0.zip" }),
+      true
+    );
+    assert.equal(
+      isForceCaptureItem({ url: "https://drive.usercontent.google.com/download?id=1&export=download" }),
+      true
+    );
+    assert.equal(isForceCaptureItem({ url: "https://example.com/page", mime: "application/zip" }), true);
+    assert.equal(isForceCaptureItem({ url: "https://example.com/page" }), false);
+    assert.equal(isForceCaptureItem({ url: "https://example.com/page", mime: "text/html" }), false);
+    assert.equal(isForceCaptureItem(null), false);
+  });
+
+  test("36. the new archive/document extensions are in DEFAULT_EXTENSIONS", () => {
+    for (const ext of [
+      "docx", "xlsx", "pptx", "pdf", "epub", "rar", "7z", "tgz", "zst",
+      "deb", "rpm", "appimage", "apk", "jar", "iso", "mp4", "mkv", "mp3", "flac"
+    ]) {
+      assert.equal(DEFAULT_EXTENSIONS.includes(ext), true, `${ext} must be listed`);
+      assert.equal(matchesExtension(`file.${ext}`, DEFAULT_EXTENSIONS), true);
+    }
+  });
+
+  test("37. HTML failure from the host is reported in Arabic and never re-downloaded", async () => {
+    resetUrlDedupeCache();
+    let downloadCalled = false;
+    const fakeDownloadsApi = {
+      cancel: async () => {},
+      erase: async () => {},
+      download: async () => {
+        downloadCalled = true;
+      }
+    };
+    const fakeSendCapture = async () => ({
+      ok: false,
+      error: { code: "html_response", message: "server returned text/html" }
+    });
+
+    const res = await processDownloadCapture({
+      item: {
+        id: 414,
+        url: "https://example.com/archive.zip",
+        filename: "archive.zip",
+        totalBytes: 10 * 1024 * 1024
+      },
+      settings: baseSettings,
+      downloadsApi: fakeDownloadsApi,
+      sendCaptureFn: fakeSendCapture
+    });
+
+    assert.equal(res.message, HTML_RESPONSE_MESSAGE_AR);
+    assert.equal(res.redownloaded, false, "an HTML failure must never be given back");
+    assert.equal(downloadCalled, false);
   });
 });

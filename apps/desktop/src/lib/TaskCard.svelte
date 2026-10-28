@@ -45,6 +45,7 @@
 
 <div
   class="task-card"
+  data-task-id={task.id}
   class:selected
   on:click={(e) => dispatch("select", { id: task.id, ctrlKey: e.ctrlKey || e.metaKey, shiftKey: e.shiftKey })}
   on:dblclick={() => {

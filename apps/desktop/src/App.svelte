@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, tick } from "svelte";
   import { t, currentLang, setLanguage, toggleLanguage } from "./lib/i18n.js";
   import { safeInvoke, toasts, removeToast, showToast } from "./lib/tauri.js";
   import { canPauseTask, canResumeTask, formatSpeed, isTaskPending } from "./lib/format.js";
@@ -10,6 +10,7 @@
     filterTasks,
     getStateCounts,
     matchesCategory,
+    resolveNewTaskVisibility,
   } from "./lib/filters.js";
   import {
     areAllDownloadsFinished,
@@ -45,7 +46,15 @@
     buildPrepareCaptureTaskArgs,
     friendlyPrepareCaptureError,
     logCaptureDiagnostic,
+    isCaptureOfferPayload,
+    enqueueCaptureOffer,
+    dequeueCaptureOffer,
   } from "./lib/capture.js";
+  import {
+    extractUrls,
+    shouldHandleClipboardPaste,
+    splitClipboardIntoActions,
+  } from "./lib/clipboardPaste.js";
 
   let tasks = [];
   let selectedId = null;
@@ -69,9 +78,14 @@
   let extensionGuideOpen = false;
 
   let preDownloadOpen = false;
+  /** Pending `sayl://capture-offer` payloads, oldest first (one capture → one dialog). */
+  let captureOfferQueue = [];
+  /** Currently displayed offer (head of queue) passed to PreDownloadDialog. */
   let captureOffer = null;
-  /** Dedupe capture-offer events: one browser capture → one dialog session. */
+  /** Dedupe capture-offer events: task_id of the offer currently on screen. */
   let captureOfferTaskId = null;
+  /** Timer that removes the "new task" row highlight. */
+  let highlightTimer = null;
 
   // Duplicate task dialog state
   let duplicateDialogOpen = false;
@@ -383,7 +397,7 @@
       if (outcome.kind === "added") {
         const newTask = outcome.task;
         tasks = [newTask, ...tasks.filter((t) => t.id !== newTask.id)];
-        selectedId = newTask.id;
+        await revealNewTask(newTask.id);
 
         if (settings.show_download_window && newTask.state !== "Cancelled") {
           handleOpenDownloadWindow(newTask.id);
@@ -393,6 +407,47 @@
       // Handled by safeInvoke toast
     } finally {
       endClick(start, "add-task");
+    }
+  }
+
+  async function handlePasteFromClipboard() {
+    try {
+      const raw = await invoke("get_clipboard_urls");
+      // The Rust command already filters, but the clipboard is untrusted input:
+      // re-validate on the JS side so one contract (clipboardPaste.js) decides.
+      const urls = extractUrls(
+        Array.isArray(raw) ? raw.join("\n") : typeof raw === "string" ? raw : ""
+      );
+      const action = splitClipboardIntoActions(urls);
+
+      if (action.kind === "none") {
+        showToast($t("toast.clipboardNoUrl") || ($currentLang === "ar" ? "الحافظة لا تحتوي على رابط" : "Clipboard does not contain a valid URL"), "error");
+        return;
+      }
+
+      if (action.kind === "single") {
+        // Single URL - open PreDownloadDialog prefilled
+        droppedUrl = action.url;
+        addDialogOpen = true;
+        return;
+      }
+
+      // Multiple URLs - batch add (queue them one by one)
+      const addedIds = [];
+      for (const url of action.urls) {
+        const outcome = await invoke("add_task", { url, force: true });
+        if (outcome?.kind === "added" && outcome.task?.id) {
+          addedIds.push(outcome.task.id);
+        }
+      }
+      if (addedIds.length > 0) {
+        await loadTasks();
+        await revealNewTask(addedIds[addedIds.length - 1]);
+      }
+      showToast($t("toast.clipboardBatchAdded") || ($currentLang === "ar" ? "تمت إضافة {count} روابط" : "Added {count} URLs").replace("{count}", String(action.urls.length)), "success");
+    } catch (err) {
+      console.warn("Failed to read clipboard:", err);
+      showToast($t("toast.clipboardError") || ($currentLang === "ar" ? "تعذر قراءة الحافظة" : "Failed to read clipboard"), "error");
     }
   }
 
@@ -726,7 +781,17 @@
       activeEl &&
       (activeEl.tagName === "INPUT" ||
         activeEl.tagName === "SELECT" ||
-        activeEl.tagName === "TEXTAREA");
+        activeEl.tagName === "TEXTAREA" ||
+        activeEl.isContentEditable);
+
+    // Ctrl+V / Cmd+V / Shift+Insert - paste clipboard URL.
+    // Focus rule lives in clipboardPaste.js: inside editable fields the native
+    // paste must win (this also gates Shift+Insert, which previously was not).
+    if (shouldHandleClipboardPaste(e, activeEl)) {
+      e.preventDefault();
+      handlePasteFromClipboard();
+      return;
+    }
 
     if ((e.ctrlKey || e.metaKey) && (e.key === "n" || e.key === "N")) {
       e.preventDefault();
@@ -824,12 +889,85 @@
     extensionGuideOpen = true;
   }
 
+  /** True while the PreDownloadDialog is showing the offer `offer`. */
+  function isCaptureOfferShowing(offer) {
+    return preDownloadOpen && !!captureOfferTaskId && offer?.task_id === captureOfferTaskId;
+  }
+
+  /** Shows the oldest queued capture offer when nothing is on screen yet. */
+  function showNextCaptureOffer() {
+    if (preDownloadOpen && captureOffer) return;
+    const { next, rest } = dequeueCaptureOffer(captureOfferQueue);
+    if (!next) {
+      preDownloadOpen = false;
+      return;
+    }
+    captureOfferQueue = rest;
+    addDialogOpen = false;
+    droppedUrl = "";
+    captureOffer = next;
+    captureOfferTaskId = next.task_id;
+    preDownloadOpen = true;
+  }
+
+  /**
+   * Closes the offer on screen, clears its dedupe id, and reveals the next
+   * queued capture (a second browser capture must not overwrite the first).
+   */
+  function dismissCaptureOffer() {
+    preDownloadOpen = false;
+    captureOffer = null;
+    captureOfferTaskId = null;
+    showNextCaptureOffer();
+  }
+
+  /** Highlights the row of a just-added task, then removes the highlight. */
+  function highlightTaskRow(taskId) {
+    if (typeof document === "undefined") return;
+    const nodes = Array.from(document.querySelectorAll(`[data-task-id="${taskId}"]`));
+    if (nodes.length === 0) return;
+    const first = nodes[0];
+    if (typeof first.scrollIntoView === "function") {
+      first.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+    for (const node of nodes) node.classList.add("new-task-highlight");
+    if (highlightTimer) clearTimeout(highlightTimer);
+    highlightTimer = setTimeout(() => {
+      highlightTimer = null;
+      for (const node of nodes) node.classList.remove("new-task-highlight");
+    }, 2400);
+  }
+
+  /**
+   * Makes a just-added task visible (capture, Ctrl+V, manual add): widens the
+   * sidebar filters to "الكل" when they would hide it, then selects, scrolls to
+   * and highlights the row.
+   * @param {string} taskId
+   */
+  async function revealNewTask(taskId) {
+    if (!taskId) return;
+    const task = tasks.find((t) => t.id === taskId) || { id: taskId };
+    const target = resolveNewTaskVisibility(task, {
+      category: selectedCategory,
+      state: selectedStateFilter,
+      query: searchQuery,
+    });
+    selectedCategory = target.category;
+    selectedStateFilter = target.state;
+    searchQuery = target.query;
+
+    selectedId = taskId;
+    selectedIds = [taskId];
+    lastAnchorId = taskId;
+
+    await tick();
+    highlightTaskRow(taskId);
+  }
+
   async function handleCaptureOfferConfirm(event) {
     const { taskId, filename, folder, category } = event.detail || {};
     if (!taskId) {
-      preDownloadOpen = false;
-      captureOffer = null;
-      captureOfferTaskId = null;
+      dismissCaptureOffer();
       return;
     }
     try {
@@ -843,10 +981,11 @@
       await invoke("prepare_capture_task", prepareArgs, { suppressToast: true });
       markPendingStart(taskId);
       await invoke("start_task", { id: taskId }, { suppressToast: true });
-      preDownloadOpen = false;
-      captureOffer = null;
-      captureOfferTaskId = null;
+      dismissCaptureOffer();
+      addDialogOpen = false;
+      droppedUrl = "";
       await loadTasks();
+      await revealNewTask(taskId);
     } catch (err) {
       logCaptureDiagnostic(err, "handleCaptureOfferConfirm");
       showToast(friendlyPrepareCaptureError(err, $currentLang), "error");
@@ -855,8 +994,8 @@
 
   async function handleCaptureOfferCancel() {
     const taskId = captureOffer?.task_id;
-    preDownloadOpen = false;
-    captureOffer = null;
+    // Clears captureOfferTaskId (dedupe id) and shows the next queued offer.
+    dismissCaptureOffer();
     if (!taskId) return;
     try {
       await invoke("delete_task", { id: taskId, delete_files: false });
@@ -905,13 +1044,11 @@
 
         unlistenCaptureOffer = await listen("sayl://capture-offer", (event) => {
           const payload = event.payload;
-          if (!payload?.task_id) return;
-          if (payload.task_id === captureOfferTaskId && preDownloadOpen) return;
-          captureOfferTaskId = payload.task_id;
-          addDialogOpen = false;
-          droppedUrl = "";
-          captureOffer = payload;
-          preDownloadOpen = true;
+          if (!isCaptureOfferPayload(payload)) return;
+          // Queue instead of overwrite: a second capture must not replace the
+          // dialog the user is filling in; it opens after confirm/cancel.
+          captureOfferQueue = enqueueCaptureOffer(captureOfferQueue, payload, isCaptureOfferShowing);
+          showNextCaptureOffer();
         });
 
         // Open settings listener (Req 11)
@@ -1049,6 +1186,10 @@
     }
     if (unlistenThemeChanged) unlistenThemeChanged();
     stopCountdownTimer();
+    if (highlightTimer) {
+      clearTimeout(highlightTimer);
+      highlightTimer = null;
+    }
   });
 </script>
 
@@ -1083,6 +1224,7 @@
       canPauseSelected={selectedTask ? canPauseTask(selectedTask.state) : canPauseAny}
       hasSelected={selectedIds.length > 0 || !!selectedId}
       on:add={() => openAddDialog()}
+      on:addFromClipboard={handlePasteFromClipboard}
       on:openFolder={() => invoke("open_download_folder")}
       on:exit={() => invoke("quit_app")}
       on:resume={() => selectedId && handleResumeTask(selectedId)}
@@ -1617,6 +1759,14 @@
 
   .toast-close:hover {
     color: var(--color-text);
+  }
+
+  /* New-task row highlight (the row lives inside TaskTable/TaskCard/DownloadWindow) */
+  :global(.task-row.new-task-highlight),
+  :global(.task-card.new-task-highlight),
+  :global(.download-window.new-task-highlight) {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
   }
 
   @keyframes banner-in {

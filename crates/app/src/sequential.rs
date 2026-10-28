@@ -577,7 +577,48 @@ async fn attempt_download_attempt(
                         return Err(CoreError::http(None, format!("stream error: {err}"), None));
                     }
                     Ok(None) => {
-                        // EOF
+                        // EOF - check pause/cancel tokens before completing
+                        if pause_token.is_cancelled() {
+                            use tokio::io::AsyncWriteExt;
+                            let _ = file.flush().await;
+                            let _ = file.sync_all().await;
+                            drop(file);
+                            let checkpoint = Checkpoint::new(
+                                task_id,
+                                current_written,
+                                expected_length,
+                                vec![(0, current_written)],
+                            );
+                            let _ = store.save_checkpoint(&checkpoint);
+                            let _ = event_sender.emit(
+                                task_id,
+                                EventKind::Checkpoint,
+                                EventPayload::Checkpoint {
+                                    durable_bytes: current_written,
+                                    total_bytes: expected_length,
+                                },
+                            ).await;
+                            return Ok(DownloadOutcome::Paused {
+                                written: current_written,
+                            });
+                        }
+                        if cancel_token.is_cancelled() {
+                            use tokio::io::AsyncWriteExt;
+                            let _ = file.flush().await;
+                            let _ = file.sync_all().await;
+                            drop(file);
+                            let checkpoint = Checkpoint::new(
+                                task_id,
+                                current_written,
+                                expected_length,
+                                vec![(0, current_written)],
+                            );
+                            let _ = store.save_checkpoint(&checkpoint);
+                            return Ok(DownloadOutcome::Cancelled {
+                                written: current_written,
+                            });
+                        }
+                        // EOF and no pause/cancel - break to complete
                         break;
                     }
                     Err(_) => {

@@ -402,6 +402,7 @@
 
         <tr
           class="grid-row task-row"
+          data-task-id={task.id}
           class:selected={isSelected}
           class:failed-row={isFailed}
           class:paused-row={isPaused}

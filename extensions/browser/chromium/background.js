@@ -4,6 +4,8 @@ import {
   sanitizeUrlForLog,
   shouldInterceptDownload,
   recordUrlDedupe,
+  HTML_RESPONSE_MESSAGE_AR,
+  HTML_FAILURE_ERROR_CODES,
   DEFAULT_EXTENSIONS,
   DEFAULT_MIN_SIZE_MB
 } from "./rules.mjs";
@@ -169,18 +171,55 @@ async function refreshDownloadItem(item) {
   return item;
 }
 
+/**
+ * Collects cookies for a capture:
+ * - cookies scoped to the final URL (the exact download host, e.g. drive.usercontent.google.com)
+ * - for Google downloads, the shared `.google.com` parent cookies so Drive's
+ *   confirm/download handshake keeps the account session
+ * Returns [{ name, value }], de-duplicated by cookie name (URL scope wins).
+ */
 async function getCookiesForUrl(url) {
   if (!url) return [];
+
+  const collected = [];
+
   try {
     const cookies = await chrome.cookies.getAll({ url });
-    return (cookies || []).map((c) => ({
-      name: c.name,
-      value: c.value
-    }));
+    for (const c of cookies || []) {
+      collected.push({ name: c.name, value: c.value });
+    }
   } catch (err) {
     sendLog("warn", "Failed to retrieve cookies", sanitizeUrlForLog(url));
-    return [];
   }
+
+  // Google Drive confirm downloads need the account cookies from the parent domain.
+  let host = "";
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch (_) {
+    host = "";
+  }
+  const isGoogleHost = host === "google.com" || host.endsWith(".google.com");
+  if (isGoogleHost && chrome.cookies?.getAll) {
+    try {
+      const parentCookies = await chrome.cookies.getAll({ domain: ".google.com" });
+      for (const c of parentCookies || []) {
+        collected.push({ name: c.name, value: c.value });
+      }
+    } catch (_) {
+      sendLog("warn", "Failed to retrieve parent google cookies", sanitizeUrlForLog(url));
+    }
+  }
+
+  // De-duplicate by name, keeping the first (most specific URL-scoped) value.
+  const seen = new Set();
+  const result = [];
+  for (const cookie of collected) {
+    if (!cookie.name || seen.has(cookie.name)) continue;
+    seen.add(cookie.name);
+    result.push(cookie);
+  }
+  return result;
 }
 
 // Send Capture message to native host with 10 s timeout
@@ -352,9 +391,10 @@ async function handleInterceptedDownload(item, decision) {
   sendLog("info", `Cancelled and erased browser download ${id} immediately upon capture`, cleanUrl);
 
   const captureTargetUrl = decision.targetUrl || item.finalUrl || item.url || "";
-  recordUrlDedupe(captureTargetUrl);
+  // Record the intercept keyed by download id + URL, only after the real intercept.
+  recordUrlDedupe(captureTargetUrl, Date.now(), id);
   if (item.url && item.url !== captureTargetUrl) {
-    recordUrlDedupe(item.url);
+    recordUrlDedupe(item.url, Date.now(), id);
   }
 
   const cookies = await getCookiesForUrl(captureTargetUrl);
@@ -387,6 +427,14 @@ async function handleInterceptedDownload(item, decision) {
     const errCode = captureResult.error?.code || "ERROR";
     const errMsg = captureResult.error?.message || "Capture failed";
     sendLog("warn", `Capture error: ${errCode} - ${errMsg}`, cleanUrl);
+
+    // HTML or "not a file" failure from the app: terminal. Report it in Arabic and
+    // never hand the download back to the browser (that would loop forever).
+    if (HTML_FAILURE_ERROR_CODES.has(errCode)) {
+      setBadgeWarning(errCode, HTML_RESPONSE_MESSAGE_AR);
+      return;
+    }
+
     setBadgeWarning(errCode, errMsg);
 
     // Give back to browser ONLY when the host is unreachable (connect error).
@@ -448,6 +496,20 @@ chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
   });
 
   if (!decision.intercept) {
+    // HTML page instead of a file: tell the user in Arabic, never create a task,
+    // and never hand it to the host (no loop).
+    if (decision.reason === "html_response") {
+      markHandled(item.id);
+      suggest({ filename: item.filename || suggested });
+      notify(msg("notify_error_title"), HTML_RESPONSE_MESSAGE_AR);
+      sendLog(
+        "warn",
+        "Download skipped: html_response",
+        sanitizeUrlForLog(decision.targetUrl)
+      );
+      return;
+    }
+
     // Call suggest() ONLY for downloads we don't intercept!
     markHandled(item.id);
     suggest({ filename: item.filename || suggested });
@@ -470,39 +532,41 @@ chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
   return true;
 });
 
-chrome.downloads.onCreated.addListener(async (item) => {
-  if (!item || !item.id) return;
+// Chromium decides only in onDeterminingFilename: a fallback decision here would
+// race it (Chrome fires onCreated first) and the dedupe must not consume the item.
+// onCreated is used only where onDeterminingFilename does not exist (Firefox).
+if (!chrome.downloads?.onDeterminingFilename) {
+  chrome.downloads?.onCreated?.addListener(async (item) => {
+    if (!item || !item.id) return;
 
-  // onCreated must skip items already handled by onDeterminingFilename (no double path)
-  if (handledDownloadIds.has(item.id) || downloadCaptureState.get(item.id)?.handled) {
-    return;
-  }
-
-  // If onDeterminingFilename is supported (Chromium), wait a short tick to let it decide synchronously
-  if (chrome.downloads?.onDeterminingFilename) {
-    await new Promise((r) => setTimeout(r, 50));
     if (handledDownloadIds.has(item.id) || downloadCaptureState.get(item.id)?.handled) {
       return;
     }
-  }
 
-  // Fallback path when onDeterminingFilename is absent or skipped
-  const decision = shouldInterceptDownload({
-    item,
-    settings: cachedSettings,
-    altBypasses: cachedAltClicks,
-    extensionId: chrome.runtime?.id || "",
-    suggestedFilename: extractBasename(item.filename),
-    nowMs: Date.now(),
-    givenBackUrls,
-    checkDedupe: true
+    const decision = shouldInterceptDownload({
+      item,
+      settings: cachedSettings,
+      altBypasses: cachedAltClicks,
+      extensionId: chrome.runtime?.id || "",
+      suggestedFilename: extractBasename(item.filename),
+      nowMs: Date.now(),
+      givenBackUrls,
+      checkDedupe: true
+    });
+
+    if (decision.reason === "html_response") {
+      markHandled(item.id);
+      notify(msg("notify_error_title"), HTML_RESPONSE_MESSAGE_AR);
+      sendLog("warn", "Download skipped: html_response", sanitizeUrlForLog(decision.targetUrl));
+      return;
+    }
+
+    if (decision.intercept) {
+      markHandled(item.id);
+      await handleInterceptedDownload(item, decision);
+    }
   });
-
-  if (decision.intercept) {
-    markHandled(item.id);
-    await handleInterceptedDownload(item, decision);
-  }
-});
+}
 
 // Setup context menu on installation
 chrome.runtime.onInstalled.addListener(() => {
