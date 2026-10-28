@@ -49,14 +49,14 @@
 
     <!-- Description -->
     <text x="600" y="435" font-size="20" font-weight="400" fill="#94A3B8">
-      مفتوح المصدر • يدعم الاستئناف والتنزيل المتوازي • واجهة عربية أولاً
+      مصدره متاح • يدعم الاستئناف والتنزيل المتوازي • واجهة عربية أولاً
     </text>
 
     <!-- Feature badges container -->
     <g transform="translate(600, 500)">
       <rect x="-380" y="-22" width="760" height="44" rx="22" fill="#0B1A4E" stroke="#00B6BD" stroke-opacity="0.3" stroke-width="1.5"/>
       <text x="0" y="6" font-size="16" font-weight="600" fill="#00B6BD">
-        بدون تتبع  •  بدون تحليلات  •  تخزين محلي آمن  •  رخصة Apache-2.0
+        بدون تتبع  •  بدون تحليلات  •  تخزين محلي آمن  •  رخصة PolyForm NC
       </text>
     </g>
   </g>

@@ -115,11 +115,12 @@ ALLOWED_URL_HOST_PATTERNS = [
     r"^https?://(?:a|origin1|cdn\.other)\.com(?:/.*)?$",
     # Official project support page (no tracking parameters, not application telemetry).
     r"^https?://ko-fi\.com/athar_studio(?:/.*)?$",
-    # Official project website, sister app, metadata schemas, and open-source license references
+    # Official project website, sister app, metadata schemas, and license references
     r"^https?://(?:[a-zA-Z0-9_\-]+\.)*sayl\.site(?:/.*)?$",
     r"^https?://atharapp\.download(?:/.*)?$",
     r"^https?://schema\.org(?:/.*)?$",
     r"^https?://(?:www\.)?apache\.org/licenses/LICENSE-2\.0(?:/.*)?$",
+    r"^https?://polyformproject\.org/licenses/noncommercial/1\.0\.0(?:/.*)?$",
     # Competitor and comparison reference sites
     r"^https?://(?:www\.)?(?:internetdownloadmanager|freedownloadmanager)\.com(?:/.*)?$",
     r"^https?://aria2\.github\.io(?:/.*)?$",

@@ -10,10 +10,10 @@
 
 [![CI](https://github.com/athar-studios/sayl/actions/workflows/ci.yml/badge.svg)](https://github.com/athar-studios/sayl/actions)
 [![Latest Release](https://img.shields.io/github/v/release/athar-studios/sayl?color=00B6BD&label=Release)](https://github.com/athar-studios/sayl/releases/latest)
-[![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg)](LICENSE)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-orange.svg)](https://ko-fi.com/athar_studio)
 
-**SAYL is a fast, lightweight Windows-first download manager built in Rust with a modern desktop UI, completely open source, and respecting your privacy with zero ads and zero telemetry.**
+**SAYL is a fast, lightweight Windows-first download manager built in Rust with a modern desktop UI, source-available and free for personal and non-commercial use, respecting your privacy with zero ads and zero telemetry.**
 
 <br>
 
@@ -44,7 +44,7 @@ Visit the **[GitHub Releases Page](https://github.com/athar-studios/sayl/release
 - **Windows Installer (64-bit):** `SAYL-Setup-x64-0.1.0.exe` (installs cleanly in user space without requiring administrator elevation).
 
 > **Windows SmartScreen Notice:**  
-> Because SAYL is an independent open-source project without a costly commercial EV code-signing certificate, Windows may show a blue warning saying 'Windows protected your PC / Unknown Publisher'.  
+> Because SAYL is an independent project without a costly commercial EV code-signing certificate, Windows may show a blue warning saying 'Windows protected your PC / Unknown Publisher'.  
 > To launch: click **'More info'** and then choose **'Run anyway'**. Sayl's source code is 100% open and auditable on GitHub.
 
 ---
@@ -125,7 +125,7 @@ We welcome community contributions. Please read **[CONTRIBUTING.md](CONTRIBUTING
 
 ## Support Sayl
 
-Sayl is and will always remain free and open source. If you find it helpful and wish to support our work and infrastructure, you can donate any amount via Ko-fi:
+Sayl is and will remain free for personal use, with its source code openly available. If you find it helpful and wish to support our work and infrastructure, you can donate any amount via Ko-fi:
 
 ☕ **[Support us on Ko-fi](https://ko-fi.com/athar_studio)**
 
@@ -133,4 +133,8 @@ Sayl is and will always remain free and open source. If you find it helpful and 
 
 ## License
 
-Sayl is released under the **[Apache-2.0 License](LICENSE)**.
+Sayl is released under the **[PolyForm Noncommercial License 1.0.0](LICENSE)**.
+
+- The source code is available to read and modify.
+- Free for personal and any non-commercial use.
+- Commercial use requires written permission. Contact: contact@atharapp.download
