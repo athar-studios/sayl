@@ -5,14 +5,16 @@
   export let open = false;
   export let count = 1;
   export let filename = "";
+  /** Opened via "Delete with file": pre-check the delete-from-disk option. */
+  export let withFile = false;
 
   const dispatch = createEventDispatcher();
 
   let deleteFiles = false;
 
   $: if (open) {
-    // Always default to OFF (unchecked) per Requirement 2
-    deleteFiles = false;
+    // Default OFF (Requirement 2) unless opened via "Delete with file"
+    deleteFiles = !!withFile;
   }
 
   $: isMultiple = count > 1;
@@ -20,11 +22,13 @@
     ? $t("deleteDialog.titleMultiple")
     : $t("deleteDialog.title");
 
+  $: singleKey = deleteFiles ? "deleteDialog.promptSingleWithFile" : "deleteDialog.promptSingle";
+  $: multipleKey = deleteFiles ? "deleteDialog.promptMultipleWithFile" : "deleteDialog.promptMultiple";
   $: promptText = isMultiple
-    ? $t("deleteDialog.promptMultiple").replace("{count}", String(count))
+    ? $t(multipleKey).replace("{count}", String(count))
     : filename
-      ? $t("deleteDialog.promptSingle").replace("{filename}", filename)
-      : $t("deleteDialog.promptSingle").replace("'{filename}'", "").replace("'{filename}' ", "");
+      ? $t(singleKey).replace("{filename}", filename)
+      : $t(singleKey).replace("'{filename}' ", "").replace("'{filename}'", "");
 
   $: primaryButtonLabel = deleteFiles
     ? $t("deleteDialog.deleteFileAndRemove")

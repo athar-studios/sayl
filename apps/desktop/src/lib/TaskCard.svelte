@@ -473,6 +473,7 @@
     background-color: var(--color-bg-alt);
     border-radius: var(--radius-full);
     overflow: hidden;
+    position: relative;
   }
 
   .progress-bar-fill {
@@ -486,6 +487,22 @@
 
   .progress-bar-fill.completed {
     background: var(--state-completed, #16a34a) !important;
+  }
+
+  /* RTL: progress fill grows from right */
+  :global([dir="rtl"]) .progress-bar-wrap .progress-bar-fill {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    left: auto;
+    border-radius: 0 var(--radius-full) var(--radius-full) 0;
+  }
+  :global([dir="rtl"]) .progress-bar-wrap .progress-bar-fill.completed {
+    border-radius: 0 var(--radius-full) var(--radius-full) 0;
+  }
+  :global([dir="rtl"]) .progress-bar-wrap .progress-bar-fill.downloading {
+    border-radius: 0 var(--radius-full) var(--radius-full) 0;
   }
 
   .card-footer {

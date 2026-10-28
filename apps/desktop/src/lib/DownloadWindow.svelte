@@ -11,6 +11,7 @@
     isTaskPending,
   } from "./format.js";
   import { friendlyError } from "./errors.js";
+  import { mergeTaskMonotonic } from "./monotonic.js";
   import StatusPill from "./StatusPill.svelte";
   import { createEventDispatcher } from "svelte";
   import iconSvg from "../assets/icon.svg";
@@ -23,37 +24,41 @@
 
   const dispatch = createEventDispatcher();
 
-  $: isPending = isTaskPending(pendingStart, task?.id);
-  $: isCompleted = task.state === "Completed";
-  $: isDownloading = task.state === "Downloading";
-  $: isFailed = task.state === "Failed";
-  $: allowPause = canPauseTask(task.state);
-  $: allowResume = canResumeTask(task.state);
-  $: allowCancel = canCancel(task.state);
-  $: errInfo = isFailed ? friendlyError(task, $currentLang) : null;
+  // Monotonically merge incoming task updates to prevent progress regression
+  let mergedTask = task;
+  $: mergedTask = mergeTaskMonotonic(mergedTask, task);
+
+  $: isPending = isTaskPending(pendingStart, mergedTask?.id);
+  $: isCompleted = mergedTask.state === "Completed";
+  $: isDownloading = mergedTask.state === "Downloading";
+  $: isFailed = mergedTask.state === "Failed";
+  $: allowPause = canPauseTask(mergedTask.state);
+  $: allowResume = canResumeTask(mergedTask.state);
+  $: allowCancel = canCancel(mergedTask.state);
+  $: errInfo = isFailed ? friendlyError(mergedTask, $currentLang) : null;
 
   $: percentNum =
-    task.total_size && task.total_size > 0
-      ? Math.min(100, Math.max(0, Math.round((task.written / task.total_size) * 1000) / 10))
+    mergedTask.total_size && mergedTask.total_size > 0
+      ? Math.min(100, Math.max(0, Math.round((mergedTask.written / mergedTask.total_size) * 1000) / 10))
       : null;
 
-  $: writtenFormatted = formatBytes(task.written, $currentLang);
-  $: totalFormatted = task.total_size
-    ? formatBytes(task.total_size, $currentLang)
+  $: writtenFormatted = formatBytes(mergedTask.written, $currentLang);
+  $: totalFormatted = mergedTask.total_size
+    ? formatBytes(mergedTask.total_size, $currentLang)
     : $t("task.unknownSize");
-  $: speedFormatted = formatSpeed(task.speed_bps, $currentLang);
-  $: etaFormatted = formatEta(task.eta_secs, $currentLang);
+  $: speedFormatted = formatSpeed(mergedTask.speed_bps, $currentLang);
+  $: etaFormatted = formatEta(mergedTask.eta_secs, $currentLang);
   $: percentFormatted = percentNum !== null ? formatPercent(percentNum, $currentLang) : null;
   $: isRtl = $currentLang === "ar";
 </script>
 
 <div
   class="download-window"
-  data-task-id={task.id}
+  data-task-id={mergedTask.id}
   class:rtl={isRtl}
   dir={isRtl ? "rtl" : "ltr"}
   role="dialog"
-  aria-label="{task.filename || $t('downloadWindow.title')}"
+  aria-label="{mergedTask.filename || $t('downloadWindow.title')}"
 >
   <!-- Window Header -->
   <div class="window-header">
@@ -61,19 +66,19 @@
       <div class="logo-box" aria-hidden="true">
         <img src={iconSvg} alt="SAYL" class="logo-img" />
       </div>
-      <span class="file-name" title={task.filename}>
-        <bdi dir="auto">{task.filename || "—"}</bdi>
+      <span class="file-name" title={mergedTask.filename}>
+        <bdi dir="auto">{mergedTask.filename || "—"}</bdi>
       </span>
     </div>
 
     <div class="header-end">
-      <StatusPill state={task.state} isConnecting={isPending} />
+      <StatusPill state={mergedTask.state} isConnecting={isPending} />
       {#if !isNativeWindow}
         <button
           class="close-btn"
           title={$t("downloadWindow.close")}
           aria-label={$t("downloadWindow.close")}
-          on:click={() => dispatch("close", task.id)}
+          on:click={() => dispatch("close", mergedTask.id)}
         >
           <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true">
             <path
@@ -143,8 +148,8 @@
           clip-rule="evenodd"
         />
       </svg>
-      <span class="error-msg" title={task.error || errInfo?.hint || ""}>
-        <bdi dir="auto">{task.error || errInfo?.hint || $t("status.failed")}</bdi>
+      <span class="error-msg" title={mergedTask.error || errInfo?.hint || ""}>
+        <bdi dir="auto">{mergedTask.error || errInfo?.hint || $t("status.failed")}</bdi>
       </span>
     </div>
   {/if}
@@ -155,13 +160,13 @@
       {#if isCompleted}
         <button
           class="action-btn btn-primary"
-          on:click={() => dispatch("openFile", task.id)}
+          on:click={() => dispatch("openFile", mergedTask.id)}
         >
           <span>{$t("downloadWindow.openFile")}</span>
         </button>
         <button
           class="action-btn btn-secondary"
-          on:click={() => dispatch("reveal", task.id)}
+          on:click={() => dispatch("reveal", mergedTask.id)}
         >
           <span>{$t("downloadWindow.revealFolder")}</span>
         </button>
@@ -170,7 +175,7 @@
           <button
             class="action-btn btn-secondary"
             title={$t("toolbar.pause")}
-            on:click={() => dispatch("pause", task.id)}
+            on:click={() => dispatch("pause", mergedTask.id)}
           >
             <span>{$t("toolbar.pause")}</span>
           </button>
@@ -182,7 +187,7 @@
             class:disabled={isPending}
             disabled={isPending}
             title={isPending ? $t("task.connecting") : $t("toolbar.resume")}
-            on:click={() => dispatch("resume", task.id)}
+            on:click={() => dispatch("resume", mergedTask.id)}
           >
             <span>{isPending ? $t("task.connecting") : $t("toolbar.resume")}</span>
           </button>
@@ -194,7 +199,7 @@
             class:disabled={isPending}
             disabled={isPending}
             title={isPending ? $t("task.connecting") : $t("downloadWindow.retry")}
-            on:click={() => dispatch("retry", task.id)}
+            on:click={() => dispatch("retry", mergedTask.id)}
           >
             <span>{isPending ? $t("task.connecting") : $t("downloadWindow.retry")}</span>
           </button>
@@ -204,9 +209,16 @@
           <button
             class="action-btn btn-danger"
             title={$t("task.cancel")}
-            on:click={() => dispatch("cancel", task.id)}
+            on:click={() => dispatch("cancel", mergedTask.id)}
           >
             <span>{$t("task.cancel")}</span>
+          </button>
+          <button
+            class="action-btn btn-secondary"
+            title={$t("downloadWindow.hide")}
+            on:click={() => dispatch("close", mergedTask.id)}
+          >
+            <span>{$t("downloadWindow.hide")}</span>
           </button>
         {/if}
       {/if}
@@ -343,6 +355,10 @@
     border-radius: 8px;
     overflow: hidden;
     box-sizing: border-box;
+  }
+
+  .download-window.rtl .progress-bar-wrap {
+    direction: rtl;
   }
 
   .progress-bar-fill {

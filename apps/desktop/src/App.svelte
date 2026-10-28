@@ -13,6 +13,10 @@
     resolveNewTaskVisibility,
   } from "./lib/filters.js";
   import {
+    mergeTaskMonotonic,
+    mergeTasksMonotonic,
+  } from "./lib/monotonic.js";
+  import {
     areAllDownloadsFinished,
     getBlockedReasonMessage,
   } from "./lib/shutdown.js";
@@ -93,6 +97,7 @@
 
   // Delete confirmation dialog state
   let deleteDialogOpen = false;
+  let deleteDialogWithFile = false;
   let deleteTaskIds = [];
 
   // Floating download windows: array of task IDs
@@ -256,7 +261,15 @@
     if (!payload || typeof payload !== "object") return;
 
     if (payload.full) {
-      tasks = Array.isArray(payload.upsert) ? payload.upsert : [];
+      // A full refresh replaces the list, but progress must still be monotonic:
+      // a periodic list read can legitimately report fewer committed bytes than
+      // the live Progress stream already showed. Merging keeps the UI from
+      // jumping backwards mid-download.
+      const incoming = Array.isArray(payload.upsert) ? payload.upsert : [];
+      const merged = mergeTasksMonotonic(tasks, incoming);
+      // A full refresh is authoritative for membership: drop tasks it no longer lists.
+      const incomingIds = new Set(incoming.map((t) => t.id));
+      tasks = merged.filter((t) => incomingIds.has(t.id));
       for (const t of tasks) {
         if (pendingStart.has(t.id)) {
           clearPendingStart(t.id);
@@ -284,7 +297,7 @@
         }
         next = next.map((t) => {
           if (upsertMap.has(t.id)) {
-            const updated = { ...t, ...upsertMap.get(t.id) };
+            const updated = mergeTaskMonotonic(t, upsertMap.get(t.id));
             upsertMap.delete(t.id);
             return updated;
           }
@@ -533,7 +546,13 @@
     }
   }
 
-  function handleTriggerDelete(targetId) {
+  function handleTriggerDelete(target, withFile = false) {
+    // Context menu passes { id, deleteFiles }; toolbar/keyboard pass an id or nothing.
+    let targetId = target;
+    if (target && typeof target === "object") {
+      targetId = target.id;
+      withFile = withFile || target.deleteFiles === true;
+    }
     let idsToDelete = [];
     if (typeof targetId === "string" && targetId) {
       if (selectedIds.includes(targetId)) {
@@ -550,6 +569,7 @@
     if (idsToDelete.length === 0) return;
 
     deleteTaskIds = idsToDelete;
+    deleteDialogWithFile = withFile;
     deleteDialogOpen = true;
   }
 
@@ -647,6 +667,7 @@
     const completedTasks = tasks.filter((t) => t.state === "Completed");
     if (completedTasks.length === 0) return;
     deleteTaskIds = completedTasks.map((t) => t.id);
+    deleteDialogWithFile = false;
     deleteDialogOpen = true;
   }
 
@@ -839,7 +860,7 @@
       if (e.key === "Delete") {
         if (selectedIds.length > 0 || selectedId) {
           e.preventDefault();
-          handleTriggerDelete();
+          handleTriggerDelete(undefined, e.shiftKey);
           return;
         }
       }
@@ -1081,14 +1102,14 @@
                   ? Math.round((payload.total - payload.written) / payload.speed_bps)
                   : null;
 
-              return {
-                ...t,
+              const incoming = {
                 written: payload.written,
                 total_size: payload.total !== null ? payload.total : t.total_size,
                 speed_bps: payload.speed_bps,
                 eta_secs: eta,
                 state: t.state === "Queued" || t.state === "Probing" ? "Downloading" : t.state,
               };
+              return mergeTaskMonotonic(t, incoming);
             }
             return t;
           });
@@ -1419,6 +1440,7 @@
     open={deleteDialogOpen}
     count={deleteTaskIds.length}
     filename={deleteDialogFilename}
+    withFile={deleteDialogWithFile}
     on:confirm={handleConfirmDelete}
     on:cancel={handleCancelDeleteDialog}
   />

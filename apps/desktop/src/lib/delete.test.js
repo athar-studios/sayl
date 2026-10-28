@@ -70,9 +70,9 @@ describe("delete vs cancel and delete dialog logic", () => {
       expect(ar.deleteDialog).toBeDefined();
       expect(ar.deleteDialog.title).toBe("حذف التنزيل");
       expect(ar.deleteDialog.titleMultiple).toBe("حذف التنزيلات المحددة");
-      expect(ar.deleteDialog.alsoDeleteFile).toBe("إزالة وحذف الملف من الجهاز");
+      expect(ar.deleteDialog.alsoDeleteFile).toBe("حذف الملف من القرص أيضاً");
       expect(ar.deleteDialog.removeOnly).toBe("إزالة من القائمة فقط");
-      expect(ar.deleteDialog.deleteFileAndRemove).toBe("إزالة وحذف الملف");
+      expect(ar.deleteDialog.deleteFileAndRemove).toBe("حذف الملف وإزالته من القائمة");
       expect(ar.deleteDialog.cancel).toBe("إلغاء");
       expect(ar.table.cancel).toBe("إلغاء");
     });
@@ -81,9 +81,9 @@ describe("delete vs cancel and delete dialog logic", () => {
       expect(en.deleteDialog).toBeDefined();
       expect(en.deleteDialog.title).toBe("Delete Download");
       expect(en.deleteDialog.titleMultiple).toBe("Delete Selected Downloads");
-      expect(en.deleteDialog.alsoDeleteFile).toBe("Also delete file from device");
+      expect(en.deleteDialog.alsoDeleteFile).toBe("Also delete file from disk");
       expect(en.deleteDialog.removeOnly).toBe("Remove from list only");
-      expect(en.deleteDialog.deleteFileAndRemove).toBe("Delete file and remove");
+      expect(en.deleteDialog.deleteFileAndRemove).toBe("Delete file and remove from list");
       expect(en.deleteDialog.cancel).toBe("Cancel");
       expect(en.table.cancel).toBe("Cancel");
     });
@@ -101,8 +101,21 @@ describe("delete vs cancel and delete dialog logic", () => {
       expect(getButtonLabel(false, "en")).toBe("Remove from list only");
 
       // Checked: "إزالة وحذف الملف"
-      expect(getButtonLabel(true, "ar")).toBe("إزالة وحذف الملف");
-      expect(getButtonLabel(true, "en")).toBe("Delete file and remove");
+      expect(getButtonLabel(true, "ar")).toBe("حذف الملف وإزالته من القائمة");
+      expect(getButtonLabel(true, "en")).toBe("Delete file and remove from list");
+    });
+
+    it("delete-with-file prompts say the file is deleted from disk (ar+en)", () => {
+      for (const dict of [ar, en]) {
+        expect(dict.deleteDialog.promptSingleWithFile).toContain("{filename}");
+        expect(dict.deleteDialog.promptMultipleWithFile).toContain("{count}");
+      }
+      expect(ar.deleteDialog.promptSingleWithFile).toContain("القرص");
+      expect(ar.deleteDialog.promptMultipleWithFile).toContain("القرص");
+      expect(en.deleteDialog.promptSingleWithFile).toContain("from disk");
+      expect(en.deleteDialog.promptMultipleWithFile).toContain("from disk");
+      expect(ar.contextMenu.deleteWithFile).toBe("حذف مع الملف...");
+      expect(en.contextMenu.deleteWithFile).toBe("Delete with file...");
     });
 
     it("formats single vs multi-task prompt correctly", () => {

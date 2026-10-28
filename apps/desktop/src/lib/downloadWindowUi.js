@@ -6,6 +6,8 @@
  * `StandaloneDownloadWindow.svelte` are the only consumers.
  */
 
+export { mergeTaskMonotonic, mergeTasksMonotonic, isProgressResetState } from "./monotonic.js";
+
 const MIN_SPEED_LIMIT_KBPS = 1;
 const MAX_SPEED_LIMIT_KBPS = 10_000_000;
 
@@ -384,4 +386,47 @@ export function deriveDisplayState(task, { windowClosed = false } = {}) {
   void windowClosed;
   const state = task && typeof task === "object" ? task.state : null;
   return typeof state === "string" && state ? state : "Queued";
+}
+
+/**
+ * Determines the progress bar fill direction for RTL/LTR layouts.
+ * In RTL (Arabic), the progress bar should fill from right to left.
+ * In LTR (English), the progress bar should fill from left to right.
+ *
+ * @param {boolean} isRtl - Whether the current language is RTL
+ * @returns {{ direction: 'rtl' | 'ltr', fillStart: 'right' | 'left' }}
+ */
+export function getProgressBarFillDirection(isRtl) {
+  return isRtl
+    ? { direction: 'rtl', fillStart: 'right' }
+    : { direction: 'ltr', fillStart: 'left' };
+}
+
+/**
+ * Returns the CSS style object for the progress bar fill element
+ * based on the current language direction.
+ *
+ * @param {boolean} isRtl - Whether the current language is RTL
+ * @param {number} percent - Progress percentage (0-100)
+ * @returns {object} CSS style properties for the fill element
+ */
+export function getProgressBarFillStyle(isRtl, percent) {
+  const baseStyle = {
+    width: `${Math.max(0, Math.min(100, percent))}%`,
+    height: '100%',
+  };
+
+  if (isRtl) {
+    return {
+      ...baseStyle,
+      marginLeft: 'auto',
+      marginRight: 0,
+    };
+  }
+
+  return {
+    ...baseStyle,
+    marginLeft: 0,
+    marginRight: 'auto',
+  };
 }

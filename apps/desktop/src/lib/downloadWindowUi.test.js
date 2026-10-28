@@ -13,6 +13,11 @@ import {
   normalizeSpeedLimit,
   isResumable,
   deriveDisplayState,
+  mergeTaskMonotonic,
+  mergeTasksMonotonic,
+  isProgressResetState,
+  getProgressBarFillDirection,
+  getProgressBarFillStyle,
 } from "./downloadWindowUi.js";
 
 describe("downloadWindowUi — pure helpers", () => {
@@ -306,5 +311,162 @@ describe("downloadWindowUi — pure helpers", () => {
       expect(deriveDisplayState({ state: "" })).toBe("Queued");
       expect(deriveDisplayState({ state: null })).toBe("Queued");
     });
+  });
+});
+
+describe("downloadWindowUi — monotonic progress (mergeTaskMonotonic)", () => {
+  it("prevents written bytes from decreasing for same task", () => {
+    const existing = { id: "t1", written: 500, total_size: 1000, state: "Downloading" };
+    const incoming = { id: "t1", written: 300, total_size: 1000, state: "Downloading" };
+    const merged = mergeTaskMonotonic(existing, incoming);
+    expect(merged.written).toBe(500);
+  });
+
+  it("allows written bytes to increase", () => {
+    const existing = { id: "t1", written: 300, total_size: 1000, state: "Downloading" };
+    const incoming = { id: "t1", written: 500, total_size: 1000, state: "Downloading" };
+    const merged = mergeTaskMonotonic(existing, incoming);
+    expect(merged.written).toBe(500);
+  });
+
+  it("allows progress decrease when state indicates restart (Queued from Downloading)", () => {
+    const existing = { id: "t1", written: 500, total_size: 1000, state: "Downloading" };
+    const incoming = { id: "t1", written: 0, total_size: 1000, state: "Queued" };
+    const merged = mergeTaskMonotonic(existing, incoming);
+    expect(merged.written).toBe(0);
+    expect(merged.state).toBe("Queued");
+  });
+
+  it("allows progress decrease when state is Cancelled", () => {
+    const existing = { id: "t1", written: 500, total_size: 1000, state: "Downloading" };
+    const incoming = { id: "t1", written: 0, total_size: 1000, state: "Cancelled" };
+    const merged = mergeTaskMonotonic(existing, incoming);
+    expect(merged.written).toBe(0);
+    expect(merged.state).toBe("Cancelled");
+  });
+
+  it("allows progress decrease when state transitions to Failed", () => {
+    const existing = { id: "t1", written: 500, total_size: 1000, state: "Downloading" };
+    const incoming = { id: "t1", written: 0, total_size: 1000, state: "Failed" };
+    const merged = mergeTaskMonotonic(existing, incoming);
+    expect(merged.written).toBe(0);
+    expect(merged.state).toBe("Failed");
+  });
+
+  it("does not reset progress when staying in Failed state", () => {
+    const existing = { id: "t1", written: 500, total_size: 1000, state: "Failed" };
+    const incoming = { id: "t1", written: 300, total_size: 1000, state: "Failed" };
+    const merged = mergeTaskMonotonic(existing, incoming);
+    expect(merged.written).toBe(500);
+  });
+
+  it("merges segment_ranges monotonically", () => {
+    const existing = {
+      id: "t1",
+      written: 500,
+      total_size: 1000,
+      state: "Downloading",
+      segment_ranges: [
+        { start: 0, end: 500, completed: true },
+        { start: 500, end: 1000, completed: false },
+      ],
+    };
+    const incoming = {
+      id: "t1",
+      written: 600,
+      total_size: 1000,
+      state: "Downloading",
+      segment_ranges: [
+        { start: 0, end: 500, completed: true },
+        { start: 500, end: 1000, completed: true },
+      ],
+    };
+    const merged = mergeTaskMonotonic(existing, incoming);
+    expect(merged.segment_ranges[1].completed).toBe(true);
+  });
+
+  it("mergeTasksMonotonic merges multiple tasks", () => {
+    const existingTasks = [
+      { id: "t1", written: 500, total_size: 1000, state: "Downloading" },
+      { id: "t2", written: 200, total_size: 500, state: "Paused" },
+    ];
+    const incomingTasks = [
+      { id: "t1", written: 300, total_size: 1000, state: "Downloading" }, // should not decrease
+      { id: "t2", written: 300, total_size: 500, state: "Downloading" }, // should increase
+      { id: "t3", written: 100, total_size: 1000, state: "Queued" }, // new task
+    ];
+    const merged = mergeTasksMonotonic(existingTasks, incomingTasks);
+    expect(merged.find(t => t.id === "t1").written).toBe(500);
+    expect(merged.find(t => t.id === "t2").written).toBe(300);
+    expect(merged.find(t => t.id === "t3").written).toBe(100);
+  });
+
+  it("isProgressResetState detects restart transitions", () => {
+    expect(isProgressResetState("Queued", "Downloading")).toBe(true);
+    expect(isProgressResetState("Probing", "Downloading")).toBe(true);
+    expect(isProgressResetState("Cancelled", "Downloading")).toBe(true);
+    expect(isProgressResetState("Failed", "Downloading")).toBe(true);
+    expect(isProgressResetState("Downloading", "Queued")).toBe(false);
+    expect(isProgressResetState("Paused", "Downloading")).toBe(false);
+    expect(isProgressResetState("Failed", "Failed")).toBe(false);
+  });
+});
+
+describe("downloadWindowUi — RTL progress bar fill direction", () => {
+  it("returns RTL direction and right fill start for Arabic", () => {
+    const result = getProgressBarFillDirection(true);
+    expect(result.direction).toBe("rtl");
+    expect(result.fillStart).toBe("right");
+  });
+
+  it("returns LTR direction and left fill start for English", () => {
+    const result = getProgressBarFillDirection(false);
+    expect(result.direction).toBe("ltr");
+    expect(result.fillStart).toBe("left");
+  });
+
+  it("getProgressBarFillStyle returns marginLeft: auto for RTL", () => {
+    const style = getProgressBarFillStyle(true, 50);
+    expect(style.marginLeft).toBe("auto");
+    expect(style.marginRight).toBe(0);
+    expect(style.width).toBe("50%");
+  });
+
+  it("getProgressBarFillStyle returns marginRight: auto for LTR", () => {
+    const style = getProgressBarFillStyle(false, 50);
+    expect(style.marginLeft).toBe(0);
+    expect(style.marginRight).toBe("auto");
+    expect(style.width).toBe("50%");
+  });
+
+  it("clamps percent to 0..100 in getProgressBarFillStyle", () => {
+    expect(getProgressBarFillStyle(false, -10).width).toBe("0%");
+    expect(getProgressBarFillStyle(false, 150).width).toBe("100%");
+  });
+});
+
+describe("downloadWindowUi — Cancel vs Hide button behavior", () => {
+  it("Cancel button dispatches cancel event", () => {
+    const dispatch = vi.fn();
+    const taskId = "task-123";
+    const handler = () => dispatch("cancel", taskId);
+    handler();
+    expect(dispatch).toHaveBeenCalledWith("cancel", taskId);
+  });
+
+  it("Hide/Close button dispatches close event", () => {
+    const dispatch = vi.fn();
+    const taskId = "task-123";
+    const handler = () => dispatch("close", taskId);
+    handler();
+    expect(dispatch).toHaveBeenCalledWith("close", taskId);
+  });
+
+  it("X button in header dispatches close event (hide window)", () => {
+    const dispatch = vi.fn();
+    const taskId = "task-123";
+    const handler = () => dispatch("close", taskId);
+    handler();
+    expect(dispatch).toHaveBeenCalledWith("close", taskId);
   });
 });

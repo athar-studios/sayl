@@ -2481,3 +2481,206 @@ async fn test_fallback_without_range_truncates_partial_to_zero() {
     );
     assert_eq!(bytes, expected_data);
 }
+
+#[tokio::test]
+async fn test_parallel_progress_monotonic_and_cancel() {
+    // Test that parallel download progress never decreases (monotonic) and cancel
+    // fully stops all workers and transitions state to Cancelled.
+    let size = 2097152; // 2 MiB
+    let expected_data = generate_bytes(size);
+    let data_clone = expected_data.clone();
+
+    let requests = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let requests_clone = std::sync::Arc::clone(&requests);
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    // Slow server that adds delay to each chunk so we can observe progress and cancel in time
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let data = data_clone.clone();
+            let reqs = std::sync::Arc::clone(&requests_clone);
+            tokio::spawn(async move {
+                let mut buf = [0u8; 4096];
+                let n = socket.read(&mut buf).await.unwrap_or(0);
+                let req = String::from_utf8_lossy(&buf[..n]).to_string();
+                reqs.lock().unwrap().push(req.clone());
+
+                if req.starts_with("HEAD") {
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                } else if req.to_ascii_lowercase().contains("range: bytes=") {
+                    if req.contains("Range: bytes=0-0") {
+                        let resp = format!(
+                            "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-0/{}\r\nContent-Length: 1\r\nConnection: close\r\n\r\n{}",
+                            size, data[0] as char
+                        );
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                    } else {
+                        // Chunked response with delay per chunk to allow progress monitoring
+                        let range_start = req
+                            .split("bytes=")
+                            .nth(1)
+                            .and_then(|s| s.split('-').next())
+                            .and_then(|s| s.parse::<u64>().ok())
+                            .unwrap_or(0);
+                        let chunk_size = 65536;
+                        let end = (range_start + chunk_size).min(size as u64);
+                        let chunk_data = &data[range_start as usize..end as usize];
+
+                        // Send headers
+                        let resp = format!(
+                            "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {}-{}/{}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                            range_start, end - 1, size, chunk_data.len()
+                        );
+                        let _ = socket.write_all(resp.as_bytes()).await;
+
+                        // Send data in small pieces with delay to simulate slow transfer
+                        for piece in chunk_data.chunks(8192) {
+                            let _ = socket.write_all(piece).await;
+                            tokio::time::sleep(Duration::from_millis(30)).await;
+                        }
+                    }
+                } else {
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                    let _ = socket.write_all(&data).await;
+                }
+            });
+        }
+    });
+
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let config = EngineConfig {
+        max_connections: 4,
+        chunk_size: 65536,
+        stall_timeout: Duration::from_secs(10),
+        ..Default::default()
+    };
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+    let mut event_rx = engine.take_event_receiver().expect("take event receiver");
+
+    let url = format!("http://{addr}/test_progress_cancel.dat");
+    let task_id = engine.add(&url).await.expect("add task");
+
+    // Spawn download in background
+    let engine_clone = engine.clone();
+    let handle = tokio::spawn(async move { engine_clone.start(task_id).await });
+
+    // Collect progress events and verify monotonicity
+    let mut progress_values = Vec::new();
+    let mut saw_positive_progress = false;
+    let mut cancel_sent = false;
+
+    let deadline = Instant::now() + Duration::from_secs(15);
+    while Instant::now() < deadline {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        match tokio::time::timeout(remaining, event_rx.recv()).await {
+            Ok(Some(ev)) => {
+                match ev.payload {
+                    sayl_core::event::EventPayload::Progress {
+                        downloaded_bytes, ..
+                    } => {
+                        progress_values.push(downloaded_bytes);
+                        if downloaded_bytes > 0 {
+                            saw_positive_progress = true;
+                        }
+                        // Send cancel after seeing some progress - earlier threshold
+                        if saw_positive_progress && !cancel_sent && downloaded_bytes > 10000 {
+                            eprintln!("DEBUG: Sending cancel at {} bytes", downloaded_bytes);
+                            engine.cancel(task_id).await.expect("cancel task");
+                            cancel_sent = true;
+                        }
+                    }
+                    sayl_core::event::EventPayload::StateChanged { to, .. } => {
+                        eprintln!("DEBUG: StateChanged to {:?}", to);
+                        if to == DownloadState::Cancelled {
+                            break;
+                        }
+                        if to == DownloadState::Completed {
+                            // Download completed before we could cancel
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Ok(None) => break,
+            Err(_) => continue,
+        }
+    }
+
+    // Wait for the download task to finish
+    let _ = tokio::time::timeout(Duration::from_secs(5), handle).await;
+
+    // Verify task state is Cancelled
+    let final_task = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        final_task.state,
+        DownloadState::Cancelled,
+        "cancel must leave state Cancelled, got {:?}",
+        final_task.state
+    );
+
+    // Verify progress monotonicity: downloaded_bytes must never decrease
+    assert!(
+        saw_positive_progress,
+        "expected to see positive progress before cancel"
+    );
+    assert!(cancel_sent, "cancel should have been sent during download");
+    for i in 1..progress_values.len() {
+        assert!(
+            progress_values[i] >= progress_values[i - 1],
+            "progress must be monotonic: index {} = {} < previous {}",
+            i,
+            progress_values[i],
+            progress_values[i - 1]
+        );
+    }
+
+    // Verify no Completed event was emitted
+    let mut completed_emitted = false;
+    while let Ok(ev) = event_rx.try_recv() {
+        if let sayl_core::event::EventPayload::StateChanged { to, .. } = ev.payload {
+            if to == DownloadState::Completed {
+                completed_emitted = true;
+            }
+        }
+    }
+    assert!(
+        !completed_emitted,
+        "Completed event must NOT be emitted on cancel"
+    );
+
+    // Verify .part file exists with partial content (for resume capability)
+    let part_path = dl_dir.path().join(format!("{}.part", final_task.filename));
+    assert!(part_path.exists(), ".part file must be preserved on cancel");
+    // Note: For parallel downloads, .part is preallocated to full size via set_len(),
+    // so we check the checkpoint written bytes instead of file length.
+    let part_len = tokio::fs::metadata(&part_path).await.unwrap().len();
+    assert_eq!(
+        part_len, size as u64,
+        ".part file is preallocated to full size in parallel downloads"
+    );
+
+    // Verify checkpoint exists with partial progress
+    let cp = engine
+        .load_checkpoint(task_id)
+        .unwrap()
+        .expect("checkpoint must exist after cancel");
+    assert!(
+        cp.written < size as u64,
+        "checkpoint must record partial progress, got {} of {}",
+        cp.written,
+        size
+    );
+    assert!(cp.written > 0, "checkpoint must record some progress");
+}

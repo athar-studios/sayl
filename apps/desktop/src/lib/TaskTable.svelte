@@ -909,6 +909,22 @@
     background: var(--color-danger);
   }
 
+  /* RTL: progress fill grows from right */
+  :global([dir="rtl"]) .cell-progress-bar .cell-progress-fill {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    left: auto;
+    border-radius: 0 3px 3px 0;
+  }
+  :global([dir="rtl"]) .cell-progress-bar .cell-progress-fill.paused-fill {
+    border-radius: 0 3px 3px 0;
+  }
+  :global([dir="rtl"]) .cell-progress-bar .cell-progress-fill.failed-fill {
+    border-radius: 0 3px 3px 0;
+  }
+
   .cell-progress-text {
     display: inline-flex;
     align-items: center;

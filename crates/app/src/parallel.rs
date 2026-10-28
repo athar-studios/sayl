@@ -228,29 +228,34 @@ pub async fn run_parallel_download_with_options(
     let monitor_handle = tokio::spawn(async move {
         let store_monitor = store_for_monitor.clone();
         let mut interval = tokio::time::interval(Duration::from_millis(500)); // Save checkpoint every 500ms
+        let mut last_emitted_bytes = 0u64;
         loop {
             interval.tick().await;
             if cancel_token_clone.is_cancelled() || pause_token_clone.is_cancelled() {
                 break;
             }
             let current = total_dl_clone.load(Ordering::Relaxed).min(total_size);
-            let elapsed = start_time.elapsed().as_secs_f64();
-            let speed = if elapsed > 0.0 {
-                (current as f64 / elapsed) as u64
-            } else {
-                0
-            };
-            let _ = event_sender_clone
-                .emit(
-                    task_id,
-                    EventKind::Progress,
-                    EventPayload::Progress {
-                        downloaded_bytes: current,
-                        total_bytes: Some(total_size),
-                        speed_bps: speed,
-                    },
-                )
-                .await;
+            // Only emit Progress if monotonically non-decreasing to prevent backwards jumps
+            if current >= last_emitted_bytes {
+                let elapsed = start_time.elapsed().as_secs_f64();
+                let speed = if elapsed > 0.0 {
+                    (current as f64 / elapsed) as u64
+                } else {
+                    0
+                };
+                let _ = event_sender_clone
+                    .emit(
+                        task_id,
+                        EventKind::Progress,
+                        EventPayload::Progress {
+                            downloaded_bytes: current,
+                            total_bytes: Some(total_size),
+                            speed_bps: speed,
+                        },
+                    )
+                    .await;
+                last_emitted_bytes = current;
+            }
 
             // Save checkpoint periodically
             let ranges = {
