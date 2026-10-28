@@ -180,22 +180,16 @@
 
   .context-menu-popup {
     position: fixed;
-    background: #ffffff;
-    border: 1px solid #c9c9c9;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    color: var(--text);
     border-radius: 4px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--shadow-md);
     width: 220px;
     padding: 3px 0;
     font-size: 12.5px;
     z-index: 500;
     user-select: none;
-  }
-
-  :global([data-theme="dark"]) .context-menu-popup {
-    background: #0b1a4e;
-    border-color: #1e3a8a;
-    color: #f1f5f9;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   }
 
   .ctx-item {
@@ -213,13 +207,8 @@
   }
 
   .ctx-item:hover:not(:disabled) {
-    background: #eef2ff;
-    color: #0b1a4e;
-  }
-
-  :global([data-theme="dark"]) .ctx-item:hover:not(:disabled) {
-    background: #162b6e;
-    color: #ffffff;
+    background: var(--color-bg-card-hover);
+    color: var(--accent);
   }
 
   .ctx-label {
@@ -228,11 +217,7 @@
 
   .ctx-sep {
     height: 1px;
-    background: #e5e7eb;
+    background: var(--color-border);
     margin: 3px 0;
-  }
-
-  :global([data-theme="dark"]) .ctx-sep {
-    background: #1e3a8a;
   }
 </style>

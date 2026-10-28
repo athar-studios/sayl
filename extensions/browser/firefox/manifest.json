@@ -11,12 +11,20 @@
     }
   },
   "permissions": [
+    "downloads",
+    "cookies",
+    "storage",
     "nativeMessaging",
     "contextMenus",
     "notifications"
   ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
   "background": {
     "scripts": [
+      "rules.js",
       "background.js"
     ]
   },

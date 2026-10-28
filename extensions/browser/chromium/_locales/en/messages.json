@@ -1,74 +1,38 @@
 {
   "extension_name": {
-    "message": "SAYL Download Manager — سيل",
+    "message": "Sayl",
     "description": "Extension name as shown in the browser"
   },
   "extension_description": {
-    "message": "Send downloads to SAYL (سيل). When SAYL is not running the browser keeps downloading as usual.",
+    "message": "Send downloads to Sayl. When Sayl is not running the browser keeps downloading as usual.",
     "description": "Extension description as shown in the browser"
   },
   "context_menu_download": {
-    "message": "Download with SAYL",
+    "message": "Download with Sayl",
     "description": "Right-click menu item on links (English UI)"
   },
   "action_title": {
-    "message": "SAYL Download Manager",
+    "message": "Sayl",
     "description": "Tooltip of the toolbar button"
   },
   "notify_accepted_title": {
     "message": "Download accepted",
-    "description": "Notification title when SAYL takes over a download"
-  },
-  "notify_fallback_title": {
-    "message": "SAYL is not running",
-    "description": "Notification title when the browser keeps the download"
-  },
-  "notify_fallback_body": {
-    "message": "The browser is downloading the file instead.",
-    "description": "Notification body when the browser keeps the download"
+    "description": "Notification title when Sayl takes over a download"
   },
   "notify_error_title": {
-    "message": "Could not reach SAYL",
+    "message": "Could not reach Sayl",
     "description": "Notification title for host errors"
   },
-  "status_checking": {
-    "message": "Checking connection...",
-    "description": "Status text while checking connection"
-  },
   "status_connected": {
-    "message": "SAYL connected and ready",
-    "description": "Status text when app is connected successfully"
+    "message": "Connected",
+    "description": "Status word when Sayl is connected"
+  },
+  "status_not_installed": {
+    "message": "Not installed",
+    "description": "Status word when Sayl cannot be reached"
   },
   "status_app_disconnected": {
-    "message": "App not connected",
-    "description": "Status text when host is reachable but app is disconnected"
-  },
-  "status_host_disconnected": {
-    "message": "Native host not connected",
-    "description": "Status text when native host cannot be reached"
-  },
-  "btn_test": {
-    "message": "Test",
-    "description": "Test connection button label"
-  },
-  "settings_title": {
-    "message": "Settings",
-    "description": "Settings section title"
-  },
-  "setting_enabled": {
-    "message": "Enable auto-interception",
-    "description": "Toggle to enable download interception"
-  },
-  "setting_min_size": {
-    "message": "Minimum size (MB)",
-    "description": "Minimum file size threshold in megabytes"
-  },
-  "setting_extensions": {
-    "message": "Intercepted file extensions",
-    "description": "List of intercepted file extensions"
-  },
-  "setting_saved": {
-    "message": "Saved",
-    "description": "Confirmation message that settings were saved"
+    "message": "Not connected",
+    "description": "Status word when Sayl is not running"
   }
 }

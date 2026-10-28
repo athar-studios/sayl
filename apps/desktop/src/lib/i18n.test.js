@@ -1,10 +1,31 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { get } from "svelte/store";
 import { currentLang, setLanguage, toggleLanguage, resolveTranslation } from "./i18n.js";
+import ar from "../i18n/ar.js";
+import en from "../i18n/en.js";
+
+function getLeafKeys(obj, prefix = "") {
+  let keys = [];
+  for (const [k, v] of Object.entries(obj)) {
+    const full = prefix ? `${prefix}.${k}` : k;
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      keys.push(...getLeafKeys(v, full));
+    } else {
+      keys.push(full);
+    }
+  }
+  return keys.sort();
+}
 
 describe("i18n module", () => {
   beforeEach(() => {
     setLanguage("ar");
+  });
+
+  it("maintains exact key parity between Arabic and English dictionaries", () => {
+    const arKeys = getLeafKeys(ar);
+    const enKeys = getLeafKeys(en);
+    expect(arKeys).toEqual(enKeys);
   });
 
   it("defaults to Arabic language", () => {

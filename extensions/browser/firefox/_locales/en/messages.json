@@ -1,10 +1,10 @@
 {
   "extension_name": {
-    "message": "SAYL Download Manager — سيل",
+    "message": "Sayl",
     "description": "Extension name as shown in the browser"
   },
   "extension_description": {
-    "message": "Send downloads to SAYL (سيل). When SAYL is not running the browser keeps downloading as usual.",
+    "message": "Send downloads to Sayl. When Sayl is not running the browser keeps downloading as usual.",
     "description": "Extension description as shown in the browser"
   },
   "context_menu_download": {
@@ -12,23 +12,27 @@
     "description": "Right-click menu item on links (English UI)"
   },
   "action_title": {
-    "message": "SAYL Download Manager",
+    "message": "Sayl",
     "description": "Tooltip of the toolbar button"
   },
   "notify_accepted_title": {
     "message": "Download accepted",
-    "description": "Notification title when SAYL takes over a download"
-  },
-  "notify_fallback_title": {
-    "message": "SAYL is not running",
-    "description": "Notification title when the browser keeps the download"
-  },
-  "notify_fallback_body": {
-    "message": "The browser is downloading the file instead.",
-    "description": "Notification body when the browser keeps the download"
+    "description": "Notification title when Sayl takes over a download"
   },
   "notify_error_title": {
-    "message": "Could not reach SAYL",
+    "message": "Could not reach Sayl",
     "description": "Notification title for host errors"
+  },
+  "status_connected": {
+    "message": "Connected",
+    "description": "Status word when Sayl is connected"
+  },
+  "status_not_installed": {
+    "message": "Not installed",
+    "description": "Status word when Sayl cannot be reached"
+  },
+  "status_app_disconnected": {
+    "message": "Not connected",
+    "description": "Status word when Sayl is not running"
   }
 }

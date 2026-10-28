@@ -41,6 +41,12 @@ describe("extensionGuide.js", () => {
     expect(status.statusKey).not.toBe("extension.statusConnected");
   });
 
+  it("maps unresolved failed ping without message to pending without returnInstruction", () => {
+    const status = mapPingResultToStatus({ ok: false, message: "" });
+    expect(status.variant).toBe("pending");
+    expect(status.statusKey).toBeNull();
+  });
+
   it("uses checking key while ping is unresolved", () => {
     const status = mapPingResultToStatus(null);
     expect(status.variant).toBe("checking");

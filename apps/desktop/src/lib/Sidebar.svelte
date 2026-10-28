@@ -267,8 +267,8 @@
 <style>
   .sidebar-tree {
     width: 230px;
-    background: #fafafb;
-    border-inline-end: 1px solid #dcdcdc;
+    background: var(--color-bg-subtle);
+    border-inline-end: 1px solid var(--color-border);
     display: flex;
     flex-direction: column;
     overflow-y: auto;
@@ -277,12 +277,6 @@
     -webkit-user-select: none;
     flex-shrink: 0;
     padding: 6px 0;
-  }
-
-  :global([data-theme="dark"]) .sidebar-tree {
-    background: #09143c;
-    border-inline-end-color: #162b6e;
-    color: #e2e8f0;
   }
 
   .sidebar-tree.collapsed {
@@ -295,48 +289,30 @@
     padding: 5px 12px;
     gap: 7px;
     cursor: default;
-    color: #2b3340;
+    color: var(--text);
     border-inline-start: 3px solid transparent;
     transition: background-color 0.1s;
     height: 28px;
   }
 
-  :global([data-theme="dark"]) .tree-node {
-    color: #cbd5e1;
-  }
-
   .tree-node:hover {
-    background: #f0f2f5;
-  }
-
-  :global([data-theme="dark"]) .tree-node:hover {
-    background: #142866;
-    color: #ffffff;
+    background: var(--color-bg-card-hover);
+    color: var(--text);
   }
 
   .tree-node.active {
-    background: #e6f8f8;
-    color: #0b1a4e;
+    background: var(--color-accent-light);
+    color: var(--accent);
     font-weight: 600;
-    border-inline-start-color: #00b6bd;
-  }
-
-  :global([data-theme="dark"]) .tree-node.active {
-    background: rgba(0, 182, 189, 0.22);
-    color: #ffffff;
-    border-inline-start-color: #00b6bd;
+    border-inline-start-color: var(--accent);
   }
 
   .tree-root {
     font-weight: 600;
     margin-bottom: 4px;
-    border-bottom: 1px solid #f0f0f2;
+    border-bottom: 1px solid var(--color-border-subtle);
     padding-bottom: 8px;
     height: 32px;
-  }
-
-  :global([data-theme="dark"]) .tree-root {
-    border-bottom-color: #162b6e;
   }
 
   .tree-branch {
@@ -349,20 +325,16 @@
     padding: 6px 10px 4px 10px;
     font-size: 11px;
     font-weight: 700;
-    color: #6b7280;
+    color: var(--text-subtle);
     letter-spacing: 0.02em;
     cursor: default;
     gap: 6px;
   }
 
-  :global([data-theme="dark"]) .tree-section-header {
-    color: #94a3b8;
-  }
-
   .branch-arrow {
     font-size: 8px;
     width: 10px;
-    color: #9ca3af;
+    color: var(--text-subtle);
     display: inline-block;
   }
 
@@ -381,15 +353,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #6b7280;
-  }
-
-  :global([data-theme="dark"]) .node-icon {
-    color: #94a3b8;
+    color: var(--text-subtle);
   }
 
   .root-icon {
-    color: #008f95;
+    color: var(--accent);
   }
 
   .status-icon-incomplete {
@@ -425,7 +393,7 @@
   }
 
   .cat-icon-other {
-    color: #6b7280;
+    color: var(--text-subtle);
   }
 
   .node-title {
@@ -438,26 +406,16 @@
   .node-badge {
     font-size: 11px;
     font-weight: 600;
-    color: #6b7280;
-    background: #eef0f4;
+    color: var(--text-subtle);
+    background: var(--color-bg-card);
     padding: 1px 6px;
     border-radius: 10px;
     min-width: 18px;
     text-align: center;
   }
 
-  :global([data-theme="dark"]) .node-badge {
-    background: #142866;
-    color: #cbd5e1;
-  }
-
   .tree-node.active .node-badge {
-    background: rgba(0, 182, 189, 0.22);
-    color: #0b1a4e;
-  }
-
-  :global([data-theme="dark"]) .tree-node.active .node-badge {
-    background: rgba(0, 182, 189, 0.4);
-    color: #ffffff;
+    background: var(--color-accent-light);
+    color: var(--accent);
   }
 </style>

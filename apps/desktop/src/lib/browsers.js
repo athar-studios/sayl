@@ -70,8 +70,13 @@ export function getBrowserAction(browserId, storeUrls = {}) {
 /**
  * Maps per-browser status flags to localization keys and badge levels.
  *
- * @param {{ installed?: boolean, host_registered?: boolean, connected?: boolean } | null | undefined} browser
- * @returns {{ key: string, textKey: string, level: 'success' | 'warning' | 'muted' }}
+ * Three states:
+ * - connected (level: 'success')
+ * - not installed (level: 'muted')
+ * - not connected (level: 'warning')
+ *
+ * @param {{ installed?: boolean, connected?: boolean } | null | undefined} browser
+ * @returns {{ key: 'connected' | 'not_installed' | 'not_connected', textKey: string, level: 'success' | 'warning' | 'muted' }}
  */
 export function getBrowserStatusInfo(browser) {
   if (!browser || !browser.installed) {
@@ -90,29 +95,26 @@ export function getBrowserStatusInfo(browser) {
     };
   }
 
-  if (browser.host_registered) {
-    return {
-      key: "registered",
-      textKey: "extension.statusRegistered",
-      level: "warning",
-    };
-  }
-
   return {
-    key: "unregistered",
-    textKey: "extension.statusUnregistered",
-    level: "muted",
+    key: "not_connected",
+    textKey: "extension.statusNotInstalled",
+    level: "warning",
   };
 }
 
 /**
  * Determines overall native-host bridge status across all detected browsers.
  *
- * @param {object|null} nativeStatus
+ * Three states:
+ * - connected (level: 'success'): at least one browser is connected
+ * - not connected (level: 'warning'): at least one browser is installed but none is connected
+ * - not installed (level: 'muted'): no supported browser is installed
+ *
+ * @param {object|null} _nativeStatus
  * @param {Array<object>} browserList
- * @returns {{ key: string, textKey: string, level: 'success' | 'warning' | 'muted' }}
+ * @returns {{ key: 'connected' | 'not_connected' | 'not_installed', textKey: string, level: 'success' | 'warning' | 'muted' }}
  */
-export function getHostStatusSummary(nativeStatus, browserList = []) {
+export function getHostStatusSummary(_nativeStatus, browserList = []) {
   const list = Array.isArray(browserList) ? browserList : [];
 
   if (list.some((b) => b && b.connected)) {
@@ -123,14 +125,10 @@ export function getHostStatusSummary(nativeStatus, browserList = []) {
     };
   }
 
-  const anyHostRegistered =
-    list.some((b) => b && b.host_registered) ||
-    (nativeStatus?.registered && Object.values(nativeStatus.registered).some(Boolean));
-
-  if (anyHostRegistered) {
+  if (list.some((b) => b && b.installed)) {
     return {
-      key: "registered",
-      textKey: "extension.hostRegistered",
+      key: "not_connected",
+      textKey: "extension.hostNotInstalled",
       level: "warning",
     };
   }

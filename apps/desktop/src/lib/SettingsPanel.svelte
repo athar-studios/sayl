@@ -3,14 +3,7 @@
   import { safeInvoke } from "./tauri.js";
   import { DEFAULT_SETTINGS, normalizeSettings, SETTINGS_SECTIONS } from "./settings.js";
   import iconSvg from "../assets/icon.svg";
-  import {
-    SUPPORTED_BROWSERS,
-    BROWSER_ICONS,
-    getBrowserAction,
-    getBrowserStatusInfo,
-    getHostStatusSummary,
-    hasInstalledBrowsers,
-  } from "./browsers.js";
+  import { BROWSER_ICONS, hasInstalledBrowsers } from "./browsers.js";
   import ExtensionGuideDialog from "./ExtensionGuideDialog.svelte";
   import { createEventDispatcher } from "svelte";
 
@@ -28,14 +21,11 @@
 
   // Browser extension section state
   let loadingExtensionState = false;
-  let nativeHostStatus = null;
   let browserList = [];
-  let testResult = null;
-  let testingHost = false;
   let extensionGuideOpen = false;
   let guideBrowser = null;
   let stagedExtensionDir = "";
-  let extensionDiagnostics = null;
+  let copiedDiagnostic = false;
 
   const sections = SETTINGS_SECTIONS;
 
@@ -63,24 +53,21 @@
     }
   }
 
-  $: hostSummary = getHostStatusSummary(nativeHostStatus, browserList);
   $: hasBrowsers = hasInstalledBrowsers(browserList);
+  $: isConnected =
+    Array.isArray(browserList) && browserList.some((b) => b && b.installed && b.connected);
 
   async function loadExtensionStatus() {
     if (loadingExtensionState) return;
     loadingExtensionState = true;
     try {
-      const [nhRes, bRes, diagRes] = await Promise.allSettled([
+      const [nhRes, bRes] = await Promise.allSettled([
         safeInvoke("native_host_status"),
         safeInvoke("browser_status"),
-        safeInvoke("extension_diagnostics"),
       ]);
 
-      if (nhRes.status === "fulfilled" && nhRes.value) {
-        nativeHostStatus = nhRes.value;
-        if (nhRes.value.extension_dir) {
-          stagedExtensionDir = nhRes.value.extension_dir;
-        }
+      if (nhRes.status === "fulfilled" && nhRes.value && nhRes.value.extension_dir) {
+        stagedExtensionDir = nhRes.value.extension_dir;
       }
 
       if (bRes.status === "fulfilled" && Array.isArray(bRes.value)) {
@@ -88,49 +75,48 @@
       } else {
         browserList = [];
       }
-
-      if (diagRes.status === "fulfilled" && diagRes.value) {
-        extensionDiagnostics = diagRes.value;
-      } else {
-        extensionDiagnostics = null;
-      }
     } catch {
       browserList = [];
-      extensionDiagnostics = null;
     } finally {
       loadingExtensionState = false;
     }
   }
 
-  async function handleTestHost() {
-    testingHost = true;
-    testResult = null;
+  async function handleCopyDiagnosticReport() {
     try {
-      const res = await safeInvoke("test_native_host");
-      testResult = res || { ok: true, roundtrip_ms: 0, message: "OK" };
-    } catch (err) {
-      testResult = {
-        ok: false,
-        roundtrip_ms: 0,
-        message: typeof err === "string" ? err : err?.message || String(err),
-      };
-    } finally {
-      testingHost = false;
+      const browsers = Array.isArray(browserList) ? browserList : [];
+      const lines = [
+        $t("extension.reportHeader"),
+        `${$t("extension.reportDate")}: ${new Date().toLocaleString()}`,
+        `${$t("extension.reportAppVersion")}: 0.1.0`,
+        `${$t("extension.reportExtensionFolder")}: ${stagedExtensionDir || "—"}`,
+        `${$t("extension.reportStatus")}: ${
+          isConnected ? $t("extension.connectedStatus") : $t("extension.notInstalledStatus")
+        }`,
+        `${$t("extension.reportBrowsers")}: ${
+          browsers.length
+            ? browsers
+                .map((b) => `${b.name || b.id} (${b.installed ? $t("extension.reportInstalled") : $t("extension.reportNotInstalled")})`)
+                .join("، ")
+            : $t("extension.reportNoBrowsers")
+        }`,
+      ];
+      const text = lines.join("\n");
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(text);
+      }
+      copiedDiagnostic = true;
+      setTimeout(() => {
+        copiedDiagnostic = false;
+      }, 3000);
+    } catch (e) {
+      console.warn("Failed to copy support report:", e);
     }
   }
 
   function handleActivateBrowser(browser) {
-    const action = getBrowserAction(browser.id);
-    if (action.type === "store") {
-      if (action.available && action.url) {
-        if (typeof window !== "undefined") {
-          window.open(action.url, "_blank");
-        }
-      }
-    } else {
-      guideBrowser = browser;
-      extensionGuideOpen = true;
-    }
+    guideBrowser = browser;
+    extensionGuideOpen = true;
   }
 
   async function handleBrowseFolder() {
@@ -627,125 +613,39 @@
               <h4 id="section-heading" class="section-heading">{$t("extension.title")}</h4>
               <p class="section-intro">{$t("extension.desc")}</p>
 
-              <!-- Native Host Status Line & Test Action -->
+              <!-- Single Status Line -->
               <div class="host-status-box">
                 <div class="host-status-left">
-                  <span class="status-dot {hostSummary.level}"></span>
+                  <span class="status-dot {isConnected ? 'success' : 'muted'}"></span>
                   <div class="host-status-text">
-                    <strong class="host-title">{$t("extension.hostStatus")}</strong>
-                    <span class="host-badge {hostSummary.level}">{$t(hostSummary.textKey)}</span>
-                  </div>
-                </div>
-
-                <div class="host-actions">
-                  <button
-                    type="button"
-                    class="btn btn-secondary btn-sm"
-                    disabled={testingHost}
-                    on:click={handleTestHost}
-                  >
-                    {#if testingHost}
-                      <span>{$t("extension.testingConnection")}</span>
+                    {#if isConnected}
+                      <span class="status-text-bold">{$t("extension.connectedStatus")}</span>
                     {:else}
-                      <span>{$t("extension.testConnection")}</span>
+                      <span class="status-text-bold">{$t("extension.notInstalledStatus")}</span>
                     {/if}
-                  </button>
-
-                  <button
-                    type="button"
-                    class="btn btn-secondary btn-sm"
-                    disabled={loadingExtensionState}
-                    on:click={loadExtensionStatus}
-                    title={$t("extension.refresh")}
-                  >
-                    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" aria-hidden="true">
-                      <path
-                        fill-rule="evenodd"
-                        d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
-                        clip-rule="evenodd"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              <!-- Test Native Host Result Feedback -->
-              {#if testResult}
-                <div class="test-feedback-bar" class:success={testResult.ok} class:error={!testResult.ok}>
-                  {#if testResult.ok}
-                    <span>{$t("extension.testOk").replace("{ms}", testResult.roundtrip_ms ?? 0)}</span>
-                  {:else}
-                    <span>{$t("extension.testFailed").replace("{msg}", testResult.message || "")}</span>
-                  {/if}
-                </div>
-              {/if}
-
-              {#if extensionDiagnostics}
-                <div class="capture-diagnostics-box">
-                  <h5 class="diag-title">{$t("extension.diagTitle")}</h5>
-                  <dl class="diag-meta">
-                    <div class="diag-row">
-                      <dt>{$t("extension.diagExtensionVersion")}</dt>
-                      <dd dir="ltr">{extensionDiagnostics.extension_version || $t("extension.diagNone")}</dd>
-                    </div>
-                    <div class="diag-row">
-                      <dt>{$t("extension.diagExtensionPath")}</dt>
-                      <dd dir="ltr" class="diag-path">{extensionDiagnostics.extension_path}</dd>
-                    </div>
-                    <div class="diag-row">
-                      <dt>{$t("extension.diagBridgePing")}</dt>
-                      <dd>
-                        {#if extensionDiagnostics.bridge_ping_reached}
-                          <span class="diag-ok">{$t("extension.diagBridgeReached")}</span>
-                        {:else}
-                          <span class="diag-warn">{$t("extension.diagBridgeNotReached")}</span>
-                        {/if}
-                      </dd>
-                    </div>
-                    <div class="diag-row">
-                      <dt>{$t("extension.diagLastCapture")}</dt>
-                      <dd dir="ltr">
-                        {extensionDiagnostics.last_capture_event || $t("extension.diagNone")}
-                        {#if extensionDiagnostics.last_capture_time}
-                          <small>({extensionDiagnostics.last_capture_time})</small>
-                        {/if}
-                      </dd>
-                    </div>
-                    <div class="diag-row">
-                      <dt>{$t("extension.diagLastError")}</dt>
-                      <dd dir="ltr">
-                        {extensionDiagnostics.last_error_event || $t("extension.diagNone")}
-                        {#if extensionDiagnostics.last_error_time}
-                          <small>({extensionDiagnostics.last_error_time})</small>
-                        {/if}
-                      </dd>
-                    </div>
-                  </dl>
-
-                  <div class="diag-browsers">
-                    {#each extensionDiagnostics.browsers as row (row.id)}
-                      <div class="diag-browser-row">
-                        <strong>{row.name}</strong>
-                        <span>
-                          {$t("extension.diagInstalled")}:
-                          {row.installed ? $t("extension.diagHostKeyYes") : $t("extension.diagHostKeyNo")}
-                        </span>
-                        <span>
-                          {$t("extension.diagHostKey")}:
-                          {row.host_key_present ? $t("extension.diagHostKeyYes") : $t("extension.diagHostKeyNo")}
-                        </span>
-                      </div>
-                    {/each}
                   </div>
                 </div>
-              {/if}
+
+                {#if !isConnected}
+                  <div class="host-actions">
+                    <button
+                      type="button"
+                      class="btn btn-primary btn-sm"
+                      on:click={() => {
+                        guideBrowser = browserList.find((b) => b && b.installed) || null;
+                        extensionGuideOpen = true;
+                      }}
+                    >
+                      {$t("extension.installButton")}
+                    </button>
+                  </div>
+                {/if}
+              </div>
 
               <!-- Browsers List -->
               <div class="browsers-list">
                 {#if hasBrowsers}
                   {#each browserList.filter((b) => b && b.installed) as browser (browser.id)}
-                    {@const statusInfo = getBrowserStatusInfo(browser)}
-                    {@const action = getBrowserAction(browser.id)}
                     <div class="browser-row">
                       <div class="browser-meta">
                         <div class="browser-icon" aria-hidden="true">
@@ -759,41 +659,17 @@
                         </div>
                         <div class="browser-names">
                           <strong class="browser-name">{browser.name || browser.id}</strong>
-                          <span class="browser-status-badge {statusInfo.level}">
-                            {$t(statusInfo.textKey)}
-                          </span>
                         </div>
                       </div>
 
                       <div class="browser-action-col">
-                        {#if action.type === "store"}
-                          {#if action.available}
-                            <button
-                              type="button"
-                              class="btn btn-primary btn-sm"
-                              on:click={() => handleActivateBrowser(browser)}
-                            >
-                              {$t("extension.activate")}
-                            </button>
-                          {:else}
-                            <button
-                              type="button"
-                              class="btn btn-secondary btn-sm"
-                              disabled
-                              title={$t("extension.storeUnavailable")}
-                            >
-                              {$t("extension.storeUnavailable")}
-                            </button>
-                          {/if}
-                        {:else}
-                          <button
-                            type="button"
-                            class="btn btn-primary btn-sm"
-                            on:click={() => handleActivateBrowser(browser)}
-                          >
-                            {$t("extension.activate")}
-                          </button>
-                        {/if}
+                        <button
+                          type="button"
+                          class="btn btn-primary btn-sm"
+                          on:click={() => handleActivateBrowser(browser)}
+                        >
+                          {$t("extension.activate")}
+                        </button>
                       </div>
                     </div>
                   {/each}
@@ -807,11 +683,23 @@
                     </svg>
                     <strong class="empty-title">{$t("extension.noBrowsersFound")}</strong>
                     <p class="empty-desc">{$t("extension.noBrowsersDesc")}</p>
-                    <button type="button" class="btn btn-secondary btn-sm" on:click={loadExtensionStatus}>
-                      {$t("extension.refresh")}
-                    </button>
                   </div>
                 {/if}
+              </div>
+
+              <!-- Hidden diagnostics: small link at the bottom -->
+              <div class="diagnostics-copy-row">
+                <button
+                  type="button"
+                  class="link-btn-copy-diag"
+                  on:click={handleCopyDiagnosticReport}
+                >
+                  {#if copiedDiagnostic}
+                    <span>{$t("extension.reportCopied")}</span>
+                  {:else}
+                    <span>{$t("extension.copyReport")}</span>
+                  {/if}
+                </button>
               </div>
             </div>
 
@@ -965,7 +853,7 @@
   .modal-title {
     font-size: 1.15rem;
     font-weight: 700;
-    color: var(--color-text);
+    color: var(--text);
     margin: 0;
   }
 
@@ -974,7 +862,7 @@
     height: 2.25rem;
     min-width: 2.25rem;
     min-height: 2.25rem;
-    color: var(--color-text-muted);
+    color: var(--text-muted);
     border-radius: var(--radius-sm);
     display: inline-flex;
     align-items: center;
@@ -989,8 +877,8 @@
   }
 
   .close-btn:hover {
-    background: var(--color-bg-hover, rgba(0, 0, 0, 0.05));
-    color: var(--color-text);
+    background: var(--color-bg-card-hover);
+    color: var(--text);
   }
 
   .settings-layout {
@@ -1002,7 +890,7 @@
   .settings-nav {
     width: 200px;
     border-inline-end: 1px solid var(--color-border);
-    background: var(--color-bg-subtle, rgba(0, 0, 0, 0.08));
+    background: var(--color-bg-subtle);
     display: flex;
     flex-direction: column;
     padding: 0.5rem;
@@ -1020,7 +908,7 @@
     border-radius: var(--radius-sm);
     border: none;
     background: transparent;
-    color: var(--color-text-muted);
+    color: var(--text-muted);
     font-size: 0.88rem;
     font-weight: 600;
     cursor: pointer;
@@ -1036,12 +924,12 @@
   }
 
   .nav-tab-btn:hover {
-    background: var(--color-bg-hover);
-    color: var(--color-text);
+    background: var(--color-bg-card-hover);
+    color: var(--text);
   }
 
   .nav-tab-btn.active {
-    background: #01b2bb;
+    background: var(--accent);
     color: #ffffff;
   }
 
@@ -1060,7 +948,7 @@
   .section-heading {
     font-size: 1.1rem;
     font-weight: 700;
-    color: var(--color-text);
+    color: var(--text);
     margin: 0;
     padding-bottom: 0.5rem;
     border-bottom: 1px solid var(--color-border);
@@ -1068,7 +956,7 @@
 
   .section-intro {
     font-size: 0.88rem;
-    color: var(--color-text-muted);
+    color: var(--text-muted);
     margin: 0;
   }
 
@@ -1078,7 +966,7 @@
     justify-content: space-between;
     gap: 1.5rem;
     padding-bottom: 1rem;
-    border-bottom: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.05));
+    border-bottom: 1px solid var(--color-border-subtle);
   }
 
   .setting-row.stacked {
@@ -1096,14 +984,14 @@
     display: block;
     font-size: 0.92rem;
     font-weight: 600;
-    color: var(--color-text);
+    color: var(--text);
     margin-bottom: 0.2rem;
   }
 
   .setting-desc {
     font-size: 0.82rem;
     line-height: 1.45;
-    color: var(--color-text-muted);
+    color: var(--text-muted);
     margin: 0;
   }
 
@@ -1116,10 +1004,10 @@
   }
 
   .form-control {
-    background-color: var(--color-bg-input, rgba(0, 0, 0, 0.2));
+    background-color: var(--color-bg-input);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
-    color: var(--color-text);
+    color: var(--text);
     padding: 0.45rem 0.75rem;
     font-size: 0.88rem;
     min-width: 160px;
@@ -1158,7 +1046,7 @@
   .switch-slider {
     position: absolute;
     inset: 0;
-    background-color: var(--color-border, #334155);
+    background-color: var(--color-border);
     border-radius: 24px;
     transition: 0.2s;
   }
@@ -1176,7 +1064,7 @@
   }
 
   .switch-toggle input:checked + .switch-slider {
-    background-color: #01b2bb;
+    background-color: var(--accent);
   }
 
   .switch-toggle input:checked + .switch-slider:before {
@@ -1189,17 +1077,17 @@
   }
 
   .hint-disabled {
-    color: var(--color-text-muted);
+    color: var(--text-muted);
     font-style: italic;
   }
 
   .setting-info-badge {
-    background: var(--color-bg-hover, rgba(255, 255, 255, 0.07));
+    background: var(--color-bg-subtle);
     border: 1px solid var(--color-border);
     padding: 0.35rem 0.65rem;
     border-radius: var(--radius-sm);
     font-size: 0.8rem;
-    color: var(--color-text-muted);
+    color: var(--text-muted);
   }
 
   /* Categories Grid */
@@ -1214,7 +1102,7 @@
     align-items: center;
     gap: 0.75rem;
     padding: 0.75rem;
-    background: var(--color-bg-card-subtle, rgba(255, 255, 255, 0.03));
+    background: var(--color-bg-card);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
   }
@@ -1226,11 +1114,11 @@
   .cat-info strong {
     display: block;
     font-size: 0.85rem;
-    color: var(--color-text);
+    color: var(--text);
   }
 
   .cat-info small {
-    color: var(--color-text-muted);
+    color: var(--text-muted);
     font-size: 0.75rem;
   }
 
@@ -1239,7 +1127,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: var(--color-bg-card-subtle, rgba(255, 255, 255, 0.03));
+    background: var(--color-bg-subtle);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     padding: 0.75rem 1rem;
@@ -1263,140 +1151,24 @@
     box-shadow: 0 0 6px #10b981;
   }
 
-  .status-dot.warning {
-    background: #f59e0b;
-  }
-
   .status-dot.muted {
-    background: #64748b;
+    background: var(--color-text-subtle);
   }
 
   .host-status-text {
     display: flex;
-    flex-direction: column;
+    align-items: center;
   }
 
-  .host-title {
-    font-size: 0.88rem;
-    color: var(--color-text);
-  }
-
-  .host-badge {
-    font-size: 0.78rem;
-    font-weight: 600;
-  }
-
-  .host-badge.success {
-    color: #10b981;
-  }
-
-  .host-badge.warning {
-    color: #f59e0b;
-  }
-
-  .host-badge.muted {
-    color: var(--color-text-muted);
+  .status-text-bold {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text);
   }
 
   .host-actions {
     display: flex;
     gap: 0.5rem;
-  }
-
-  .test-feedback-bar {
-    padding: 0.5rem 0.75rem;
-    border-radius: var(--radius-sm);
-    font-size: 0.82rem;
-    font-weight: 600;
-  }
-
-  .test-feedback-bar.success {
-    background: rgba(16, 185, 129, 0.15);
-    color: #10b981;
-    border: 1px solid rgba(16, 185, 129, 0.3);
-  }
-
-  .test-feedback-bar.error {
-    background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
-    border: 1px solid rgba(239, 68, 68, 0.3);
-  }
-
-  .capture-diagnostics-box {
-    margin: 1rem 0 1.25rem;
-    padding: 1rem 1.1rem;
-    border-radius: 10px;
-    border: 1px solid rgba(0, 182, 189, 0.35);
-    background: linear-gradient(180deg, rgba(0, 182, 189, 0.06), rgba(11, 26, 78, 0.03));
-  }
-
-  .diag-title {
-    margin: 0 0 0.75rem;
-    color: #0b1a4e;
-    font-size: 0.95rem;
-    font-weight: 700;
-  }
-
-  .diag-meta {
-    margin: 0 0 0.75rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.45rem;
-  }
-
-  .diag-row {
-    display: grid;
-    grid-template-columns: minmax(8rem, 38%) 1fr;
-    gap: 0.5rem;
-    font-size: 0.875rem;
-  }
-
-  .diag-row dt {
-    margin: 0;
-    color: #0b1a4e;
-    font-weight: 600;
-  }
-
-  .diag-row dd {
-    margin: 0;
-    color: #334155;
-    word-break: break-word;
-  }
-
-  .diag-path {
-    font-family: ui-monospace, monospace;
-    font-size: 0.8125rem;
-  }
-
-  .diag-ok {
-    color: #0b1a4e;
-    font-weight: 600;
-  }
-
-  .diag-warn {
-    color: #b45309;
-    font-weight: 600;
-  }
-
-  .diag-browsers {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    border-top: 1px solid rgba(11, 26, 78, 0.08);
-    padding-top: 0.65rem;
-  }
-
-  .diag-browser-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    font-size: 0.8125rem;
-    color: #475569;
-  }
-
-  .diag-browser-row strong {
-    color: #0b1a4e;
-    min-width: 6rem;
   }
 
   .browsers-list {
@@ -1409,8 +1181,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.65rem 0.85rem;
-    background: var(--color-bg-card-subtle, rgba(255, 255, 255, 0.03));
+    padding: 0.75rem 1rem;
+    background: var(--color-bg-card);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
   }
@@ -1427,7 +1199,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #00e5ff;
+    color: var(--accent);
   }
 
   .browser-icon :global(svg) {
@@ -1442,23 +1214,31 @@
 
   .browser-name {
     font-size: 0.9rem;
-    color: var(--color-text);
+    color: var(--text);
   }
 
-  .browser-status-badge {
-    font-size: 0.76rem;
+  .diagnostics-copy-row {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--color-border-subtle);
+    display: flex;
+    justify-content: center;
   }
 
-  .browser-status-badge.success {
-    color: #10b981;
+  .link-btn-copy-diag {
+    background: transparent;
+    border: none;
+    color: var(--text-subtle);
+    font-size: 0.8125rem;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0.35rem 0.65rem;
+    border-radius: var(--radius-sm);
+    transition: color 120ms ease;
   }
 
-  .browser-status-badge.warning {
-    color: #f59e0b;
-  }
-
-  .browser-status-badge.muted {
-    color: var(--color-text-muted);
+  .link-btn-copy-diag:hover {
+    color: var(--accent);
   }
 
   .empty-browsers-state {
@@ -1471,20 +1251,20 @@
   }
 
   .empty-browser-icon {
-    color: var(--color-text-muted);
-    opacity: 0.5;
+    color: var(--text-subtle);
+    opacity: 0.7;
   }
 
   .empty-title {
     font-size: 0.95rem;
-    color: var(--color-text);
+    color: var(--text);
   }
 
   .empty-desc {
     font-size: 0.82rem;
-    color: var(--color-text-muted);
+    color: var(--text-muted);
     max-width: 380px;
-    margin: 0 0 0.5rem;
+    margin: 0;
   }
 
   /* About section styles */
@@ -1507,19 +1287,19 @@
   .about-app-name {
     font-size: 1.15rem;
     font-weight: 700;
-    color: var(--color-text);
+    color: var(--text);
     margin: 0;
   }
 
   .about-version {
     font-size: 0.82rem;
     font-weight: 600;
-    color: #00e5ff;
+    color: var(--accent);
   }
 
   .about-desc {
     font-size: 0.85rem;
-    color: var(--color-text-muted);
+    color: var(--text-muted);
     margin: 0.25rem 0 0;
   }
 
@@ -1535,12 +1315,12 @@
 
   .success-banner {
     background: rgba(16, 185, 129, 0.15);
-    color: #10b981;
+    color: var(--color-success);
   }
 
   .error-banner {
     background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
+    color: var(--color-danger);
   }
 
   /* Modal Footer */
@@ -1557,8 +1337,8 @@
   }
 
   .btn-browse {
-    background: var(--color-bg-hover, rgba(255, 255, 255, 0.08));
-    color: var(--color-text);
+    background: var(--color-bg-card);
+    color: var(--text);
     border: 1px solid var(--color-border);
     white-space: nowrap;
     cursor: pointer;
@@ -1566,7 +1346,7 @@
   }
 
   .btn-browse:hover {
-    background: var(--color-bg-card-subtle, rgba(255, 255, 255, 0.14));
+    background: var(--color-bg-card-hover);
   }
 
   .btn {
@@ -1585,22 +1365,42 @@
   }
 
   .btn-primary {
-    background: #01b2bb;
+    background: var(--accent);
     color: #ffffff;
   }
 
   .btn-primary:hover:not(:disabled) {
-    background: #0299a1;
+    background: var(--color-accent-hover);
   }
 
   .btn-secondary {
-    background: var(--color-bg-hover, rgba(255, 255, 255, 0.08));
-    color: var(--color-text);
+    background: var(--color-bg-card);
+    color: var(--text);
     border: 1px solid var(--color-border);
   }
 
   .btn-secondary:hover:not(:disabled) {
-    background: var(--color-bg-card-subtle, rgba(255, 255, 255, 0.14));
+    background: var(--color-bg-card-hover);
+  }
+
+  .diagnostics-copy-row {
+    margin-top: 1rem;
+    text-align: center;
+  }
+
+  .link-btn-copy-diag {
+    background: none;
+    border: none;
+    color: var(--text-subtle);
+    font-size: 0.78rem;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .link-btn-copy-diag:hover {
+    color: var(--accent);
   }
 
   .btn:disabled {

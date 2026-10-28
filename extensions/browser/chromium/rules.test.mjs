@@ -522,4 +522,166 @@ describe("extension guards and download capture pipeline", () => {
     assert.equal(second.intercept, false);
     assert.equal(second.reason, "url_deduped");
   });
+
+  test("20. intercepted => cancel before any other await, suggest not called", async () => {
+    resetUrlDedupeCache();
+    const callOrder = [];
+    let suggestCalled = false;
+    const suggest = () => { suggestCalled = true; };
+
+    const fakeDownloadsApi = {
+      cancel: async (id) => {
+        callOrder.push(`cancel:${id}`);
+      },
+      removeFile: async (id) => {
+        callOrder.push(`removeFile:${id}`);
+      },
+      erase: async ({ id }) => {
+        callOrder.push(`erase:${id}`);
+      },
+      download: async () => {
+        callOrder.push("download");
+      }
+    };
+
+    const fakeSendCapture = async () => {
+      callOrder.push("sendCapture");
+      return { ok: true, response: { task_id: "test-task-1" } };
+    };
+
+    const item = {
+      id: 301,
+      url: "https://example.com/software.exe",
+      filename: "software.exe",
+      totalBytes: 15 * 1024 * 1024
+    };
+
+    // When intercepted, suggest must NOT be called
+    const decision = shouldInterceptDownload({ item, settings: baseSettings });
+    assert.equal(decision.intercept, true);
+    if (!decision.intercept) {
+      suggest({ filename: item.filename });
+    }
+    assert.equal(suggestCalled, false, "suggest must not be called when intercepting");
+
+    const res = await processDownloadCapture({
+      item,
+      settings: baseSettings,
+      downloadsApi: fakeDownloadsApi,
+      sendCaptureFn: fakeSendCapture
+    });
+
+    assert.equal(res.intercept, true);
+    assert.equal(res.cancelled, true);
+    assert.equal(callOrder[0], "cancel:301", "cancel must be the very first operation");
+    assert.equal(callOrder[1], "erase:301", "erase must follow cancel");
+    assert.equal(callOrder[2], "sendCapture", "sendCapture must follow erase");
+  });
+
+  test("21. timeout => no browser re-download", async () => {
+    resetUrlDedupeCache();
+    let downloadCalled = false;
+    const fakeDownloadsApi = {
+      cancel: async () => {},
+      erase: async () => {},
+      download: async () => {
+        downloadCalled = true;
+      }
+    };
+
+    // Host times out after 10s
+    const fakeSendCaptureTimeout = async () => ({
+      ok: false,
+      error: { code: "TIMEOUT", message: "SAYL host timed out after 10s" }
+    });
+
+    const item = {
+      id: 302,
+      url: "https://example.com/large-archive.zip",
+      filename: "large-archive.zip",
+      totalBytes: 50 * 1024 * 1024
+    };
+
+    const res = await processDownloadCapture({
+      item,
+      settings: baseSettings,
+      downloadsApi: fakeDownloadsApi,
+      sendCaptureFn: fakeSendCaptureTimeout
+    });
+
+    assert.equal(res.intercept, true);
+    assert.equal(res.cancelled, true);
+    assert.equal(res.redownloaded, false, "timeout must never trigger browser re-download");
+    assert.equal(downloadCalled, false, "chrome.downloads.download must not be called on timeout");
+  });
+
+  test("22. host error reply => no browser re-download", async () => {
+    resetUrlDedupeCache();
+    let downloadCalled = false;
+    const fakeDownloadsApi = {
+      cancel: async () => {},
+      erase: async () => {},
+      download: async () => {
+        downloadCalled = true;
+      }
+    };
+
+    const fakeSendCaptureError = async () => ({
+      ok: false,
+      error: { code: "HOST_ERROR", message: "User rejected download" }
+    });
+
+    const item = {
+      id: 303,
+      url: "https://example.com/rejected.iso",
+      filename: "rejected.iso",
+      totalBytes: 100 * 1024 * 1024
+    };
+
+    const res = await processDownloadCapture({
+      item,
+      settings: baseSettings,
+      downloadsApi: fakeDownloadsApi,
+      sendCaptureFn: fakeSendCaptureError
+    });
+
+    assert.equal(res.intercept, true);
+    assert.equal(res.redownloaded, false, "host error reply must never trigger browser re-download");
+    assert.equal(downloadCalled, false);
+  });
+
+  test("23. completed item => removeFile before erase", async () => {
+    resetUrlDedupeCache();
+    const callOrder = [];
+    const fakeDownloadsApi = {
+      cancel: async (id) => { callOrder.push(`cancel:${id}`); },
+      removeFile: async (id) => { callOrder.push(`removeFile:${id}`); },
+      erase: async ({ id }) => { callOrder.push(`erase:${id}`); },
+      download: async () => {}
+    };
+
+    const fakeSendCapture = async () => ({
+      ok: true,
+      response: { task_id: "complete-task-1" }
+    });
+
+    const item = {
+      id: 304,
+      url: "https://example.com/already-done.bin",
+      filename: "already-done.bin",
+      totalBytes: 5 * 1024 * 1024,
+      state: "complete"
+    };
+
+    const res = await processDownloadCapture({
+      item,
+      settings: baseSettings,
+      downloadsApi: fakeDownloadsApi,
+      sendCaptureFn: fakeSendCapture
+    });
+
+    assert.equal(res.intercept, true);
+    assert.equal(res.removedFile, true);
+    assert.deepEqual(callOrder, ["cancel:304", "removeFile:304", "erase:304"]);
+  });
 });

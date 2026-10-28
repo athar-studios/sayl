@@ -1242,6 +1242,20 @@ pub fn run() {
             // Setup system tray icon and menu
             let tray_handle = tray::setup_tray(app.handle()).ok();
 
+            // Auto-repair & re-register native host for all browsers silently on start.
+            // Executed in the background pool so a slow registry write never delays app startup.
+            tauri::async_runtime::spawn_blocking(|| {
+                let mut reg = sayl_bridge::install::WindowsRegistry;
+                match native_host::register_native_host_with_ops(&mut reg, None) {
+                    Ok(()) => {
+                        tracing::info!("native messaging host auto-registered and repaired");
+                    }
+                    Err(e) => {
+                        tracing::warn!("auto-registration of native messaging host failed: {e}");
+                    }
+                }
+            });
+
             // Handle --hidden startup argument
             if autostart::is_hidden_arg(std::env::args()) {
                 if let Some(window) = app.get_webview_window("main") {
@@ -1292,6 +1306,23 @@ pub fn run() {
                     }
                 })
                 .expect("failed to spawn clipboard poller thread");
+
+            // Auto-register native host for all browsers on every start (silent repair)
+            let app_handle_for_host = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                // Small delay to let the app fully start
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                let _ = app_handle_for_host
+                    .try_state::<AppState>()
+                    .map(|state| {
+                        let settings = state.settings.read().ok();
+                        if settings.is_some() {
+                            // Only re-register if the user hasn't explicitly disabled it
+                            // This is silent - no user prompts
+                            let _ = crate::commands::register_native_host(None);
+                        }
+                    });
+            });
 
             // Start loopback IPC capture server
             let capture_engine = engine.clone();

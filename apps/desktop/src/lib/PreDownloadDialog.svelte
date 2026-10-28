@@ -180,20 +180,23 @@
   .dialog-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(11, 26, 78, 0.45);
+    background: rgba(7, 15, 46, 0.65);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1200;
     padding: 1rem;
+    backdrop-filter: blur(4px);
   }
 
   .dialog-card {
-    background: #fff;
+    background: var(--color-bg-card);
+    color: var(--text);
     border-radius: 12px;
     width: min(520px, 100%);
-    box-shadow: 0 20px 50px rgba(11, 26, 78, 0.2);
-    border-top: 4px solid #00b6bd;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--color-border);
+    border-top: 4px solid var(--accent);
     overflow: hidden;
   }
 
@@ -202,13 +205,13 @@
     align-items: center;
     justify-content: space-between;
     padding: 1rem 1.25rem;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--color-border);
   }
 
   .dialog-title {
     margin: 0;
     font-size: 1.125rem;
-    color: #0b1a4e;
+    color: var(--text);
     font-weight: 700;
   }
 
@@ -216,9 +219,17 @@
     border: none;
     background: transparent;
     cursor: pointer;
-    color: #64748b;
+    color: var(--text-muted);
     padding: 0.25rem;
     border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .close-btn:hover {
+    color: var(--text);
+    background: var(--color-bg-card-hover);
   }
 
   .dialog-body {
@@ -237,14 +248,22 @@
   .form-label {
     font-size: 0.875rem;
     font-weight: 600;
-    color: #0b1a4e;
+    color: var(--accent);
   }
 
   .form-control {
-    border: 1px solid #cbd5e1;
+    background: var(--color-bg-input);
+    color: var(--text);
+    border: 1px solid var(--color-border);
     border-radius: 8px;
     padding: 0.5rem 0.65rem;
     font-size: 0.9375rem;
+    font-family: inherit;
+  }
+
+  .form-control:focus {
+    outline: none;
+    border-color: var(--color-border-focus);
   }
 
   .folder-row {
@@ -260,10 +279,10 @@
 
   .size-readonly {
     padding: 0.5rem 0.65rem;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
+    background: var(--color-bg-subtle);
+    border: 1px solid var(--color-border);
     border-radius: 8px;
-    color: #334155;
+    color: var(--text-muted);
     font-size: 0.9375rem;
   }
 
@@ -272,6 +291,7 @@
     justify-content: flex-end;
     gap: 0.5rem;
     padding: 1rem 1.25rem 1.25rem;
+    border-top: 1px solid var(--color-border-subtle);
   }
 
   .btn {
@@ -280,22 +300,28 @@
     font-weight: 600;
     cursor: pointer;
     border: none;
+    font-family: inherit;
+    transition: all 120ms ease;
   }
 
   .btn-primary {
-    background: #0b1a4e;
-    color: #fff;
+    background: var(--accent);
+    color: #ffffff;
   }
 
   .btn-primary:hover:not(:disabled) {
-    background: #00b6bd;
-    color: #0b1a4e;
+    background: var(--color-accent-hover);
+    color: #ffffff;
   }
 
   .btn-secondary {
-    background: #f1f5f9;
-    color: #0b1a4e;
-    border: 1px solid #cbd5e1;
+    background: var(--color-bg-card);
+    color: var(--text);
+    border: 1px solid var(--color-border);
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--color-bg-card-hover);
   }
 
   .btn-sm {
@@ -305,7 +331,7 @@
   }
 
   .error-text {
-    color: #b91c1c;
+    color: var(--color-danger);
     font-size: 0.875rem;
     margin: 0;
   }

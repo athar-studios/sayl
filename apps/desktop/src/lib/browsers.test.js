@@ -85,43 +85,44 @@ describe("browsers.js pure logic", () => {
 
   it("maps per-browser status flags to localized text keys", () => {
     expect(getBrowserStatusInfo(null).key).toBe("not_installed");
+    expect(getBrowserStatusInfo(null).level).toBe("muted");
     expect(getBrowserStatusInfo({ installed: false }).key).toBe("not_installed");
     expect(getBrowserStatusInfo({ installed: false }).textKey).toBe("extension.statusNotInstalled");
+    expect(getBrowserStatusInfo({ installed: false }).level).toBe("muted");
 
     expect(getBrowserStatusInfo({ installed: true, connected: true }).key).toBe("connected");
     expect(getBrowserStatusInfo({ installed: true, connected: true }).textKey).toBe("extension.statusConnected");
+    expect(getBrowserStatusInfo({ installed: true, connected: true }).level).toBe("success");
 
-    expect(getBrowserStatusInfo({ installed: true, host_registered: true, connected: false }).key).toBe("registered");
-    expect(getBrowserStatusInfo({ installed: true, host_registered: true, connected: false }).textKey).toBe(
-      "extension.statusRegistered"
+    expect(getBrowserStatusInfo({ installed: true, connected: false }).key).toBe("not_connected");
+    expect(getBrowserStatusInfo({ installed: true, connected: false }).textKey).toBe(
+      "extension.statusNotInstalled"
     );
-
-    expect(getBrowserStatusInfo({ installed: true, host_registered: false, connected: false }).key).toBe("unregistered");
+    expect(getBrowserStatusInfo({ installed: true, connected: false }).level).toBe("warning");
   });
 
   it("determines overall host summary status correctly", () => {
     // When at least one browser is connected
     const connectedList = [
-      { id: "chrome", installed: true, host_registered: true, connected: true },
-      { id: "edge", installed: true, host_registered: false, connected: false },
+      { id: "chrome", installed: true, connected: true },
+      { id: "edge", installed: true, connected: false },
     ];
     expect(getHostStatusSummary(null, connectedList).key).toBe("connected");
     expect(getHostStatusSummary(null, connectedList).textKey).toBe("extension.hostConnected");
+    expect(getHostStatusSummary(null, connectedList).level).toBe("success");
 
-    // When registered but not connected
-    const registeredList = [
-      { id: "chrome", installed: true, host_registered: true, connected: false },
+    // When browsers are installed but none is connected
+    const notConnectedList = [
+      { id: "chrome", installed: true, connected: false },
     ];
-    expect(getHostStatusSummary(null, registeredList).key).toBe("registered");
-    expect(getHostStatusSummary(null, registeredList).textKey).toBe("extension.hostRegistered");
+    expect(getHostStatusSummary(null, notConnectedList).key).toBe("not_connected");
+    expect(getHostStatusSummary(null, notConnectedList).textKey).toBe("extension.hostNotInstalled");
+    expect(getHostStatusSummary(null, notConnectedList).level).toBe("warning");
 
-    // When nativeStatus has registered flag
-    const nativeStatus = { registered: { chrome: true, firefox: false } };
-    expect(getHostStatusSummary(nativeStatus, []).key).toBe("registered");
-
-    // When nothing is registered or connected
+    // When nothing is installed
     expect(getHostStatusSummary(null, []).key).toBe("not_installed");
     expect(getHostStatusSummary(null, []).textKey).toBe("extension.hostNotInstalled");
+    expect(getHostStatusSummary(null, []).level).toBe("muted");
   });
 
   it("detects whether any installed browser exists (empty state check)", () => {

@@ -404,12 +404,19 @@ export async function processDownloadCapture({
     return { intercept: false, reason: decision.reason, cancelled: false };
   }
 
-  // 1. Immediately cancel and erase browser download so it never runs in both
+  // 1. Immediately cancel and erase browser download so it never runs in both.
+  // chrome.downloads.cancel(id) is the very first await, then erase.
+  // If the item already completed, chrome.downloads.removeFile(id) before erase.
   let cancelled = false;
+  let removedFile = false;
   let erased = false;
   if (downloadsApi?.cancel) {
     await downloadsApi.cancel(item.id);
     cancelled = true;
+  }
+  if (item?.state === "complete" && downloadsApi?.removeFile) {
+    await downloadsApi.removeFile(item.id);
+    removedFile = true;
   }
   if (downloadsApi?.erase) {
     await downloadsApi.erase({ id: item.id });
@@ -433,9 +440,16 @@ export async function processDownloadCapture({
     });
   }
 
-  // 3. Only if host send fails: re-download once in browser
+  // 3. Give back to browser ONLY when the host is unreachable (connect error).
+  // Never on timeout or after any reply from host.
   let redownloaded = false;
-  if (hostResult && !hostResult.ok) {
+  const isConnectError =
+    hostResult &&
+    !hostResult.ok &&
+    (hostResult.error?.code === "HOST_UNREACHABLE" ||
+     hostResult.error?.code === "CONNECT_ERROR");
+
+  if (isConnectError) {
     givenBackUrls.add(decision.targetUrl);
     if (item.url) givenBackUrls.add(item.url);
     if (downloadsApi?.download) {
@@ -451,6 +465,7 @@ export async function processDownloadCapture({
     intercept: true,
     decision,
     cancelled,
+    removedFile,
     erased,
     hostResult,
     redownloaded

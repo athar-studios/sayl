@@ -97,7 +97,7 @@
       pingResult =
         res && typeof res === "object"
           ? res
-          : { ok: false, message: $t("extension.testFailed").replace("{msg}", "") };
+          : { ok: false, message: "" };
     } catch (err) {
       pingResult = {
         ok: false,
@@ -378,7 +378,7 @@
   .dialog-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(11, 26, 78, 0.72);
+    background: rgba(7, 15, 46, 0.65);
     backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
@@ -388,11 +388,11 @@
   }
 
   .dialog-card {
-    background: var(--color-bg-card, #0f1d46);
-    color: var(--color-text, #e2e8f0);
-    border: 1px solid var(--color-border, #23386e);
+    background: var(--color-bg-card);
+    color: var(--text);
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-lg, 12px);
-    box-shadow: var(--shadow-lg, 0 20px 40px rgba(0, 0, 0, 0.55));
+    box-shadow: var(--shadow-lg);
     width: 100%;
     max-width: 520px;
     display: flex;
@@ -406,7 +406,7 @@
     justify-content: space-between;
     gap: 0.75rem;
     padding: 1rem 1.25rem;
-    border-bottom: 1px solid var(--color-border, #1c2e5c);
+    border-bottom: 1px solid var(--color-border);
   }
 
   .dialog-title {
@@ -414,13 +414,13 @@
     font-weight: 700;
     margin: 0;
     flex: 1;
-    color: var(--color-text, #ffffff);
+    color: var(--text);
   }
 
   .close-btn {
     background: transparent;
     border: none;
-    color: var(--color-text-muted, #8b9fc7);
+    color: var(--text-muted);
     cursor: pointer;
     padding: 0.35rem;
     border-radius: 6px;
@@ -430,8 +430,8 @@
   }
 
   .close-btn:hover {
-    background: var(--color-bg-hover, #192a56);
-    color: var(--color-text, #ffffff);
+    background: var(--color-bg-card-hover);
+    color: var(--text);
   }
 
   .dialog-body {
@@ -451,7 +451,7 @@
   .step-counter {
     font-size: 0.75rem;
     font-weight: 700;
-    color: #00b6bd;
+    color: var(--accent);
     letter-spacing: 0.02em;
   }
 
@@ -459,13 +459,13 @@
     margin: 0;
     font-size: 1rem;
     font-weight: 700;
-    color: var(--color-text, #f8fafc);
+    color: var(--text);
   }
 
   .step-instruction {
     font-size: 0.95rem;
     line-height: 1.55;
-    color: var(--color-text-muted, #d1dff8);
+    color: var(--text-muted);
     margin: 0;
   }
 
@@ -478,7 +478,7 @@
   .path-label {
     font-size: 0.8rem;
     font-weight: 600;
-    color: var(--color-text-muted, #8ea5d0);
+    color: var(--text-muted);
   }
 
   .path-input-group {
@@ -490,10 +490,10 @@
   .path-input {
     flex: 1;
     min-width: 0;
-    background: #08112c;
-    border: 1px solid #23396c;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
     border-radius: 6px;
-    color: #00b6bd;
+    color: var(--accent);
     font-family: monospace;
     font-size: 0.82rem;
     padding: 0.5rem 0.75rem;
@@ -501,10 +501,10 @@
   }
 
   .btn-copy {
-    background: #1b2f60;
-    border: 1px solid #2e4a8a;
+    background: var(--color-bg-subtle);
+    border: 1px solid var(--color-border);
     border-radius: 6px;
-    color: #e2e8f0;
+    color: var(--text);
     font-size: 0.82rem;
     font-weight: 600;
     padding: 0 0.85rem;
@@ -517,12 +517,12 @@
   }
 
   .btn-copy:hover {
-    background: #233e7e;
+    background: var(--color-bg-card-hover);
   }
 
   .btn-copy.copied {
-    background: #059669;
-    border-color: #10b981;
+    background: var(--color-success);
+    border-color: var(--color-success);
     color: #ffffff;
   }
 
@@ -531,16 +531,16 @@
     flex-wrap: wrap;
     gap: 0.75rem;
     padding-top: 0.5rem;
-    border-top: 1px solid #1a2b56;
+    border-top: 1px solid var(--color-border-subtle);
   }
 
   .status-return-hint {
-    background: rgba(11, 26, 78, 0.45);
-    border: 1px dashed #203362;
+    background: var(--color-bg-subtle);
+    border: 1px dashed var(--color-border);
     border-radius: 6px;
     padding: 0.65rem 0.9rem;
     font-size: 0.82rem;
-    color: #9cb2db;
+    color: var(--text-muted);
   }
 
   .status-indicator-badge {
@@ -550,31 +550,31 @@
   }
 
   .status-indicator-badge.success {
-    color: #34d399;
+    color: var(--color-success);
     font-weight: 700;
   }
 
   .status-indicator-badge.checking {
-    color: #8da4d2;
+    color: var(--text-muted);
   }
 
   .status-indicator-badge.error {
-    color: #fca5a5;
+    color: var(--color-danger);
   }
 
   .pulse-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #34d399;
-    box-shadow: 0 0 8px #34d399;
+    background: var(--color-success);
+    box-shadow: 0 0 8px var(--color-success);
   }
 
   .spin-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    border: 2px solid #00b6bd;
+    border: 2px solid var(--accent);
     border-top-color: transparent;
     animation: spin 1s linear infinite;
   }
@@ -591,8 +591,8 @@
     justify-content: flex-end;
     gap: 0.75rem;
     padding: 0.85rem 1.25rem;
-    background: rgba(11, 26, 78, 0.35);
-    border-top: 1px solid var(--color-border, #1c2e5c);
+    background: var(--color-bg-subtle);
+    border-top: 1px solid var(--color-border);
   }
 
   .btn {
@@ -610,23 +610,22 @@
   }
 
   .btn-primary {
-    background: #00b6bd;
-    color: #0b1a4e;
+    background: var(--accent);
+    color: #ffffff;
   }
 
   .btn-primary:hover {
-    background: #0299a1;
+    background: var(--color-accent-hover);
     color: #ffffff;
   }
 
   .btn-secondary {
-    background: #172750;
-    color: #cbd5e1;
-    border: 1px solid #283c70;
+    background: var(--color-bg-card);
+    color: var(--text);
+    border: 1px solid var(--color-border);
   }
 
   .btn-secondary:hover {
-    background: #21356a;
-    color: #ffffff;
+    background: var(--color-bg-card-hover);
   }
 </style>

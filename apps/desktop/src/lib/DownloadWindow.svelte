@@ -243,11 +243,11 @@
     max-height: 260px;
     box-sizing: border-box;
     padding: 1rem;
-    background: var(--color-bg-card, #ffffff);
-    color: var(--color-text, #1f2937);
-    border: 1px solid var(--color-border, #d4e0ee);
+    background: var(--color-bg-card);
+    color: var(--text);
+    border: 1px solid var(--color-border);
     border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--shadow-md);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -258,13 +258,6 @@
 
   .download-window.rtl {
     text-align: right;
-  }
-
-  :global([data-theme="dark"]) .download-window {
-    background: #1f2937;
-    color: #f3f4f6;
-    border-color: #374151;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   }
 
   /* Window Header */
@@ -304,14 +297,10 @@
   .file-name {
     font-size: 0.875rem;
     font-weight: 600;
-    color: var(--color-text, #1f2937);
+    color: var(--text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  :global([data-theme="dark"]) .file-name {
-    color: #f3f4f6;
   }
 
   .header-end {
@@ -327,7 +316,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: var(--color-text-muted, #4b5563);
+    color: var(--text-muted);
     background: transparent;
     border: none;
     border-radius: 4px;
@@ -336,17 +325,8 @@
   }
 
   .close-btn:hover {
-    background: var(--color-bg-card-hover, #f0f4fa);
-    color: var(--color-text, #1f2937);
-  }
-
-  :global([data-theme="dark"]) .close-btn {
-    color: #9ca3af;
-  }
-
-  :global([data-theme="dark"]) .close-btn:hover {
-    background: #374151;
-    color: #f3f4f6;
+    background: var(--color-bg-card-hover);
+    color: var(--text);
   }
 
   /* 16px Turquoise Progress Bar */
@@ -358,26 +338,21 @@
   .progress-bar-wrap {
     height: 16px;
     width: 100%;
-    background-color: #e5e7eb;
+    background-color: var(--color-border);
     border-radius: 8px;
     overflow: hidden;
     box-sizing: border-box;
   }
 
-  :global([data-theme="dark"]) .progress-bar-wrap {
-    background-color: #1f2937;
-    border: 1px solid #374151;
-  }
-
   .progress-bar-fill {
     height: 100%;
-    background-color: #00b6bd;
+    background-color: var(--accent);
     border-radius: 8px;
     transition: width 150ms ease;
   }
 
   .progress-bar-fill.completed {
-    background-color: #16a34a;
+    background-color: var(--color-success);
   }
 
   /* 2-Column Grid */
@@ -407,24 +382,16 @@
   }
 
   .grid-label {
-    color: #4b5563;
+    color: var(--accent);
     flex-shrink: 0;
-  }
-
-  :global([data-theme="dark"]) .grid-label {
-    color: #d1d5db;
   }
 
   .grid-value {
     font-weight: 600;
-    color: #1f2937;
+    color: var(--text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  :global([data-theme="dark"]) .grid-value {
-    color: #f3f4f6;
   }
 
   /* Real Error Banner */
@@ -433,20 +400,14 @@
     align-items: center;
     gap: 6px;
     padding: 6px 10px;
-    background-color: #fee2e2;
-    border: 1px solid #f87171;
+    background-color: var(--color-danger-light);
+    border: 1px solid var(--color-danger);
     border-radius: 6px;
-    color: #dc2626;
+    color: var(--color-danger);
     font-size: 0.75rem;
     line-height: 1.3;
     overflow: hidden;
     flex-shrink: 0;
-  }
-
-  :global([data-theme="dark"]) .error-banner {
-    background-color: rgba(239, 68, 68, 0.15);
-    border-color: #ef4444;
-    color: #f87171;
   }
 
   .error-icon {
@@ -492,49 +453,33 @@
   }
 
   .btn-primary {
-    background-color: #00b6bd;
+    background-color: var(--accent);
     color: #ffffff;
-    border-color: #009ea4;
+    border-color: var(--color-accent-hover);
   }
 
   .btn-primary:hover {
-    background-color: #009ea4;
+    background-color: var(--color-accent-hover);
   }
 
   .btn-secondary {
-    background-color: #f3f4f6;
-    color: #1f2937;
-    border-color: #d1d5db;
+    background-color: var(--color-bg-subtle);
+    color: var(--text);
+    border-color: var(--color-border);
   }
 
   .btn-secondary:hover {
-    background-color: #e5e7eb;
-  }
-
-  :global([data-theme="dark"]) .btn-secondary {
-    background-color: #374151;
-    color: #f3f4f6;
-    border-color: #4b5563;
-  }
-
-  :global([data-theme="dark"]) .btn-secondary:hover {
-    background-color: #4b5563;
+    background-color: var(--color-bg-card-hover);
   }
 
   .btn-danger {
-    background-color: #fee2e2;
-    color: #dc2626;
-    border-color: #fca5a5;
+    background-color: var(--color-danger-light);
+    color: var(--color-danger);
+    border-color: var(--color-danger);
   }
 
   .btn-danger:hover {
-    background-color: #fecaca;
-  }
-
-  :global([data-theme="dark"]) .btn-danger {
-    background-color: rgba(239, 68, 68, 0.2);
-    color: #f87171;
-    border-color: #ef4444;
+    filter: brightness(0.95);
   }
 
   .options-row {
@@ -552,17 +497,13 @@
     align-items: center;
     gap: 6px;
     font-size: 0.75rem;
-    color: #4b5563;
+    color: var(--text-muted);
     cursor: pointer;
-  }
-
-  :global([data-theme="dark"]) .option-label {
-    color: #9ca3af;
   }
 
   .option-checkbox {
     cursor: pointer;
-    accent-color: #00b6bd;
+    accent-color: var(--accent);
   }
 
   @media (prefers-reduced-motion: reduce) {

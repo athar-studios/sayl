@@ -1449,20 +1449,12 @@
   .titlebar-title {
     font-size: 12px;
     font-weight: 600;
-    color: #0b1a4e;
-  }
-
-  :global([data-theme="dark"]) .titlebar-title {
-    color: #f1f5f9;
+    color: var(--text);
   }
 
   .titlebar-version {
     font-size: 11px;
-    color: #6b7280;
-  }
-
-  :global([data-theme="dark"]) .titlebar-version {
-    color: #94a3b8;
+    color: var(--text-muted);
   }
 
   .app-workspace {
@@ -1470,11 +1462,7 @@
     display: flex;
     overflow: hidden;
     min-height: 0;
-    background: #ffffff;
-  }
-
-  :global([data-theme="dark"]) .app-workspace {
-    background: #070f2e;
+    background: var(--color-bg, #f5f8fc);
   }
 
   .app-main {
@@ -1496,7 +1484,7 @@
     padding: 0 4px;
     gap: 2px;
     font-size: 11.5px;
-    color: #4b5563;
+    color: var(--text-muted);
     flex-shrink: 0;
     user-select: none;
     -webkit-user-select: none;
@@ -1505,7 +1493,6 @@
   :global([data-theme="dark"]) .app-statusbar {
     background: #09143c;
     border-top-color: #162b6e;
-    color: #cbd5e1;
   }
 
   .status-pane {
@@ -1528,12 +1515,8 @@
   }
 
   .speed-indicator {
-    color: #008f95;
+    color: var(--accent);
     font-weight: 700;
-  }
-
-  :global([data-theme="dark"]) .speed-indicator {
-    color: #00b6bd;
   }
 
   .bridge-indicator-dot {

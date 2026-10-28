@@ -57,7 +57,7 @@ export function mapPingResultToStatus(ping, browserConnected = false) {
 
   return {
     variant: "pending",
-    statusKey: "extension.returnInstruction",
+    statusKey: null,
     message: null,
   };
 }

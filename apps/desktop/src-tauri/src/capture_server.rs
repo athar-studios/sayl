@@ -510,6 +510,7 @@ mod tests {
                 .as_nanos()
         );
         let tmp_root = std::env::var_os("CARGO_TARGET_TMPDIR")
+            .or_else(|| std::env::var_os("TEMP"))
             .map(PathBuf::from)
             .or_else(|| {
                 let p = PathBuf::from("target").join("tmp");

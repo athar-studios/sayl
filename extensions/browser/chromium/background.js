@@ -93,29 +93,67 @@ function setBadgeWarning(code, message) {
   notify(msg("notify_error_title"), text);
 }
 
+// In-memory cache for settings and alt_clicks (no awaits before cancel)
+let cachedSettings = {
+  enabled: true,
+  minSizeMb: DEFAULT_MIN_SIZE_MB,
+  extensions: DEFAULT_EXTENSIONS
+};
+let cachedAltClicks = {};
+
+try {
+  chrome.storage?.local?.get(["enabled", "min_size_mb", "allowed_extensions"], (res) => {
+    consumeLastError();
+    if (res) {
+      cachedSettings = {
+        enabled: res.enabled !== false,
+        minSizeMb:
+          typeof res.min_size_mb === "number"
+            ? res.min_size_mb
+            : DEFAULT_MIN_SIZE_MB,
+        extensions: res.allowed_extensions || DEFAULT_EXTENSIONS
+      };
+    }
+  });
+} catch (_) {}
+
+try {
+  chrome.storage?.session?.get("alt_clicks", (res) => {
+    consumeLastError();
+    if (res?.alt_clicks) {
+      cachedAltClicks = res.alt_clicks;
+    }
+  });
+} catch (_) {}
+
+// Refresh cache on storage.onChanged
+try {
+  chrome.storage?.onChanged?.addListener((changes, areaName) => {
+    if (areaName === "local") {
+      if (changes.enabled) {
+        cachedSettings.enabled = changes.enabled.newValue !== false;
+      }
+      if (changes.min_size_mb) {
+        cachedSettings.minSizeMb =
+          typeof changes.min_size_mb.newValue === "number"
+            ? changes.min_size_mb.newValue
+            : DEFAULT_MIN_SIZE_MB;
+      }
+      if (changes.allowed_extensions) {
+        cachedSettings.extensions =
+          changes.allowed_extensions.newValue || DEFAULT_EXTENSIONS;
+      }
+    } else if (areaName === "session") {
+      if (changes.alt_clicks) {
+        cachedAltClicks = changes.alt_clicks.newValue || {};
+      }
+    }
+  });
+} catch (_) {}
+
 // Retrieve settings from local storage
 async function getSettings() {
-  try {
-    const res = await chrome.storage.local.get([
-      "enabled",
-      "min_size_mb",
-      "allowed_extensions"
-    ]);
-    return {
-      enabled: res.enabled !== false,
-      minSizeMb:
-        typeof res.min_size_mb === "number"
-          ? res.min_size_mb
-          : DEFAULT_MIN_SIZE_MB,
-      extensions: res.allowed_extensions || DEFAULT_EXTENSIONS
-    };
-  } catch {
-    return {
-      enabled: true,
-      minSizeMb: DEFAULT_MIN_SIZE_MB,
-      extensions: DEFAULT_EXTENSIONS
-    };
-  }
+  return cachedSettings;
 }
 
 // Retrieve cookies for URL mapped to [{ name, value }]
@@ -273,113 +311,90 @@ function pruneDownloadState(id) {
 /** @type {Set<string>} URLs that failed native host capture and are given back to the browser */
 const givenBackUrls = new Set();
 
-async function evaluateAndCaptureDownload(item, suggestedFilename) {
-  if (!item || !item.id) return;
+/** Track downloads already handled to avoid double paths between onDeterminingFilename and onCreated */
+const handledDownloadIds = new Set();
 
+function markHandled(id) {
+  handledDownloadIds.add(id);
+  setTimeout(() => handledDownloadIds.delete(id), 5 * 60 * 1000);
+}
+
+async function handleInterceptedDownload(item, decision) {
   const id = item.id;
   let state = downloadCaptureState.get(id) || {};
-  if (state.handled || state.cancelled) return;
-
-  if (suggestedFilename) {
-    state.suggestedFilename = suggestedFilename;
-  }
+  state.handled = true;
+  state.cancelled = true;
   downloadCaptureState.set(id, state);
 
-  const effectiveSuggested = state.suggestedFilename || suggestedFilename;
+  const cleanUrl = sanitizeUrlForLog(decision.targetUrl);
+
+  // chrome.downloads.cancel(id) is the very first await!
+  try {
+    await chrome.downloads.cancel(id);
+  } catch (_) {}
+
+  // If the item already completed, chrome.downloads.removeFile(id) before erase.
+  try {
+    if (item.state === "complete") {
+      await chrome.downloads.removeFile(id);
+    } else {
+      const searchRes = await chrome.downloads.search({ id });
+      if (searchRes?.[0]?.state === "complete") {
+        await chrome.downloads.removeFile(id);
+      }
+    }
+  } catch (_) {}
 
   try {
-    const freshItem = await refreshDownloadItem(item);
-    const targetUrl = freshItem.finalUrl || freshItem.url || "";
-    const cleanUrl = sanitizeUrlForLog(targetUrl);
+    await chrome.downloads.erase({ id });
+  } catch (_) {}
 
-    const settings = await getSettings();
+  sendLog("info", `Cancelled and erased browser download ${id} immediately upon capture`, cleanUrl);
 
-    let altBypasses = {};
-    try {
-      const sessionRes = await chrome.storage.session.get("alt_clicks");
-      altBypasses = (sessionRes && sessionRes.alt_clicks) || {};
-    } catch (_) {}
+  const captureTargetUrl = decision.targetUrl || item.finalUrl || item.url || "";
+  recordUrlDedupe(captureTargetUrl);
+  if (item.url && item.url !== captureTargetUrl) {
+    recordUrlDedupe(item.url);
+  }
 
-    const decision = shouldInterceptDownload({
-      item: freshItem,
-      settings,
-      altBypasses,
-      extensionId: chrome.runtime.id,
-      suggestedFilename: effectiveSuggested,
-      nowMs: Date.now(),
-      givenBackUrls,
-      checkDedupe: true
-    });
+  const cookies = await getCookiesForUrl(captureTargetUrl);
+  const payload = {
+    type: "Capture",
+    version: 1,
+    url: item.url || captureTargetUrl,
+    final_url: captureTargetUrl,
+    filename: decision.filename,
+    referrer: item.referrer || "",
+    cookies,
+    user_agent: navigator.userAgent,
+    size: decision.size,
+    mime: item.mime || ""
+  };
 
-    if (!decision.intercept) {
-      if (decision.reason === "given_back_to_browser") {
-        givenBackUrls.delete(decision.targetUrl);
-        if (freshItem.url) givenBackUrls.delete(freshItem.url);
-      }
-      sendLog("info", `Download skipped: ${decision.reason}`, cleanUrl);
-      return;
-    }
+  sendLog(
+    "info",
+    "Sending capture payload to SAYL host",
+    `file=${decision.filename}, size=${decision.size}`
+  );
 
-    state = downloadCaptureState.get(id) || {};
-    if (state.handled || state.cancelled) return;
+  const captureResult = await sendCaptureToHost(payload);
 
-    // Immediately mark as handled and cancelled
-    state.handled = true;
-    state.cancelled = true;
+  state = downloadCaptureState.get(id) || {};
+  state.capturePostInFlight = false;
+
+  if (!captureResult.ok) {
     downloadCaptureState.set(id, state);
+    const errCode = captureResult.error?.code || "ERROR";
+    const errMsg = captureResult.error?.message || "Capture failed";
+    sendLog("warn", `Capture error: ${errCode} - ${errMsg}`, cleanUrl);
+    setBadgeWarning(errCode, errMsg);
 
-    // Call chrome.downloads.cancel(id) FIRST, then erase(id)
-    // Never wait for the host reply before cancelling!
-    try {
-      await chrome.downloads.cancel(id);
-    } catch (_) {}
-    try {
-      await chrome.downloads.erase({ id });
-    } catch (_) {}
-    sendLog("info", `Cancelled and erased browser download ${id} immediately upon capture`, cleanUrl);
-
-    // Record URL for dedupe
-    const captureTargetUrl = decision.targetUrl || targetUrl;
-    recordUrlDedupe(captureTargetUrl);
-    if (freshItem.url && freshItem.url !== captureTargetUrl) {
-      recordUrlDedupe(freshItem.url);
-    }
-
-    const cookies = await getCookiesForUrl(captureTargetUrl);
-    const payload = {
-      type: "Capture",
-      version: 1,
-      url: freshItem.url || captureTargetUrl,
-      final_url: captureTargetUrl,
-      filename: decision.filename,
-      referrer: freshItem.referrer || "",
-      cookies,
-      user_agent: navigator.userAgent,
-      size: decision.size,
-      mime: freshItem.mime || ""
-    };
-
-    sendLog(
-      "info",
-      "Sending capture payload to SAYL host",
-      `file=${decision.filename}, size=${decision.size}`
-    );
-
-    const captureResult = await sendCaptureToHost(payload);
-
-    state = downloadCaptureState.get(id) || {};
-    state.capturePostInFlight = false;
-
-    if (!captureResult.ok) {
-      downloadCaptureState.set(id, state);
-      const errCode = captureResult.error.code;
-      const errMsg = captureResult.error.message;
-      sendLog("warn", `Fallback error: ${errCode} - ${errMsg}`, cleanUrl);
-      setBadgeWarning(errCode, errMsg);
-
-      // Only if host send fails: re-download once in browser with flag/marker
+    // Give back to browser ONLY when the host is unreachable (connect error).
+    // Never on timeout or after any reply. Wait up to 10s for the reply.
+    const isConnectError = errCode === "HOST_UNREACHABLE" || errCode === "CONNECT_ERROR";
+    if (isConnectError) {
       givenBackUrls.add(captureTargetUrl);
-      if (freshItem.url) givenBackUrls.add(freshItem.url);
+      if (item.url) givenBackUrls.add(item.url);
 
       try {
         await chrome.downloads.download({
@@ -388,41 +403,105 @@ async function evaluateAndCaptureDownload(item, suggestedFilename) {
           conflictAction: "uniquify",
           saveAs: false
         });
-        sendLog("info", `Re-downloaded in browser after host error: ${cleanUrl}`);
+        sendLog("info", `Re-downloaded in browser after host unreachable: ${cleanUrl}`);
       } catch (dlErr) {
         sendLog("warn", `Failed to re-download in browser: ${dlErr.message}`, cleanUrl);
       }
-      return;
+    } else {
+      sendLog("info", `Not re-downloading in browser for non-connect error (${errCode})`, cleanUrl);
     }
-
-    state.accepted = true;
-    downloadCaptureState.set(id, state);
-    pruneDownloadState(id);
-
-    const taskId = captureResult.response.task_id;
-    sendLog("info", `Download accepted by SAYL (task ${taskId})`, cleanUrl);
-    setBadgeSuccess();
-  } catch (err) {
-    state = downloadCaptureState.get(id) || {};
-    if (!state.accepted) {
-      state.capturePostInFlight = false;
-      downloadCaptureState.set(id, state);
-    }
-    throw err;
+    return;
   }
+
+  state.accepted = true;
+  downloadCaptureState.set(id, state);
+  pruneDownloadState(id);
+
+  const taskId = captureResult.response.task_id;
+  sendLog("info", `تم قبول التنزيل بواسطة سيل (مهمة ${taskId})`, cleanUrl);
+  setBadgeSuccess();
 }
 
 chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
+  if (!item || !item.id) {
+    suggest();
+    return;
+  }
+
+  if (handledDownloadIds.has(item.id)) {
+    return;
+  }
+
   const suggested = item.filename || "";
-  suggest({ filename: suggested });
   const basename = extractBasename(suggested);
-  void evaluateAndCaptureDownload(item, basename || undefined);
+
+  // Decide synchronously from in-memory cache — no awaits before cancel!
+  const decision = shouldInterceptDownload({
+    item,
+    settings: cachedSettings,
+    altBypasses: cachedAltClicks,
+    extensionId: chrome.runtime?.id || "",
+    suggestedFilename: basename || undefined,
+    nowMs: Date.now(),
+    givenBackUrls,
+    checkDedupe: true
+  });
+
+  if (!decision.intercept) {
+    // Call suggest() ONLY for downloads we don't intercept!
+    markHandled(item.id);
+    suggest({ filename: item.filename || suggested });
+    if (decision.reason === "given_back_to_browser") {
+      givenBackUrls.delete(decision.targetUrl);
+      if (item.url) givenBackUrls.delete(item.url);
+    }
+    sendLog("info", `Download skipped: ${decision.reason}`, sanitizeUrlForLog(decision.targetUrl));
+    return;
+  }
+
+  // Intercepting:
+  // DON'T call suggest()!
+  markHandled(item.id);
+
+  // Asynchronously cancel, erase, and forward to host
+  void handleInterceptedDownload(item, decision);
+
+  // return true to tell Chrome filename determination is handled asynchronously
+  return true;
 });
 
 chrome.downloads.onCreated.addListener(async (item) => {
   if (!item || !item.id) return;
-  sendLog("info", "Download created", sanitizeUrlForLog(item.finalUrl || item.url || ""));
-  await evaluateAndCaptureDownload(item, undefined);
+
+  // onCreated must skip items already handled by onDeterminingFilename (no double path)
+  if (handledDownloadIds.has(item.id) || downloadCaptureState.get(item.id)?.handled) {
+    return;
+  }
+
+  // If onDeterminingFilename is supported (Chromium), wait a short tick to let it decide synchronously
+  if (chrome.downloads?.onDeterminingFilename) {
+    await new Promise((r) => setTimeout(r, 50));
+    if (handledDownloadIds.has(item.id) || downloadCaptureState.get(item.id)?.handled) {
+      return;
+    }
+  }
+
+  // Fallback path when onDeterminingFilename is absent or skipped
+  const decision = shouldInterceptDownload({
+    item,
+    settings: cachedSettings,
+    altBypasses: cachedAltClicks,
+    extensionId: chrome.runtime?.id || "",
+    suggestedFilename: extractBasename(item.filename),
+    nowMs: Date.now(),
+    givenBackUrls,
+    checkDedupe: true
+  });
+
+  if (decision.intercept) {
+    markHandled(item.id);
+    await handleInterceptedDownload(item, decision);
+  }
 });
 
 // Setup context menu on installation
@@ -451,7 +530,7 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
   if (info.menuItemId !== CONTEXT_MENU_ID || !info.linkUrl) return;
 
   if (!/^https?:\/\//i.test(info.linkUrl)) {
-    notify(msg("notify_error_title"), "Only http(s) links can be sent to SAYL.");
+    notify(msg("notify_error_title"), "يمكن إرسال روابط http(s) فقط إلى سيل.");
     return;
   }
 
@@ -487,7 +566,7 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
   }
 
   const taskId = result.response.task_id;
-  sendLog("info", `Context menu capture accepted (task ${taskId})`, cleanUrl);
+  sendLog("info", `تم قبول التنزيل بواسطة سيل (مهمة ${taskId})`, cleanUrl);
   setBadgeSuccess();
-  notify(msg("notify_accepted_title"), `Task: ${taskId}`);
+  notify(msg("notify_accepted_title"), `مهمة: ${taskId}`);
 });

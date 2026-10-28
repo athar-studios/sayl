@@ -2,18 +2,19 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <title>SAYL Download Manager</title>
+  <title>سيل</title>
   <style>
     :root {
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --accent: #38bdf8;
-      --accent-hover: #0284c7;
-      --green: #22c55e;
-      --red: #ef4444;
-      --yellow: #f59e0b;
+      --bg: #ffffff;
+      --card-bg: #f5f7fa;
+      --border: #e2e6ee;
+      --text-main: #10192b;
+      --text-muted: #5b6b85;
+      --accent: #00a5ad;
+      --green: #16a34a;
+      --red: #dc2626;
+      --yellow: #d97706;
+      --track: #cbd5e1;
     }
     * {
       box-sizing: border-box;
@@ -21,59 +22,94 @@
       padding: 0;
     }
     body {
-      width: 320px;
+      width: 232px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       background: var(--bg);
       color: var(--text-main);
-      padding: 16px;
+      padding: 14px;
       user-select: none;
+      font-size: 13px;
     }
     .header {
       display: flex;
       align-items: center;
       gap: 10px;
-      margin-bottom: 14px;
-      border-bottom: 1px solid #334155;
+      margin-bottom: 12px;
       padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
     }
     .header img {
-      width: 28px;
-      height: 28px;
+      width: 24px;
+      height: 24px;
     }
-    .header-titles {
-      flex: 1;
-    }
-    .title-ar {
-      font-size: 15px;
+    .title-main {
+      font-size: 14px;
       font-weight: 700;
       color: var(--text-main);
     }
-    .title-en {
-      font-size: 11px;
-      color: var(--text-muted);
-      direction: ltr;
-      text-align: right;
-    }
-    .status-card {
+    .card {
       background: var(--card-bg);
-      border-radius: 8px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
       padding: 12px;
-      margin-bottom: 12px;
-      border: 1px solid #334155;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
-    .status-header {
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: pointer;
+    }
+    .switch-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .switch-row input[type="checkbox"] {
+      appearance: none;
+      -moz-appearance: none;
+      position: relative;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+      border-radius: 999px;
+      background: var(--track);
+      cursor: pointer;
+      transition: background 150ms ease;
+    }
+    .switch-row input[type="checkbox"]::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+      transition: transform 150ms ease;
+    }
+    .switch-row input[type="checkbox"]:checked {
+      background: var(--accent);
+    }
+    .switch-row input[type="checkbox"]:checked::after {
+      transform: translateX(-18px);
+    }
+    .status-row {
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 6px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
     }
     .dot {
-      width: 10px;
-      height: 10px;
+      width: 9px;
+      height: 9px;
       border-radius: 50%;
       flex-shrink: 0;
-    }
-    .dot.pending {
       background: var(--yellow);
     }
     .dot.success {
@@ -82,70 +118,49 @@
     .dot.error {
       background: var(--red);
     }
-    .status-ar {
-      font-size: 13px;
-      font-weight: 600;
+    .status-text {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--yellow);
     }
-    .status-en {
-      font-size: 11px;
-      color: var(--text-muted);
-      direction: ltr;
-      text-align: left;
-      padding-inline-start: 18px;
+    .status-text.success {
+      color: var(--green);
     }
-    .details {
-      margin-top: 8px;
-      font-size: 10px;
-      color: var(--text-muted);
-      background: #090d16;
-      border-radius: 4px;
-      padding: 6px 8px;
-      direction: ltr;
-      word-break: break-all;
+    .status-text.error {
+      color: var(--red);
     }
-    .hidden {
-      display: none;
-    }
-    .btn {
-      width: 100%;
-      padding: 8px 12px;
-      background: var(--accent);
-      color: #0f172a;
-      border: none;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 6px;
-    }
-    .btn:hover {
-      background: var(--accent-hover);
-      color: #ffffff;
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f172a;
+        --card-bg: #1e293b;
+        --border: #334155;
+        --text-main: #f8fafc;
+        --text-muted: #94a3b8;
+        --track: #475569;
+      }
+      .switch-row input[type="checkbox"]::after {
+        background: #e2e8f0;
+      }
     }
   </style>
 </head>
 <body>
   <div class="header">
-    <img src="icons/32x32.png" alt="SAYL Logo">
-    <div class="header-titles">
-      <div class="title-ar">سيل — مدير التنزيلات</div>
-      <div class="title-en">SAYL Download Manager</div>
-    </div>
+    <img src="icons/32x32.png" alt="">
+    <div id="title-main" class="title-main">سيل</div>
   </div>
 
-  <div class="status-card">
-    <div class="status-header">
-      <div id="status-dot" class="dot pending"></div>
-      <div id="status-ar" class="status-ar">جاري فحص الاتصال...</div>
+  <div class="card">
+    <label class="switch-row">
+      <span id="lbl-enabled" class="switch-label">الاعتراض التلقائي</span>
+      <input type="checkbox" id="setting-enabled" checked>
+    </label>
+    <div class="status-row">
+      <div id="status-dot" class="dot"></div>
+      <div id="status-text" class="status-text">متصلة</div>
     </div>
-    <div id="status-en" class="status-en">Checking connection...</div>
-    <div id="host-details" class="details hidden"></div>
   </div>
-
-  <button id="recheck-btn" class="btn">إعادة الفحص / Recheck</button>
 
   <script src="popup.js"></script>
 </body>
