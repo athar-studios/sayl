@@ -167,6 +167,40 @@ pub fn extract_download_url(text: &str) -> Option<String> {
     Some(trimmed.to_string())
 }
 
+/// Extracts all valid download URLs from clipboard text.
+/// Supports multiple URLs separated by whitespace or newlines.
+/// Returns a vector of valid http/https/ftp URLs.
+pub fn extract_download_urls(text: &str) -> Vec<String> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+
+    // Split by whitespace (spaces, tabs, newlines)
+    trimmed
+        .split_whitespace()
+        .filter_map(|token| {
+            let token_trimmed = token.trim();
+            if token_trimmed.is_empty() || token_trimmed.len() > 8192 {
+                return None;
+            }
+
+            // Check for valid URL scheme
+            let parsed = url::Url::parse(token_trimmed).ok()?;
+            let scheme = parsed.scheme();
+            if scheme != "http" && scheme != "https" && scheme != "ftp" {
+                return None;
+            }
+
+            if parsed.host_str().unwrap_or("").is_empty() {
+                return None;
+            }
+
+            Some(token_trimmed.to_string())
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -318,5 +352,100 @@ mod tests {
         // Subsequent copy emits
         let res2 = state.tick(true, Some("https://example.com/next.zip".to_string()));
         assert_eq!(res2, Some("https://example.com/next.zip".to_string()));
+    }
+
+    #[test]
+    fn test_extract_download_urls_single_with_surrounding_whitespace() {
+        assert_eq!(
+            extract_download_urls("  \t\r\n https://example.com/archive.zip \n\t  "),
+            vec!["https://example.com/archive.zip".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_extract_download_urls_one_per_line_preserves_order() {
+        let text = concat!(
+            "https://example.com/a.zip\n",
+            "http://example.com/b.iso\r\n",
+            "ftp://ftp.example.com/c.bin"
+        );
+        assert_eq!(
+            extract_download_urls(text),
+            vec![
+                "https://example.com/a.zip".to_string(),
+                "http://example.com/b.iso".to_string(),
+                "ftp://ftp.example.com/c.bin".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_extract_download_urls_skips_junk_lines() {
+        let text = concat!(
+            "hello world\n",
+            "https://example.com/a.zip\n",
+            "not a url\n",
+            "\thttps://example.com/b.zip  "
+        );
+        assert_eq!(
+            extract_download_urls(text),
+            vec![
+                "https://example.com/a.zip".to_string(),
+                "https://example.com/b.zip".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_extract_download_urls_scheme_filtering() {
+        let text = [
+            "ftp://ftp.example.com/file.bin",
+            "https://example.com/secure.zip",
+            "http://example.com/plain.zip",
+            "javascript:alert(1)",
+            "javascript:void(0)",
+            "data:text/plain;base64,SGVsbG8=",
+            "file:///C:/Windows/file.iso",
+            "mailto:user@example.com",
+        ]
+        .join("\n");
+
+        assert_eq!(
+            extract_download_urls(&text),
+            vec![
+                "ftp://ftp.example.com/file.bin".to_string(),
+                "https://example.com/secure.zip".to_string(),
+                "http://example.com/plain.zip".to_string(),
+            ]
+        );
+    }
+
+    /// KNOWN GAP (documented, not silently accepted):
+    /// `extract_download_urls` does NOT de-duplicate — it returns every matching
+    /// token in order. This file is test-only scope, so the behavior is pinned
+    /// here as-is. The user-facing paste path still de-duplicates because
+    /// `App.svelte` re-runs the result through `extractUrls()` in
+    /// `src/lib/clipboardPaste.js`, which de-dupes (see clipboardPaste.test.js).
+    #[test]
+    fn test_extract_download_urls_duplicates_are_preserved_by_rust_layer() {
+        let text = concat!(
+            "https://example.com/a.zip\n",
+            "https://example.com/b.zip\n",
+            "https://example.com/a.zip"
+        );
+        assert_eq!(
+            extract_download_urls(text),
+            vec![
+                "https://example.com/a.zip".to_string(),
+                "https://example.com/b.zip".to_string(),
+                "https://example.com/a.zip".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_extract_download_urls_empty_and_whitespace_only() {
+        assert!(extract_download_urls("").is_empty());
+        assert!(extract_download_urls("   \t\r\n\n ").is_empty());
     }
 }
