@@ -226,7 +226,11 @@
         <ol class="steps">
           <li >Open Sayl, then go to <strong>Settings</strong> (gear icon or <kbd>Ctrl+,</kbd>).</li>
           <li >Navigate to the <strong>Browser Extension</strong> section and click <strong>Activate</strong>.</li>
-          <li >The extension is not yet listed in browser stores; follow the install steps Sayl shows in Settings.</li>
+          <li >The extension is not yet listed in browser stores; Sayl installs it locally (it registers the native messaging host automatically). Open Sayl > Settings > Browser Extension > Activate, then follow the steps it shows:</li>
+          <li >In your browser: open the extensions page (<code>chrome://extensions</code> or <code>edge://extensions</code>) and enable 'Developer mode'.</li>
+          <li >Click 'Load unpacked' and select the extension folder shown by Sayl (use the copy-path / open-folder buttons).</li>
+          <li >For Firefox: open <code>about:debugging#/runtime/this-firefox</code> → 'Load Temporary Add-on' → select <code>manifest.json</code>.</li>
+          <li >After install, check the 'Connected' status in Sayl Settings; captures then happen automatically.</li>
         </ol>
         <p >Once installed, Sayl captures downloads seamlessly, and you can right-click any link to choose <strong>'Download with Sayl'</strong>.</p>
 
