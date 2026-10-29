@@ -586,6 +586,71 @@ pub mod commands {
         })
     }
 
+    /// Adds a task and leaves it `Queued` so the "Download File Info" window can
+    /// show the probed filename/size before any bytes are downloaded.
+    ///
+    /// Mirrors `add_task` (same duplicate check) but skips `spawn_start`; the
+    /// caller starts it later with `start_task` once the user confirms.
+    #[tauri::command]
+    pub async fn add_task_queued(
+        state: State<'_, AppState>,
+        url: String,
+        force: Option<bool>,
+    ) -> Result<AddTaskOutcome, String> {
+        let clean_url = url.trim();
+        if clean_url.is_empty() {
+            return Err("URL cannot be empty".to_string());
+        }
+
+        let max_conn = state
+            .settings
+            .read()
+            .map(|s| s.max_connections_per_task)
+            .unwrap_or(4);
+
+        if force != Some(true) {
+            let records = state
+                .engine
+                .list_tasks()
+                .map_err(|e| format!("Storage read failed: {e}"))?;
+            if let Some(existing_rec) = duplicates::find_duplicate(&records, clean_url) {
+                let stats_guard = state.live_stats.lock().ok();
+                let stats = stats_guard
+                    .as_ref()
+                    .and_then(|m| m.get(&existing_rec.id).copied());
+                let parts = get_cached_parts(&state.engine, &state.parts_cache, existing_rec.id);
+                let connections = estimate_connections(existing_rec.state, parts, max_conn);
+                let view = TaskView::from_record_full(
+                    existing_rec,
+                    stats.map(|s| s.speed_bps),
+                    stats.and_then(|s| s.eta_secs),
+                    parts,
+                    connections,
+                );
+                return Ok(AddTaskOutcome::Duplicate { existing: view });
+            }
+        }
+
+        let task_id = state
+            .engine
+            .add(clean_url)
+            .await
+            .map_err(|e| format!("Failed to add task: {e}"))?;
+
+        let record = state
+            .engine
+            .get_task(task_id)
+            .map_err(|e| format!("Storage read failed: {e}"))?
+            .ok_or_else(|| "Task record not found after insert".to_string())?;
+
+        let parts = get_cached_parts(&state.engine, &state.parts_cache, task_id);
+        let connections = estimate_connections(record.state, parts, max_conn);
+
+        Ok(AddTaskOutcome::Added {
+            task: TaskView::from_record_full(&record, None, None, parts, connections),
+        })
+    }
+
     #[tauri::command]
     pub async fn prepare_capture_task(
         state: State<'_, AppState>,
@@ -1043,6 +1108,17 @@ pub mod commands {
             }
         };
 
+        let language = state
+            .settings
+            .read()
+            .map(|s| s.language.clone())
+            .unwrap_or_else(|_| "ar".into());
+        let title = if language == "en" {
+            "Download"
+        } else {
+            "تنزيل"
+        };
+
         let bg_color = if is_dark {
             tauri::window::Color(31, 41, 55, 255) // #1f2937
         } else {
@@ -1055,9 +1131,9 @@ pub mod commands {
             &label,
             tauri::WebviewUrl::App(url.into()),
         )
-        .title("تنزيل")
+        .title(title)
         .visible(false)
-        .inner_size(460.0, 260.0)
+        .inner_size(600.0, 440.0)
         .resizable(false)
         .decorations(true)
         .background_color(bg_color)
@@ -1181,6 +1257,7 @@ pub fn run() {
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             commands::add_task,
+            commands::add_task_queued,
             commands::start_task,
             commands::pause_task,
             commands::cancel_task,

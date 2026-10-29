@@ -1,4 +1,5 @@
 // SAYL Download Interception Rules - Pure Decision Logic
+// Portions derived from AB Download Manager (https://github.com/amir1376/ab-download-manager), Apache-2.0
 
 export const DEFAULT_EXTENSIONS = [
   "zip", "rar", "7z", "tar", "gz", "bz2", "xz", "iso", "img", "dmg",

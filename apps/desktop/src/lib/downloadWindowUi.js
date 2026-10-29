@@ -6,6 +6,17 @@
  * `StandaloneDownloadWindow.svelte` are the only consumers.
  */
 
+import { resolveTranslation } from "./i18n.js";
+import {
+  formatBytes,
+  formatSpeed,
+  formatEta,
+  formatPercent,
+  canPauseTask,
+  canResumeTask,
+  canCancel,
+} from "./format.js";
+
 export { mergeTaskMonotonic, mergeTasksMonotonic, isProgressResetState } from "./monotonic.js";
 
 const MIN_SPEED_LIMIT_KBPS = 1;
@@ -339,6 +350,60 @@ export function buildSegmentDetailRows(segments) {
 }
 
 /**
+ * Connection ranges for the segmented bar and the per-connection table.
+ *
+ * Prefers real checkpoint ranges (`task.segment_ranges`) when the backend sends
+ * them; otherwise synthesises `parts` equal byte bands and fills them
+ * sequentially from the task's `written` total, so the window still shows the
+ * connection regions IDM draws before per-range data is available.
+ *
+ * @param {{ total_size?: number|null, written?: number, parts?: number|null, connections?: number|null, segment_ranges?: Array<object> }} task
+ * @returns {Array<{ start: number, end: number, written: number, total_completed: boolean }>}
+ */
+export function buildConnectionSegments(task) {
+  const t = task && typeof task === "object" ? task : {};
+
+  if (Array.isArray(t.segment_ranges) && t.segment_ranges.length > 0) {
+    return t.segment_ranges.map((range) => {
+      const raw = range && typeof range === "object" ? range : {};
+      const start = Math.max(0, Math.floor(toFiniteNumber(raw.start) ?? 0));
+      const end = Math.max(start, Math.floor(toFiniteNumber(raw.end) ?? start));
+      const span = end - start;
+      const explicit = toFiniteNumber(raw.written);
+      const completed = raw.completed === true || raw.total_completed === true;
+
+      return {
+        start,
+        end,
+        written: explicit !== null ? clamp(explicit, 0, span) : completed ? span : 0,
+        total_completed: completed || (span > 0 && explicit !== null && explicit >= span),
+      };
+    });
+  }
+
+  const total = toFiniteNumber(t.total_size);
+  const parts = Math.floor(toFiniteNumber(t.parts) ?? toFiniteNumber(t.connections) ?? 0);
+  const written = Math.max(0, toFiniteNumber(t.written) ?? 0);
+  if (total === null || total <= 0 || parts < 1) return [];
+
+  const bandSize = total / parts;
+  const segments = [];
+  for (let i = 0; i < parts; i += 1) {
+    const start = i === 0 ? 0 : Math.round(i * bandSize);
+    const end = i === parts - 1 ? total : Math.round((i + 1) * bandSize);
+    const span = Math.max(end - start, 0);
+    const filled = clamp(written - start, 0, span);
+    segments.push({
+      start,
+      end,
+      written: filled,
+      total_completed: span > 0 && filled >= span,
+    });
+  }
+  return segments;
+}
+
+/**
  * Validates a KB/s limit typed by the user.
  * Returns an integer inside `[1, 10_000_000]`, or `null` for junk input.
  *
@@ -428,5 +493,202 @@ export function getProgressBarFillStyle(isRtl, percent) {
     ...baseStyle,
     marginLeft: 0,
     marginRight: 'auto',
+  };
+}
+
+/**
+ * Percentage of a download that has been written, as `0..100` with one decimal.
+ * Returns `null` when the total size is unknown, so callers can render `—`.
+ *
+ * @param {number|null|undefined} written
+ * @param {number|null|undefined} totalSize
+ * @returns {number|null}
+ */
+export function progressPercent(written, totalSize) {
+  return percentOf(written, totalSize);
+}
+
+/**
+ * Rows for the «حالة التنزيل» tab. Each row carries an i18n `labelKey` for the
+ * component to translate, plus an already-formatted `value`, so the same rows
+ * are produced in Arabic and English.
+ *
+ * Order: state, [parts], file size, downloaded (with %), transfer rate,
+ * time left, resumable.
+ *
+ * @param {object|null|undefined} task
+ * @param {string} [lang="ar"]
+ * @returns {Array<{ key: string, labelKey: string, value: string, valueDir: "ltr"|"auto" }>}
+ */
+export function buildStatusRows(task, lang = "ar") {
+  const row = (key, labelKey, value, valueDir) => ({ key, labelKey, value, valueDir });
+  const t = task && typeof task === "object" ? task : {};
+
+  const totalSize = toFiniteNumber(t.total_size);
+  const written = Math.max(0, toFiniteNumber(t.written) ?? 0);
+  const speed = toFiniteNumber(t.speed_bps);
+  const eta = toFiniteNumber(t.eta_secs);
+  const parts = toFiniteNumber(t.parts);
+  const percent = percentOf(written, totalSize);
+
+  const rows = [
+    row("state", "downloadWindow.state", typeof t.state === "string" && t.state ? t.state : "Queued", "auto"),
+  ];
+
+  if (parts !== null && parts > 0) {
+    rows.push(row("parts", "downloadWindow.parts", String(Math.floor(parts)), "ltr"));
+  }
+
+  rows.push(
+    row(
+      "fileSize",
+      "downloadWindow.fileSize",
+      totalSize !== null && totalSize > 0
+        ? formatBytes(totalSize, lang)
+        : resolveTranslation(lang, "task.unknownSize"),
+      "ltr"
+    ),
+    row(
+      "downloaded",
+      "downloadWindow.downloaded",
+      percent === null
+        ? formatBytes(written, lang)
+        : `${formatBytes(written, lang)} (${formatPercent(percent, lang)})`,
+      "ltr"
+    ),
+    row(
+      "transferRate",
+      "downloadWindow.speed",
+      speed !== null && speed > 0 ? formatSpeed(speed, lang) : "—",
+      "ltr"
+    ),
+    row(
+      "timeLeft",
+      "downloadWindow.timeLeft",
+      eta !== null && eta > 0
+        ? formatEta(eta, lang)
+        : speed !== null && speed > 0
+          ? resolveTranslation(lang, "task.calculating")
+          : "—",
+      "ltr"
+    ),
+    row(
+      "resumable",
+      "downloadWindow.resumable",
+      isResumable(t) ? resolveTranslation(lang, "downloadWindow.yes") : resolveTranslation(lang, "downloadWindow.no"),
+      "auto"
+    )
+  );
+
+  return rows;
+}
+
+/**
+ * Human-readable byte range, e.g. `0 B – 1.2 MB`.
+ *
+ * @param {number} start
+ * @param {number} end
+ * @param {string} [lang="ar"]
+ * @returns {string}
+ */
+export function formatRangeInfo(start, end, lang = "ar") {
+  const from = Math.max(0, toFiniteNumber(start) ?? 0);
+  const to = Math.max(from, toFiniteNumber(end) ?? from);
+  if (to === from) return "—";
+  return `${formatBytes(from, lang)} – ${formatBytes(to, lang)}`;
+}
+
+/**
+ * Rows for the per-connection table (N°, downloaded, info/range, status).
+ * `status` is one of `done` | `downloading` | `pending`; the component maps it
+ * to the `downloadWindow.connDone` / `connDownloading` / `connPending` keys.
+ *
+ * @param {Array<{start?: number, end?: number, written?: number, total_completed?: boolean}>} segments
+ * @param {string} [lang="ar"]
+ * @returns {Array<{ key: string, index: number, downloaded: string, info: string, status: string }>}
+ */
+export function buildConnectionTableRows(segments, lang = "ar") {
+  return buildSegmentDetailRows(segments).map((detail) => ({
+    key: detail.key,
+    index: detail.index,
+    downloaded: formatBytes(detail.downloaded, lang),
+    info: formatRangeInfo(detail.start, detail.end, lang),
+    status: detail.status,
+  }));
+}
+
+/**
+ * Speed-limit tab state. Falls back to an unlimited label when the task has no
+ * limit configured.
+ *
+ * @param {{ speed_limit_kbps?: number|null }} task
+ * @param {string} [lang="ar"]
+ * @returns {{ enabled: boolean, limitKbps: number|null, label: string }}
+ */
+export function buildSpeedLimitState(task, lang = "ar") {
+  const raw = task && typeof task === "object" ? task.speed_limit_kbps : null;
+  const limit = normalizeSpeedLimit(raw);
+  const enabled = limit !== null && (raw === 0 || raw === "0" ? false : toFiniteNumber(raw) !== 0);
+  return {
+    enabled,
+    limitKbps: enabled ? limit : null,
+    label: enabled
+      ? `${limit} ${resolveTranslation(lang, "units.kbps")}`
+      : resolveTranslation(lang, "downloadWindow.unlimited"),
+  };
+}
+
+/**
+ * Which action buttons the window should offer for the current state.
+ * `cancel` genuinely cancels the task; `hide` only dismisses the window.
+ *
+ * @param {{ state?: string }|null|undefined} task
+ * @param {{ isPending?: boolean }} [context]
+ * @returns {{ pause: boolean, resume: boolean, retry: boolean, cancel: boolean, hide: boolean, openFile: boolean, reveal: boolean }}
+ */
+export function getWindowActionFlags(task, { isPending = false } = {}) {
+  const state = task && typeof task === "object" ? task.state : null;
+  const completed = state === "Completed";
+  const failed = state === "Failed";
+
+  return {
+    pause: !isPending && canPauseTask(state),
+    resume: !isPending && !failed && canResumeTask(state),
+    retry: !isPending && failed,
+    cancel: canCancel(state),
+    hide: true,
+    openFile: completed,
+    reveal: completed,
+  };
+}
+
+/**
+ * Details shown by the completion window: file name, size, saved path.
+ *
+ * @param {object|null|undefined} task
+ * @param {string} [lang="ar"]
+ * @returns {{ filename: string, size: string, savedPath: string }}
+ */
+export function buildCompleteDetails(task, lang = "ar") {
+  const t = task && typeof task === "object" ? task : {};
+  const name = typeof t.filename === "string" && t.filename.trim() ? t.filename.trim() : "—";
+  const total = toFiniteNumber(t.total_size);
+  const written = toFiniteNumber(t.written);
+  const size =
+    total !== null && total > 0
+      ? formatBytes(total, lang)
+      : written !== null && written > 0
+        ? formatBytes(written, lang)
+        : resolveTranslation(lang, "task.unknownSize");
+
+  const folder =
+    (typeof t.folder === "string" && t.folder.trim()) ||
+    (typeof t.save_path === "string" && t.save_path.trim()) ||
+    "";
+
+  return {
+    filename: name,
+    size,
+    savedPath: folder || "—",
   };
 }

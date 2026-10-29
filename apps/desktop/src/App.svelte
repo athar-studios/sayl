@@ -27,7 +27,7 @@
   import Toolbar from "./lib/Toolbar.svelte";
   import TaskList from "./lib/TaskList.svelte";
   import AddTaskDialog from "./lib/AddTaskDialog.svelte";
-  import PreDownloadDialog from "./lib/PreDownloadDialog.svelte";
+  import PreDownloadWindow from "./lib/windows/PreDownloadWindow.svelte";
   import DuplicateTaskDialog from "./lib/DuplicateTaskDialog.svelte";
   import DeleteConfirmDialog from "./lib/DeleteConfirmDialog.svelte";
   import DownloadWindow from "./lib/DownloadWindow.svelte";
@@ -47,6 +47,7 @@
     moveSelection,
   } from "./lib/selection.js";
   import {
+    CATEGORY_SUBFOLDERS,
     buildPrepareCaptureTaskArgs,
     friendlyPrepareCaptureError,
     logCaptureDiagnostic,
@@ -84,12 +85,17 @@
   let preDownloadOpen = false;
   /** Pending `sayl://capture-offer` payloads, oldest first (one capture → one dialog). */
   let captureOfferQueue = [];
-  /** Currently displayed offer (head of queue) passed to PreDownloadDialog. */
+  /** Currently displayed offer (head of queue) passed to the File Info window. */
   let captureOffer = null;
   /** Dedupe capture-offer events: task_id of the offer currently on screen. */
   let captureOfferTaskId = null;
   /** Timer that removes the "new task" row highlight. */
   let highlightTimer = null;
+
+  // Track previous task states to detect transitions
+  let previousTaskStates = new Map();
+  /** Save folder the user asked to remember from the File Info window. */
+  let rememberedCaptureFolder = "";
 
   // Duplicate task dialog state
   let duplicateDialogOpen = false;
@@ -249,7 +255,9 @@
       const res = await invoke("list_tasks");
       if (Array.isArray(res)) {
         tasks = res;
-        handleTasksUpdated(res);
+        // A list read is a snapshot, not a live transition: first sighting of a
+        // task only seeds the state map, so no window opens for old downloads.
+        handleTaskStateTransitions(res);
       }
     } catch {
       // safeInvoke handles toast
@@ -311,18 +319,131 @@
       tasks = next;
     }
 
-    handleTasksUpdated(tasks);
+    handleTaskStateTransitions(tasks);
   }
 
-  function handleTasksUpdated(newTasks) {
+  /**
+   * Drives the three download windows from real state changes:
+   * a task that starts running opens the Downloading window, a completed task
+   * switches to the Download complete window. Tasks seen for the first time
+   * (startup list read, a just-added task) only seed the map, so no window pops
+   * for downloads that were already running.
+   *
+   * @param {Array<object>} newTasks
+   */
+  function handleTaskStateTransitions(newTasks) {
+    const liveIds = new Set();
+
     for (const t of newTasks) {
-      if (
-        (t.state === "Completed" && settings.close_download_window_on_finish) ||
-        t.state === "Cancelled"
-      ) {
-        openWindowsSet.delete(t.id);
-        openDownloadWindows = openDownloadWindows.filter((id) => id !== t.id);
+      liveIds.add(t.id);
+      const prevState = previousTaskStates.get(t.id);
+      const newState = t.state;
+      const known = prevState !== undefined;
+
+      if (known && prevState !== newState) {
+        // Start/resume: switch to the Downloading window (window b).
+        if (newState === "Downloading" && settings.show_download_window) {
+          handleOpenDownloadWindow(t.id);
+        }
+
+        // Completion: switch to the Download complete window (window c), unless
+        // the user disabled it. Two guards keep a pause from ever showing c:
+        // a paused task is excluded by state, and a task that claims completion
+        // without all bytes written is not treated as complete.
+        if (newState === "Completed" && prevState !== "Paused" && isTrulyComplete(t)) {
+          switchToCompleteWindow(t.id);
+        }
+
+        // Cancelled downloads never keep a progress window around.
+        if (newState === "Cancelled") {
+          closeDownloadWindow(t.id, { native: true });
+        }
       }
+
+      previousTaskStates.set(t.id, newState);
+    }
+
+    // Forget ids that left the list so the map cannot grow without bound.
+    for (const id of Array.from(previousTaskStates.keys())) {
+      if (!liveIds.has(id)) previousTaskStates.delete(id);
+    }
+
+    // Keep the auto-close setting effective even when no transition was observed.
+    // Only the in-app stack entry is dropped here: a native progress window for a
+    // task the user re-opened after finishing must not be force-closed.
+    for (const t of newTasks) {
+      if (t.state === "Completed" && settings.close_download_window_on_finish) {
+        closeDownloadWindow(t.id);
+      }
+    }
+  }
+
+  /**
+   * True when a completed task really wrote every byte. Guards window c against
+   * a state that ends in `Completed` without the bytes (e.g. an interrupted
+   * download reported after a pause). Unknown-size tasks are trusted, since a
+   * server without Content-Length has no size to compare against.
+   *
+   * @param {object} task
+   * @returns {boolean}
+   */
+  function isTrulyComplete(task) {
+    if (!task) return false;
+    const total = typeof task.total_size === "number" ? task.total_size : null;
+    if (total === null || total <= 0) return true;
+    const written = typeof task.written === "number" ? task.written : 0;
+    return written >= total;
+  }
+
+  /**
+   * Switches a just-finished download from window b to window c.
+   *
+   * The settings snapshot is refreshed first: the completion window's
+   * «لا تعرض هذه النافذة مرة أخرى» checkbox writes `show_download_complete_window`
+   * from another webview, so a stale copy here would reopen a window the user
+   * asked to stop seeing.
+   *
+   * @param {string} taskId
+   */
+  async function switchToCompleteWindow(taskId) {
+    if (!taskId) return;
+    try {
+      const fresh = await invoke("get_settings", undefined, { suppressToast: true });
+      if (fresh) settings = normalizeSettings({ ...settings, ...fresh });
+    } catch {
+      // Keep the last known snapshot; the switch below still respects it.
+    }
+
+    if (settings.show_download_complete_window) {
+      // Switch, do not stack: the progress window goes away, then c opens.
+      closeDownloadWindow(taskId, { native: true });
+      invoke("open_complete_window", { id: taskId }).catch(() => {});
+    } else if (settings.close_download_window_on_finish) {
+      closeDownloadWindow(taskId, { native: true });
+    }
+  }
+
+  /**
+   * Removes a task's progress window: the in-app floating entry, and (for the
+   * native `download-<id>` window) the Tauri window itself. The native close is
+   * only sent for windows this app actually opened, so a repeated tasks refresh
+   * cannot spam `close_download_window` for long-finished downloads.
+   *
+   * @param {string} id
+   * @param {{ native?: boolean }} [options]
+   */
+  function closeDownloadWindow(id, options = {}) {
+    if (!id) return;
+    const wasOpen = openWindowsSet.delete(id);
+    if (openDownloadWindows.includes(id)) {
+      openDownloadWindows = openDownloadWindows.filter((wId) => wId !== id);
+    }
+    const canCloseNative =
+      wasOpen &&
+      typeof window !== "undefined" &&
+      (window.__TAURI_INTERNALS__ || window.__TAURI__);
+    if (options.native && canCloseNative) {
+      invoke("close_download_window", { id }).catch(() => {});
     }
   }
 
@@ -439,9 +560,44 @@
       }
 
       if (action.kind === "single") {
-        // Single URL - open PreDownloadDialog prefilled
-        droppedUrl = action.url;
-        addDialogOpen = true;
+        // Ctrl+V: queue the link without starting it, then show the
+        // "Download File Info" window so name/folder are confirmed first.
+        const outcome = await invoke("add_task_queued", { url: action.url, force: false });
+
+        // Browser preview/mock has no queued-add command: fall back to the
+        // instant add so Ctrl+V still works outside the Tauri shell.
+        if (!outcome) {
+          await handleAddTask(action.url);
+          return;
+        }
+
+        if (outcome.kind === "duplicate") {
+          duplicateExistingTask = outcome.existing;
+          duplicateDialogOpen = true;
+          return;
+        }
+
+        if (outcome.kind !== "added" || !outcome.task?.id) return;
+
+        const queued = outcome.task;
+        tasks = [queued, ...tasks.filter((t) => t.id !== queued.id)];
+        previousTaskStates.set(queued.id, queued.state);
+        await revealNewTask(queued.id);
+
+        if (settings.show_download_window) {
+          openFileInfoWindow({
+            task_id: queued.id,
+            url: queued.url || action.url,
+            filename: queued.filename || "",
+            size: queued.total_size ?? null,
+          });
+        } else {
+          // File Info window disabled: start with the probed name and default path.
+          await prepareAndStart(queued.id, {
+            filename: queued.filename || "",
+            startNow: true,
+          });
+        }
         return;
       }
 
@@ -461,6 +617,56 @@
     } catch (err) {
       console.warn("Failed to read clipboard:", err);
       showToast($t("toast.clipboardError") || ($currentLang === "ar" ? "تعذر قراءة الحافظة" : "Failed to read clipboard"), "error");
+    }
+  }
+
+  /** Base folder for the File Info window default path. */
+  function captureBaseFolder() {
+    const remembered = (rememberedCaptureFolder || "").trim();
+    if (!remembered) return settings.download_dir || "";
+    const parts = remembered.split(/[\\/]+/).filter((p) => p.length > 0);
+    const last = (parts[parts.length - 1] || "").toLowerCase();
+    const subfolders = Object.values(CATEGORY_SUBFOLDERS).map((s) => s.toLowerCase());
+    if (parts.length > 1 && subfolders.includes(last)) {
+      const sep = remembered.includes("\\") ? "\\" : "/";
+      const isAbsolute = remembered.startsWith(sep) || /^[A-Za-z]:/.test(remembered);
+      const base = parts.slice(0, -1).join(sep);
+      return isAbsolute && !/^[A-Za-z]:/.test(base) ? sep + base : base;
+    }
+    return remembered;
+  }
+
+  /** Queues a File Info offer and shows it (one dialog at a time). */
+  function openFileInfoWindow(offer) {
+    if (!offer) return;
+    captureOfferQueue = enqueueCaptureOffer(captureOfferQueue, offer, isCaptureOfferShowing);
+    showNextCaptureOffer();
+  }
+
+  /**
+   * Applies the confirmed File Info values to a queued task and optionally
+   * starts it. Shared by browser captures and Ctrl+V adds.
+   *
+   * @param {string} taskId
+   * @param {{ filename?: string, folder?: string, category?: string, startNow?: boolean }} detail
+   */
+  async function prepareAndStart(taskId, detail = {}) {
+    if (!taskId) return;
+    const prepareArgs = buildPrepareCaptureTaskArgs({
+      id: taskId,
+      filename: detail.filename || "",
+      folder: detail.folder || "",
+      category: detail.category,
+      settings,
+    });
+    await invoke("prepare_capture_task", prepareArgs, { suppressToast: true });
+
+    if (detail.startNow !== false) {
+      markPendingStart(taskId);
+      await invoke("start_task", { id: taskId }, { suppressToast: true });
+      if (settings.show_download_window) {
+        handleOpenDownloadWindow(taskId);
+      }
     }
   }
 
@@ -910,7 +1116,7 @@
     extensionGuideOpen = true;
   }
 
-  /** True while the PreDownloadDialog is showing the offer `offer`. */
+  /** True while the File Info window is showing the offer `offer`. */
   function isCaptureOfferShowing(offer) {
     return preDownloadOpen && !!captureOfferTaskId && offer?.task_id === captureOfferTaskId;
   }
@@ -986,22 +1192,28 @@
   }
 
   async function handleCaptureOfferConfirm(event) {
-    const { taskId, filename, folder, category } = event.detail || {};
+    const {
+      taskId,
+      filename,
+      folder,
+      category,
+      startNow = true,
+      rememberPath = false,
+    } = event.detail || {};
     if (!taskId) {
       dismissCaptureOffer();
       return;
     }
     try {
-      const prepareArgs = buildPrepareCaptureTaskArgs({
-        id: taskId,
-        filename,
-        folder,
-        category,
-        settings,
-      });
-      await invoke("prepare_capture_task", prepareArgs, { suppressToast: true });
-      markPendingStart(taskId);
-      await invoke("start_task", { id: taskId }, { suppressToast: true });
+      // «تنزيل لاحقًا» keeps the task Queued with the confirmed destination;
+      // «ابدأ التنزيل» also starts it and switches to the Downloading window.
+      await prepareAndStart(taskId, { filename, folder, category, startNow });
+      if (startNow === false) {
+        showToast($t("toast.downloadQueued"), "success");
+      }
+      if (rememberPath && (folder || "").trim()) {
+        rememberedCaptureFolder = folder.trim();
+      }
       dismissCaptureOffer();
       addDialogOpen = false;
       droppedUrl = "";
@@ -1066,6 +1278,23 @@
         unlistenCaptureOffer = await listen("sayl://capture-offer", (event) => {
           const payload = event.payload;
           if (!isCaptureOfferPayload(payload)) return;
+
+          // "Show download window" off = no File Info window: start the captured
+          // task right away with the browser-provided name and the default folder.
+          if (!settings.show_download_window) {
+            prepareAndStart(payload.task_id, {
+              filename: payload.filename || "",
+              startNow: true,
+            })
+              .then(() => loadTasks())
+              .then(() => revealNewTask(payload.task_id))
+              .catch((err) => {
+                logCaptureDiagnostic(err, "handleCaptureOfferAutoStart");
+                showToast(friendlyPrepareCaptureError(err, $currentLang), "error");
+              });
+            return;
+          }
+
           // Queue instead of overwrite: a second capture must not replace the
           // dialog the user is filling in; it opens after confirm/cancel.
           captureOfferQueue = enqueueCaptureOffer(captureOfferQueue, payload, isCaptureOfferShowing);
@@ -1418,10 +1647,10 @@
     on:submit={(e) => handleAddTask(e.detail)}
   />
 
-  <PreDownloadDialog
+  <PreDownloadWindow
     open={preDownloadOpen}
     offer={captureOffer}
-    defaultFolder={settings.download_dir}
+    defaultFolder={captureBaseFolder()}
     on:confirm={handleCaptureOfferConfirm}
     on:cancel={handleCaptureOfferCancel}
   />
@@ -1488,6 +1717,7 @@
           {pendingStart}
           {autoShutdown}
           autoClose={settings.close_download_window_on_finish}
+          maxConnections={settings.max_connections_per_task}
           on:close={(e) => handleCloseDownloadWindow(e.detail)}
           on:pause={(e) => handlePauseTask(e.detail)}
           on:resume={(e) => handleResumeTask(e.detail)}

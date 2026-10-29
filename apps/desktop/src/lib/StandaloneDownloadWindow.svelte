@@ -136,6 +136,7 @@
       {task}
       {autoShutdown}
       autoClose={settings.close_download_window_on_finish}
+      maxConnections={settings.max_connections_per_task}
       isNativeWindow={true}
       on:close={closeNativeWindow}
       on:pause={(e) => safeInvoke("pause_task", { id: e.detail })}

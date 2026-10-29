@@ -125,7 +125,7 @@ pub fn open_complete_window(
     let window = tauri::WebviewWindowBuilder::new(app, &label, tauri::WebviewUrl::App(url.into()))
         .title(title)
         .visible(false)
-        .inner_size(440.0, 240.0)
+        .inner_size(480.0, 300.0)
         .resizable(false)
         .decorations(true)
         .background_color(bg_color)

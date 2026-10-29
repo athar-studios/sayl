@@ -1,5 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
+// Portions derived from AB Download Manager (https://github.com/amir1376/ab-download-manager), Apache-2.0
 import {
   DEFAULT_EXTENSIONS,
   DEFAULT_MIN_SIZE_MB,
@@ -1030,5 +1031,182 @@ describe("GitHub / Google Drive / binary capture (no listed extension required)"
     assert.equal(res.message, HTML_RESPONSE_MESSAGE_AR);
     assert.equal(res.redownloaded, false, "an HTML failure must never be given back");
     assert.equal(downloadCalled, false);
+  });
+
+  test("38. Google Drive virus-scan confirm page (HTML) is rejected, actual download after 'Download anyway' is captured", () => {
+    resetUrlDedupeCache();
+    // The confirm page returns HTML — must not be intercepted
+    const confirmPageItem = {
+      id: 501,
+      url: "https://drive.google.com/uc?export=download&id=1AbCdEfGhIjKlMnOp",
+      finalUrl: "https://drive.usercontent.google.com/download?id=1AbCdEfGhIjKlMnOp&export=download&confirm=t",
+      filename: "confirm.html",
+      totalBytes: 0,
+      mime: "text/html; charset=utf-8"
+    };
+    const confirmRes = shouldInterceptDownload({ item: confirmPageItem, settings: baseSettings });
+    assert.equal(confirmRes.intercept, false);
+    assert.equal(confirmRes.reason, "html_response");
+    assert.equal(confirmRes.message, HTML_RESPONSE_MESSAGE_AR);
+
+    // The actual download after clicking "Download anyway" has binary MIME
+    const actualDownloadItem = {
+      id: 502,
+      url: "https://drive.google.com/uc?export=download&id=1AbCdEfGhIjKlMnOp",
+      finalUrl: "https://drive.usercontent.google.com/download?id=1AbCdEfGhIjKlMnOp&export=download&confirm=t&uuid=abc123",
+      filename: "quarterly-report.pdf",
+      totalBytes: 5 * 1024 * 1024,
+      mime: "application/pdf"
+    };
+    const actualRes = shouldInterceptDownload({
+      item: actualDownloadItem,
+      settings: baseSettings,
+      suggestedFilename: "quarterly-report.pdf"
+    });
+    assert.equal(actualRes.intercept, true);
+    assert.equal(actualRes.reason, "allowed");
+    assert.equal(actualRes.filename, "quarterly-report.pdf");
+    assert.equal(actualRes.forced, true, "Drive downloads are forced captures");
+  });
+
+  test("39. drive.usercontent.google.com with confirm=t is recognized as forced capture", () => {
+    const urls = [
+      "https://drive.usercontent.google.com/download?id=123&export=download&confirm=t",
+      "https://drive.usercontent.google.com/download?id=123&export=download&confirm=yes",
+      "https://drive.usercontent.google.com/uc?id=123&export=download"
+    ];
+    for (const url of urls) {
+      assert.equal(isGoogleDriveUrl(url), true, `${url} must be recognized as Google Drive`);
+      const item = { id: 1, url, finalUrl: url, totalBytes: 0 };
+      assert.equal(isForceCaptureItem(item), true, `${url} must be a forced capture`);
+    }
+  });
+
+  test("40. immediate consecutive downloads of the same URL (different IDs) are both captured", () => {
+    resetUrlDedupeCache();
+    const url = "https://example.com/package.zip";
+    const baseSettings = { enabled: true, minSizeMb: 1, extensions: DEFAULT_EXTENSIONS };
+    const t0 = Date.now();
+
+    // First download
+    const firstItem = { id: 601, url, filename: "package.zip", totalBytes: 10 * 1024 * 1024 };
+    const first = shouldInterceptDownload({ item: firstItem, settings: baseSettings, nowMs: t0, checkDedupe: true });
+    assert.equal(first.intercept, true, "first download must be intercepted");
+    recordUrlDedupe(url, t0, firstItem.id);
+
+    // Second download, same URL, different ID, 100ms later (within 3s window)
+    const secondItem = { id: 602, url, filename: "package.zip", totalBytes: 10 * 1024 * 1024 };
+    const second = shouldInterceptDownload({ item: secondItem, settings: baseSettings, nowMs: t0 + 100, checkDedupe: true });
+    assert.equal(second.intercept, true, "second download with different ID must NOT be deduped");
+    assert.equal(second.reason, "allowed");
+
+    // Third download, same URL, same ID as first (should not happen in practice, but test dedupe)
+    const thirdItem = { id: 601, url, filename: "package.zip", totalBytes: 10 * 1024 * 1024 };
+    const third = shouldInterceptDownload({ item: thirdItem, settings: baseSettings, nowMs: t0 + 200, checkDedupe: true });
+    assert.equal(third.intercept, false, "same ID + same URL within window must be deduped");
+    assert.equal(third.reason, "url_deduped");
+  });
+
+  test("41. redirect chain: github.com -> objects.githubusercontent.com preserves original filename", () => {
+    const releaseUrl = "https://github.com/owner/repo/releases/download/v1.0/app-v1.0.exe";
+    const redirect1 = "https://objects.githubusercontent.com/github-production-release-asset-123/456/abc?X-Amz-Signature=sig1";
+    const redirect2 = "https://objects.githubusercontent.com/github-production-release-asset-123/456/abc?X-Amz-Signature=sig2&response-content-disposition=attachment%3Bfilename%3Dapp-v1.0.exe";
+
+    const item = {
+      id: 701,
+      url: releaseUrl,
+      finalUrl: redirect2,
+      filename: "Unconfirmed 123.crdownload",
+      totalBytes: 20 * 1024 * 1024
+    };
+
+    assert.equal(isGithubReleaseUrl(releaseUrl), true);
+    assert.equal(isGithubRedirectUrl(redirect1), true);
+    assert.equal(isGithubRedirectUrl(redirect2), true);
+
+    const res = shouldInterceptDownload({ item, settings: baseSettings });
+    assert.equal(res.intercept, true);
+    assert.equal(res.reason, "allowed");
+    assert.equal(res.targetUrl, redirect2);
+    // Filename should come from the original release URL since final URL has no usable extension
+    assert.equal(res.filename, "app-v1.0.exe");
+  });
+
+  test("42. Content-Disposition filename from onDeterminingFilename takes priority over URL", () => {
+    const item = {
+      id: 801,
+      url: "https://cdn.example.com/download/abc123",
+      finalUrl: "https://cdn.example.com/download/abc123?token=xyz",
+      filename: "my-custom-name.zip", // Browser-determined filename from Content-Disposition
+      totalBytes: 15 * 1024 * 1024
+    };
+
+    const res = shouldInterceptDownload({
+      item,
+      settings: baseSettings,
+      suggestedFilename: "my-custom-name.zip"
+    });
+    assert.equal(res.intercept, true);
+    assert.equal(res.filename, "my-custom-name.zip", "Content-Disposition filename wins");
+  });
+
+  test("43. GitHub codeload archive (zip/tar.gz) with no size is captured", () => {
+    resetUrlDedupeCache();
+    const urls = [
+      "https://codeload.github.com/owner/repo/zip/refs/heads/main",
+      "https://codeload.github.com/owner/repo/tar.gz/refs/tags/v1.0",
+      "https://codeload.github.com/owner/repo/legacy.zip/refs/heads/main"
+    ];
+    for (const url of urls) {
+      assert.equal(isGithubReleaseUrl(url), true, `${url} must be recognized as GitHub release/archive`);
+      const item = { id: 901, url, filename: "main", totalBytes: 0, fileSize: 0 };
+      const res = shouldInterceptDownload({ item, settings: baseSettings });
+      assert.equal(res.intercept, true, `${url} must be intercepted`);
+      assert.equal(res.reason, "allowed");
+      assert.equal(res.forced, true);
+    }
+  });
+
+  test("44. release-assets.githubusercontent.com redirect is recognized", () => {
+    const url = "https://release-assets.githubusercontent.com/github-production-release-asset-2e65bee/12345678/abcdef?X-Amz-Signature=sig";
+    assert.equal(isGithubRedirectUrl(url), true);
+    assert.equal(isGithubReleaseUrl(url), true);
+
+    const item = {
+      id: 1001,
+      url: "https://github.com/owner/repo/releases/download/v1.0/file.bin",
+      finalUrl: url,
+      filename: "Unconfirmed 456.crdownload",
+      totalBytes: 0
+    };
+    const res = shouldInterceptDownload({ item, settings: baseSettings });
+    assert.equal(res.intercept, true);
+    assert.equal(res.forced, true);
+  });
+
+  test("45. duplicate download given back to browser is not re-intercepted", () => {
+    resetUrlDedupeCache();
+    const givenBackUrls = new Set();
+    const url = "https://example.com/driver.msi";
+    const item = { id: 1101, url, filename: "driver.msi", totalBytes: 25 * 1024 * 1024 };
+    const t0 = Date.now();
+
+    // First attempt: host unreachable, given back
+    const first = shouldInterceptDownload({ item, settings: baseSettings, nowMs: t0, givenBackUrls, checkDedupe: true });
+    assert.equal(first.intercept, true);
+
+    // Simulate host unreachable -> given back
+    givenBackUrls.add(url);
+
+    // Second event from browser re-download
+    const retryItem = { id: 1102, url, filename: "driver.msi", totalBytes: 25 * 1024 * 1024 };
+    const retry = shouldInterceptDownload({ item: retryItem, settings: baseSettings, nowMs: t0 + 500, givenBackUrls });
+    assert.equal(retry.intercept, false);
+    assert.equal(retry.reason, "given_back_to_browser");
+
+    // Third event after given-back URL is cleared (simulating user clicking again later)
+    givenBackUrls.delete(url);
+    const third = shouldInterceptDownload({ item: { ...retryItem, id: 1103 }, settings: baseSettings, nowMs: t0 + 1000, givenBackUrls, checkDedupe: true });
+    assert.equal(third.intercept, true, "after given-back is cleared, download must be captured again");
   });
 });

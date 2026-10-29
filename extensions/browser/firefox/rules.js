@@ -2,6 +2,7 @@
 // background script (classic script, intentionally no ES module syntax so it
 // loads on every supported Gecko version). Exposes a single global, `SaylRules`,
 // mirroring the pure logic used by the Chromium build.
+// Portions derived from AB Download Manager (https://github.com/amir1376/ab-download-manager), Apache-2.0
 
 (function (global) {
   const DEFAULT_EXTENSIONS = [

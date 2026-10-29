@@ -1,4 +1,5 @@
 // SAYL Download Manager - Background Service Worker (Manifest V3)
+// Portions derived from AB Download Manager (https://github.com/amir1376/ab-download-manager), Apache-2.0
 import {
   extractBasename,
   sanitizeUrlForLog,

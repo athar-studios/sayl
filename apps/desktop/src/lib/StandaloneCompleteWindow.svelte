@@ -26,6 +26,19 @@
     } catch {}
   }
 
+  /**
+   * «لا تعرض هذه النافذة مرة أخرى»: persists the Rust-backed setting
+   * `show_download_complete_window`, so the host stops opening this window.
+   */
+  async function handleDontShowAgain() {
+    settings = { ...settings, show_download_complete_window: false };
+    try {
+      await safeInvoke("set_settings", { settings });
+    } catch (e) {
+      console.warn("Could not persist show_download_complete_window:", e);
+    }
+  }
+
   function applyActiveTheme(theme) {
     if (theme === "dark") {
       document.documentElement.setAttribute("data-theme", "dark");
@@ -82,6 +95,7 @@
       on:close={closeNativeWindow}
       on:reveal={(e) => safeInvoke("reveal_task", { id: e.detail })}
       on:openFile={(e) => safeInvoke("open_task_file", { id: e.detail })}
+      on:dontShowAgain={handleDontShowAgain}
     />
   {:else}
     <div class="loading-state"><span>...</span></div>

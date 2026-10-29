@@ -3,7 +3,7 @@
  * Style mirrors `format.test.js` and `state.test.js`.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   buildWindowTitle,
   truncateMiddle,
@@ -18,6 +18,14 @@ import {
   isProgressResetState,
   getProgressBarFillDirection,
   getProgressBarFillStyle,
+  progressPercent,
+  buildStatusRows,
+  buildConnectionSegments,
+  buildConnectionTableRows,
+  formatRangeInfo,
+  buildSpeedLimitState,
+  getWindowActionFlags,
+  buildCompleteDetails,
 } from "./downloadWindowUi.js";
 
 describe("downloadWindowUi — pure helpers", () => {
@@ -446,27 +454,271 @@ describe("downloadWindowUi — RTL progress bar fill direction", () => {
 });
 
 describe("downloadWindowUi — Cancel vs Hide button behavior", () => {
-  it("Cancel button dispatches cancel event", () => {
-    const dispatch = vi.fn();
-    const taskId = "task-123";
-    const handler = () => dispatch("cancel", taskId);
-    handler();
-    expect(dispatch).toHaveBeenCalledWith("cancel", taskId);
+  it("offers cancel while downloading and never swaps it for hide", () => {
+    const flags = getWindowActionFlags({ state: "Downloading" });
+    expect(flags.cancel).toBe(true);
+    expect(flags.hide).toBe(true);
+    expect(flags.pause).toBe(true);
   });
 
-  it("Hide/Close button dispatches close event", () => {
-    const dispatch = vi.fn();
-    const taskId = "task-123";
-    const handler = () => dispatch("close", taskId);
-    handler();
-    expect(dispatch).toHaveBeenCalledWith("close", taskId);
+  it("hides the window without cancelling when the task is completed", () => {
+    const flags = getWindowActionFlags({ state: "Completed" });
+    expect(flags.cancel).toBe(false);
+    expect(flags.hide).toBe(true);
+    expect(flags.openFile).toBe(true);
+    expect(flags.reveal).toBe(true);
+  });
+});
+
+describe("downloadWindowUi — progressPercent", () => {
+  it("returns a 0..100 percentage with one decimal", () => {
+    expect(progressPercent(500, 1000)).toBe(50);
+    expect(progressPercent(333, 1000)).toBe(33.3);
   });
 
-  it("X button in header dispatches close event (hide window)", () => {
-    const dispatch = vi.fn();
-    const taskId = "task-123";
-    const handler = () => dispatch("close", taskId);
-    handler();
-    expect(dispatch).toHaveBeenCalledWith("close", taskId);
+  it("clamps above the total", () => {
+    expect(progressPercent(1500, 1000)).toBe(100);
+  });
+
+  it("returns null when the total size is unknown or zero", () => {
+    expect(progressPercent(500, null)).toBe(null);
+    expect(progressPercent(500, 0)).toBe(null);
+    expect(progressPercent(500, -10)).toBe(null);
+  });
+});
+
+describe("downloadWindowUi — IDM status rows", () => {
+  const task = {
+    state: "Downloading",
+    total_size: 10_485_760,
+    written: 5_242_880,
+    speed_bps: 1_048_576,
+    eta_secs: 5,
+  };
+
+  it("lists state, file size, downloaded with %, rate, time left and resumable", () => {
+    const rows = buildStatusRows(task, "ar");
+    expect(rows.map((r) => r.key)).toEqual([
+      "state",
+      "fileSize",
+      "downloaded",
+      "transferRate",
+      "timeLeft",
+      "resumable",
+    ]);
+
+    const byKey = Object.fromEntries(rows.map((r) => [r.key, r]));
+    expect(byKey.state.value).toBe("Downloading");
+    expect(byKey.fileSize.value).toBe("10.0 MB");
+    expect(byKey.downloaded.value).toBe("5.0 MB (50%)");
+    expect(byKey.transferRate.value).toBe("1.0 MB/s");
+    expect(byKey.timeLeft.value).toBe("5ث");
+    expect(byKey.resumable.value).toBe("نعم");
+  });
+
+  it("carries i18n label keys instead of hardcoded labels", () => {
+    const rows = buildStatusRows(task, "en");
+    expect(rows.find((r) => r.key === "downloaded").labelKey).toBe("downloadWindow.downloaded");
+    expect(rows.find((r) => r.key === "timeLeft").labelKey).toBe("downloadWindow.timeLeft");
+    expect(rows.find((r) => r.key === "resumable").labelKey).toBe("downloadWindow.resumable");
+  });
+
+  it("renders the same formatted values in English", () => {
+    const byKey = Object.fromEntries(buildStatusRows(task, "en").map((r) => [r.key, r]));
+    expect(byKey.downloaded.value).toBe("5.0 MB (50%)");
+    expect(byKey.resumable.value).toBe("Yes");
+    expect(byKey.fileSize.valueDir).toBe("ltr");
+  });
+
+  it("adds a parts row when the backend reports connections", () => {
+    const rows = buildStatusRows({ ...task, parts: 4 }, "ar");
+    expect(rows.map((r) => r.key)[1]).toBe("parts");
+    expect(rows.find((r) => r.key === "parts").value).toBe("4");
+  });
+
+  it("degrades to placeholders for an unknown size and no speed", () => {
+    const byKey = Object.fromEntries(
+      buildStatusRows({ state: "Queued", written: 2048 }, "ar").map((r) => [r.key, r])
+    );
+    expect(byKey.fileSize.value).toBe("حجم غير محدد");
+    expect(byKey.downloaded.value).toBe("2.0 KB");
+    expect(byKey.transferRate.value).toBe("—");
+    expect(byKey.timeLeft.value).toBe("—");
+    expect(byKey.resumable.value).toBe("لا");
+  });
+
+  it("tolerates a null task", () => {
+    const rows = buildStatusRows(null, "ar");
+    expect(rows.find((r) => r.key === "state").value).toBe("Queued");
+    expect(rows.find((r) => r.key === "downloaded").value).toBe("0 B");
+  });
+});
+
+describe("downloadWindowUi — buildConnectionSegments", () => {
+  it("prefers real checkpoint ranges", () => {
+    const segments = buildConnectionSegments({
+      total_size: 2000,
+      segment_ranges: [
+        { start: 0, end: 1000, completed: true },
+        { start: 1000, end: 2000, completed: false },
+      ],
+    });
+
+    expect(segments).toEqual([
+      { start: 0, end: 1000, written: 1000, total_completed: true },
+      { start: 1000, end: 2000, written: 0, total_completed: false },
+    ]);
+  });
+
+  it("honours a partially written range", () => {
+    const segments = buildConnectionSegments({
+      segment_ranges: [{ start: 0, end: 1000, written: 250 }],
+    });
+    expect(segments[0].written).toBe(250);
+    expect(segments[0].total_completed).toBe(false);
+  });
+
+  it("synthesises equal bands when only parts are known", () => {
+    const segments = buildConnectionSegments({ total_size: 1000, written: 500, parts: 4 });
+    expect(segments.map((s) => s.start)).toEqual([0, 250, 500, 750]);
+    expect(segments.map((s) => s.end)).toEqual([250, 500, 750, 1000]);
+    expect(segments.map((s) => s.written)).toEqual([250, 250, 0, 0]);
+    expect(segments.map((s) => s.total_completed)).toEqual([true, true, false, false]);
+  });
+
+  it("falls back to the `connections` field", () => {
+    const segments = buildConnectionSegments({ total_size: 100, connections: 2 });
+    expect(segments).toHaveLength(2);
+  });
+
+  it("returns nothing when the size or connection count is unknown", () => {
+    expect(buildConnectionSegments({ written: 10, parts: 4 })).toEqual([]);
+    expect(buildConnectionSegments({ total_size: 100, parts: 0 })).toEqual([]);
+    expect(buildConnectionSegments(null)).toEqual([]);
+  });
+
+  it("feeds the segmented bar one cell per connection", () => {
+    const segments = buildConnectionSegments({ total_size: 1000, written: 500, parts: 4 });
+    const bars = buildSegmentBars(segments, { maxCells: segments.length });
+    expect(bars).toHaveLength(4);
+    expect(bars.map((b) => b.fraction)).toEqual([1, 1, 0, 0]);
+  });
+});
+
+describe("downloadWindowUi — per-connection table rows", () => {
+  it("numbers connections and formats downloaded bytes, range and status", () => {
+    const rows = buildConnectionTableRows(
+      [
+        { start: 0, end: 1024, written: 1024 },
+        { start: 1024, end: 2048, written: 512 },
+        { start: 2048, end: 3072, written: 0 },
+      ],
+      "en"
+    );
+
+    expect(rows.map((r) => r.index)).toEqual([1, 2, 3]);
+    expect(rows.map((r) => r.downloaded)).toEqual(["1.0 KB", "512 B", "0 B"]);
+    expect(rows.map((r) => r.status)).toEqual(["done", "downloading", "pending"]);
+    expect(rows[0].info).toBe("0 B – 1.0 KB");
+  });
+
+  it("returns an empty list without segments", () => {
+    expect(buildConnectionTableRows([])).toEqual([]);
+    expect(buildConnectionTableRows(null)).toEqual([]);
+  });
+});
+
+describe("downloadWindowUi — formatRangeInfo", () => {
+  it("renders a byte range", () => {
+    expect(formatRangeInfo(0, 1024, "en")).toBe("0 B – 1.0 KB");
+  });
+
+  it("returns a dash for an empty range", () => {
+    expect(formatRangeInfo(5, 5, "ar")).toBe("—");
+    expect(formatRangeInfo(10, 5, "ar")).toBe("—");
+  });
+});
+
+describe("downloadWindowUi — buildSpeedLimitState", () => {
+  it("reports a configured limit", () => {
+    const state = buildSpeedLimitState({ speed_limit_kbps: 512 }, "ar");
+    expect(state.enabled).toBe(true);
+    expect(state.limitKbps).toBe(512);
+    expect(state.label).toBe("512 KB/s");
+  });
+
+  it("reports unlimited when no limit is configured", () => {
+    const state = buildSpeedLimitState({}, "ar");
+    expect(state.enabled).toBe(false);
+    expect(state.limitKbps).toBe(null);
+    expect(state.label).toBe("غير محدود");
+    expect(buildSpeedLimitState(null, "en").label).toBe("Unlimited");
+  });
+
+  it("treats a zero limit as unlimited", () => {
+    expect(buildSpeedLimitState({ speed_limit_kbps: 0 }, "en").enabled).toBe(false);
+  });
+});
+
+describe("downloadWindowUi — getWindowActionFlags", () => {
+  it("allows pause, cancel and hide while downloading", () => {
+    const flags = getWindowActionFlags({ state: "Downloading" });
+    expect(flags).toMatchObject({
+      pause: true,
+      resume: false,
+      retry: false,
+      cancel: true,
+      hide: true,
+      openFile: false,
+      reveal: false,
+    });
+  });
+
+  it("allows resume while paused and retry while failed", () => {
+    expect(getWindowActionFlags({ state: "Paused" }).resume).toBe(true);
+    const failed = getWindowActionFlags({ state: "Failed" });
+    expect(failed.retry).toBe(true);
+    expect(failed.resume).toBe(false);
+    expect(failed.pause).toBe(false);
+  });
+
+  it("disables the transient actions while a start is pending", () => {
+    const flags = getWindowActionFlags({ state: "Downloading" }, { isPending: true });
+    expect(flags.pause).toBe(false);
+    expect(flags.resume).toBe(false);
+    expect(flags.cancel).toBe(true);
+  });
+
+  it("never offers cancel for a completed task", () => {
+    const flags = getWindowActionFlags({ state: "Completed" });
+    expect(flags.cancel).toBe(false);
+    expect(flags.openFile).toBe(true);
+  });
+});
+
+describe("downloadWindowUi — buildCompleteDetails", () => {
+  it("shows name, size and the saved folder", () => {
+    const details = buildCompleteDetails(
+      { filename: "file.zip", total_size: 2048, folder: "C:\\Users\\me\\Downloads" },
+      "ar"
+    );
+    expect(details.filename).toBe("file.zip");
+    expect(details.size).toBe("2.0 KB");
+    expect(details.savedPath).toBe("C:\\Users\\me\\Downloads");
+  });
+
+  it("falls back to written bytes when the total is unknown", () => {
+    expect(buildCompleteDetails({ filename: "a.bin", written: 1024 }, "en").size).toBe("1.0 KB");
+  });
+
+  it("accepts save_path as a folder alias", () => {
+    expect(buildCompleteDetails({ filename: "b", save_path: "D:\\x" }, "en").savedPath).toBe("D:\\x");
+  });
+
+  it("uses dashes and an unknown-size label for a missing task", () => {
+    const details = buildCompleteDetails(null, "ar");
+    expect(details.filename).toBe("—");
+    expect(details.savedPath).toBe("—");
+    expect(details.size).toBe("حجم غير محدد");
   });
 });

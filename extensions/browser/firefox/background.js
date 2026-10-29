@@ -5,6 +5,7 @@
 // back to Firefox ONLY when the host is unreachable. All user-facing text is
 // Arabic. Every browser API call is guarded so a missing or unsupported API
 // degrades gracefully instead of throwing.
+// Portions derived from AB Download Manager (https://github.com/amir1376/ab-download-manager), Apache-2.0
 
 const HOST_NAME = "com.sayl.downloader";
 const CONTEXT_MENU_ID = "sayl-download-link";

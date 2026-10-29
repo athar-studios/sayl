@@ -1,4 +1,5 @@
 // SAYL Download Manager - Alt-click bypass content script
+// Portions derived from AB Download Manager (https://github.com/amir1376/ab-download-manager), Apache-2.0
 (() => {
   const TTL_MS = 10000;
 
