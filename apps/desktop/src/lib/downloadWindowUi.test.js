@@ -11,6 +11,9 @@ import {
   createThrottledTaskView,
   buildSegmentBars,
   normalizeSpeedLimit,
+  parseSpeedLimitInput,
+  formatSpeedLimit,
+  kbpsToDisplayUnit,
   isResumable,
   deriveDisplayState,
   mergeTaskMonotonic,
@@ -257,11 +260,11 @@ describe("downloadWindowUi — pure helpers", () => {
       expect(normalizeSpeedLimit({})).toBe(null);
     });
 
-    it("clamps to min 1 KB/s and max 10_000_000 KB/s", () => {
+    it("clamps to min 1 KB/s with no practical upper cap", () => {
       expect(normalizeSpeedLimit(0)).toBe(1);
       expect(normalizeSpeedLimit(-10)).toBe(1);
-      expect(normalizeSpeedLimit(10_000_001)).toBe(10_000_000);
-      expect(normalizeSpeedLimit(1e9)).toBe(10_000_000);
+      expect(normalizeSpeedLimit(10_000_001)).toBe(10_000_001);
+      expect(normalizeSpeedLimit(1e12)).toBe(4_294_967_295);
     });
   });
 
@@ -720,5 +723,76 @@ describe("downloadWindowUi — buildCompleteDetails", () => {
     expect(details.filename).toBe("—");
     expect(details.savedPath).toBe("—");
     expect(details.size).toBe("حجم غير محدد");
+  });
+});
+
+describe("downloadWindowUi — parseSpeedLimitInput", () => {
+  it("returns unlimited for empty/zero input", () => {
+    expect(parseSpeedLimitInput("")).toEqual({ ok: true, kbps: null });
+    expect(parseSpeedLimitInput("0")).toEqual({ ok: true, kbps: null });
+    expect(parseSpeedLimitInput(0)).toEqual({ ok: true, kbps: null });
+    expect(parseSpeedLimitInput(null)).toEqual({ ok: true, kbps: null });
+  });
+
+  it("rejects negative numbers", () => {
+    expect(parseSpeedLimitInput("-1")).toEqual({ ok: false, error: "negative" });
+    expect(parseSpeedLimitInput(-5)).toEqual({ ok: false, error: "negative" });
+  });
+
+  it("rejects invalid strings", () => {
+    expect(parseSpeedLimitInput("abc")).toEqual({ ok: false, error: "invalid" });
+    // whitespace-only parses to 0 -> unlimited (same as "0")
+    expect(parseSpeedLimitInput("  ")).toEqual({ ok: true, kbps: null });
+  });
+
+  it("has no upper cap (30+ MB/s and beyond are accepted)", () => {
+    expect(parseSpeedLimitInput(10_000_001)).toEqual({ ok: true, kbps: 10_000_001 });
+    expect(parseSpeedLimitInput("10001", "mbps")).toEqual({ ok: true, kbps: 10001 * 1024 });
+    expect(parseSpeedLimitInput("Infinity")).toEqual({ ok: false, error: "invalid" });
+  });
+
+  it("parses KB/s as integer KB/s", () => {
+    expect(parseSpeedLimitInput("123")).toEqual({ ok: true, kbps: 123 });
+    expect(parseSpeedLimitInput(512)).toEqual({ ok: true, kbps: 512 });
+  });
+
+  it("parses MB/s to KB/s", () => {
+    expect(parseSpeedLimitInput("1", "mbps")).toEqual({ ok: true, kbps: 1024 });
+    expect(parseSpeedLimitInput("2.5", "mbps")).toEqual({ ok: true, kbps: 2560 });
+    expect(parseSpeedLimitInput(3, "mbps")).toEqual({ ok: true, kbps: 3072 });
+  });
+});
+
+describe("downloadWindowUi — formatSpeedLimit", () => {
+  it("shows unlimited label for null/0", () => {
+    expect(formatSpeedLimit(null, "ar")).toBe("غير محدود");
+    expect(formatSpeedLimit(0, "en")).toBe("Unlimited");
+  });
+
+  it("shows KB/s for non-multiple of 1024", () => {
+    expect(formatSpeedLimit(512, "en")).toBe("512 KB/s");
+    expect(formatSpeedLimit(1025, "ar")).toBe("1025 KB/s");
+  });
+
+  it("shows MB/s when exactly divisible", () => {
+    expect(formatSpeedLimit(1024, "en")).toBe("1 MB/s");
+    expect(formatSpeedLimit(2048, "ar")).toBe("2 MB/s");
+  });
+});
+
+describe("downloadWindowUi — kbpsToDisplayUnit", () => {
+  it("defaults to KB/s for unlimited", () => {
+    expect(kbpsToDisplayUnit(null)).toEqual({ value: 0, unit: "kbps" });
+    expect(kbpsToDisplayUnit(0)).toEqual({ value: 0, unit: "kbps" });
+  });
+
+  it("chooses MB/s for clean multiples", () => {
+    expect(kbpsToDisplayUnit(1024)).toEqual({ value: 1, unit: "mbps" });
+    expect(kbpsToDisplayUnit(2048)).toEqual({ value: 2, unit: "mbps" });
+  });
+
+  it("keeps KB/s for non-multiples", () => {
+    expect(kbpsToDisplayUnit(512)).toEqual({ value: 512, unit: "kbps" });
+    expect(kbpsToDisplayUnit(1025)).toEqual({ value: 1025, unit: "kbps" });
   });
 });

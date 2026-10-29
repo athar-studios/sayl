@@ -207,7 +207,15 @@ export default {
     no: "No",
     unlimited: "Unlimited",
     maxConnections: "Max connections",
-    speedLimitNote: "The speed limit is global for all downloads; a per-download limit cannot be set from this window.",
+    speedLimitNote: "You can set a per-download speed limit; it applies immediately on change, or click \"Save\" to persist it.",
+    speedLimitSave: "Save",
+    rememberLimit: "Remember this limit for this file",
+    currentLimit: "Current limit",
+    speedLimitError: {
+      negative: "Value cannot be negative",
+      invalid: "Enter a valid number",
+      applyFailed: "Failed to apply speed limit, please try again",
+    },
     autoCloseOnComplete: "Close window when complete",
     openFolderOnComplete: "Open folder when complete",
     tabs: {
@@ -244,6 +252,9 @@ export default {
     preventSleep: "Prevent Sleep",
     autoShutdown: "Shut down when finished",
     shutdownArmed: "Shutdown: Armed",
+  },
+  common: {
+    saving: "Saving...",
   },
   dialog: {
     addTitle: "Add New Download",

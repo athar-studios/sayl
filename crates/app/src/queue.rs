@@ -376,6 +376,17 @@ impl TokenBucket {
     pub fn rate(&self) -> u64 {
         self.rate
     }
+
+    /// Changes the refill rate in bytes per second, keeping the one-second burst.
+    ///
+    /// Used when the user edits a live task's speed limit: the next `take` call
+    /// already applies the new rate.
+    pub fn set_rate(&mut self, bytes_per_sec: u64) {
+        let rate = bytes_per_sec.max(1);
+        self.rate = rate;
+        self.capacity = rate as f64;
+        self.tokens = self.tokens.min(self.capacity);
+    }
 }
 
 #[cfg(test)]

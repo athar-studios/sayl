@@ -1,7 +1,9 @@
 //! Sequential streaming download implementation.
 
 use std::path::Path;
-use std::time::Instant;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use futures_util::StreamExt;
 use sayl_core::error::CoreError;
@@ -14,6 +16,8 @@ use sayl_http::{headers::build_request_headers, probe, ProbeOptions};
 use sayl_storage::{Checkpoint, Store};
 use tokio_util::sync::CancellationToken;
 use url::Url;
+
+use crate::queue::TokenBucket;
 
 /// Outcome of a sequential transfer operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,6 +78,7 @@ async fn attempt_download_with_fallbacks(
     stall_timeout: std::time::Duration,
     custom_headers: Option<&[(String, String)]>,
     resume_info: Option<&ResumeInfo>,
+    speed_limit: Option<&AtomicU64>,
 ) -> Result<DownloadOutcome, CoreError> {
     // First attempt: full headers with Range
     let result = attempt_download_attempt(
@@ -93,6 +98,7 @@ async fn attempt_download_with_fallbacks(
         true,
         true,
         true,
+        speed_limit,
     )
     .await;
 
@@ -134,6 +140,7 @@ async fn attempt_download_with_fallbacks(
         false,
         true,
         false,
+        speed_limit,
     )
     .await;
 
@@ -181,6 +188,7 @@ async fn attempt_download_with_fallbacks(
         false,
         false,
         false,
+        speed_limit,
     )
     .await
 }
@@ -202,6 +210,7 @@ pub async fn run_sequential_download(
     store: &Store,
     stall_timeout: std::time::Duration,
     custom_headers: Option<&[(String, String)]>,
+    speed_limit: Option<Arc<AtomicU64>>,
 ) -> Result<DownloadOutcome, CoreError> {
     attempt_download_with_fallbacks(
         client,
@@ -217,6 +226,7 @@ pub async fn run_sequential_download(
         stall_timeout,
         custom_headers,
         resume_info,
+        speed_limit.as_deref(),
     )
     .await
 }
@@ -240,6 +250,7 @@ async fn attempt_download_attempt(
     use_range: bool,
     include_cookies_referrer_ua: bool,
     _is_first_attempt: bool,
+    speed_limit: Option<&AtomicU64>,
 ) -> Result<DownloadOutcome, CoreError> {
     if cancel_token.is_cancelled() {
         return Ok(DownloadOutcome::Cancelled {
@@ -428,6 +439,8 @@ async fn attempt_download_attempt(
 
     let initial_written = current_written;
     let mut stream = res.bytes_stream();
+    // Live per-task throttle; `None` while the task is unlimited.
+    let mut limiter: Option<TokenBucket> = None;
     let mut last_checkpoint_bytes = current_written;
     let start_time = Instant::now();
 
@@ -516,6 +529,21 @@ async fn attempt_download_attempt(
                 match item {
                     Ok(Some(Ok(chunk))) => {
                         if !chunk.is_empty() {
+                            // Live speed limit in bytes/sec; 0 or absent means unlimited.
+                            let limit_bps = speed_limit
+                                .map(|cell| cell.load(Ordering::Relaxed))
+                                .unwrap_or(0);
+                            if limit_bps > 0 {
+                                let bucket =
+                                    limiter.get_or_insert_with(|| TokenBucket::new(limit_bps));
+                                bucket.set_rate(limit_bps);
+                                let wait = bucket.take(chunk.len() as u64, Instant::now());
+                                if wait > Duration::ZERO {
+                                    tokio::time::sleep(wait).await;
+                                }
+                            } else {
+                                limiter = None;
+                            }
                             use tokio::io::AsyncWriteExt;
                             file.write_all(&chunk)
                                 .await

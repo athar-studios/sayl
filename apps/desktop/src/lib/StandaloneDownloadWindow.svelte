@@ -137,6 +137,7 @@
       {autoShutdown}
       autoClose={settings.close_download_window_on_finish}
       maxConnections={settings.max_connections_per_task}
+      speedLimitKbps={task?.speed_limit_kbps ?? null}
       isNativeWindow={true}
       on:close={closeNativeWindow}
       on:pause={(e) => safeInvoke("pause_task", { id: e.detail })}
@@ -166,7 +167,8 @@
     margin: 0;
     padding: 0;
     overflow: hidden;
-    background: var(--color-bg, #f5f8fc);
+    background: var(--color-bg);
+    color: var(--color-text);
   }
 
   .standalone-window-container {
@@ -176,19 +178,27 @@
     align-items: stretch;
     justify-content: stretch;
     box-sizing: border-box;
-    background: var(--color-bg, #f5f8fc);
+    background: var(--color-bg);
+    color: var(--color-text);
   }
 
+  /* The native window fills its webview; the inner view drops its floating
+     chrome (radius, border, shadow, fixed size) and uses the theme surface. */
+  .standalone-window-container :global(.idm-window),
   .standalone-window-container :global(.download-window) {
     width: 100%;
     height: 100%;
     max-width: none;
     max-height: none;
+    min-width: 0;
+    min-height: 0;
     border-radius: 0;
     border: none;
     box-shadow: none;
     box-sizing: border-box;
     padding: 1rem;
+    background: var(--color-bg-card);
+    color: var(--color-text);
   }
 
   .loading-state {
@@ -197,7 +207,7 @@
     justify-content: center;
     width: 100%;
     height: 100%;
-    color: #4b5563;
+    color: var(--color-text-muted);
     font-size: 14px;
   }
 </style>

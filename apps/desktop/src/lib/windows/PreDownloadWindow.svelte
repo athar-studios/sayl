@@ -244,12 +244,13 @@
 
   .dialog-card {
     background: var(--color-bg-card);
-    color: var(--text);
+    color: var(--color-text);
     border-radius: 12px;
     width: min(560px, 100%);
     box-shadow: var(--shadow-lg);
     border: 1px solid var(--color-border);
-    border-top: 4px solid var(--accent);
+    /* Turquoise stays a 4px accent rule, never text behind or on the card. */
+    border-top: 4px solid var(--color-accent);
     overflow: hidden;
   }
 
@@ -285,7 +286,7 @@
   .dialog-title {
     margin: 0;
     font-size: 1.125rem;
-    color: var(--text);
+    color: var(--color-text);
     font-weight: 700;
   }
 
@@ -293,7 +294,7 @@
     border: none;
     background: transparent;
     cursor: pointer;
-    color: var(--text-muted);
+    color: var(--color-text-muted);
     padding: 0.25rem;
     border-radius: 6px;
     display: flex;
@@ -302,7 +303,7 @@
   }
 
   .close-btn:hover {
-    color: var(--text);
+    color: var(--color-text);
     background: var(--color-bg-card-hover);
   }
 
@@ -319,15 +320,16 @@
     gap: 0.35rem;
   }
 
+  /* Labels are muted; field values keep the normal text colour. */
   .form-label {
     font-size: 0.875rem;
     font-weight: 600;
-    color: var(--accent);
+    color: var(--color-text-muted);
   }
 
   .form-control {
     background: var(--color-bg-input);
-    color: var(--text);
+    color: var(--color-text);
     border: 1px solid var(--color-border);
     border-radius: 8px;
     padding: 0.5rem 0.65rem;
@@ -340,9 +342,15 @@
     border-color: var(--color-border-focus);
   }
 
+  /* No opacity dimming: muted text on the subtle surface stays >= 6.8:1 light
+     and >= 12:1 dark, so a disabled field is clearly inert but still readable. */
   .form-control:disabled,
   .form-control[readonly] {
-    opacity: 0.7;
+    background: var(--color-bg-subtle);
+    color: var(--color-text-muted);
+    border-color: var(--color-text-subtle);
+    border-style: dashed;
+    opacity: 1;
     cursor: not-allowed;
   }
 
@@ -367,7 +375,7 @@
     background: var(--color-bg-subtle);
     border: 1px solid var(--color-border);
     border-radius: 8px;
-    color: var(--text-muted);
+    color: var(--color-text);
     font-size: 0.9375rem;
   }
 
@@ -380,13 +388,13 @@
     align-items: center;
     gap: 6px;
     font-size: 0.8125rem;
-    color: var(--text-muted);
+    color: var(--color-text-muted);
     cursor: pointer;
   }
 
   .option-checkbox {
     cursor: pointer;
-    accent-color: var(--accent);
+    accent-color: var(--color-accent);
     width: 16px;
     height: 16px;
   }
@@ -408,29 +416,34 @@
     padding: 0.5rem 1rem;
     font-weight: 600;
     cursor: pointer;
-    border: none;
+    border: 1px solid transparent;
     font-family: inherit;
-    transition: all 120ms ease;
+    transition: background-color 120ms ease, border-color 120ms ease;
   }
 
+  /* Navy is the primary accent (white on #0b1a4e = 16.4:1); turquoise stays the
+     card's top rule, the checkbox tick and the focus ring. */
   .btn-primary {
-    background: var(--accent);
+    background: #0b1a4e;
     color: #ffffff;
+    border-color: #0b1a4e;
   }
 
   .btn-primary:hover:not(:disabled) {
-    background: var(--color-accent-hover);
+    background: #16296b;
+    border-color: #16296b;
     color: #ffffff;
   }
 
   .btn-secondary {
     background: var(--color-bg-card);
-    color: var(--text);
-    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    border: 1px solid var(--color-text-subtle);
   }
 
   .btn-secondary:hover:not(:disabled) {
     background: var(--color-bg-card-hover);
+    border-color: var(--color-text-subtle);
   }
 
   .btn-sm {
@@ -445,8 +458,14 @@
     margin: 0;
   }
 
-  .btn:disabled {
-    opacity: 0.6;
+  /* Disabled buttons keep a visible border and legible text instead of fading. */
+  .btn:disabled,
+  .btn:disabled:hover {
+    background: var(--color-bg-subtle);
+    color: var(--color-text-muted);
+    border-color: var(--color-text-subtle);
+    border-style: dashed;
+    opacity: 1;
     cursor: not-allowed;
   }
 

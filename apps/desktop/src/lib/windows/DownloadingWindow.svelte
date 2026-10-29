@@ -23,6 +23,9 @@
     progressPercent,
     getWindowActionFlags,
     buildSpeedLimitState,
+    parseSpeedLimitInput,
+    formatSpeedLimit,
+    kbpsToDisplayUnit,
   } from "../downloadWindowUi.js";
   import StatusPill from "../StatusPill.svelte";
   import iconSvg from "../../assets/icon.svg";
@@ -65,6 +68,60 @@
   $: connRows = buildConnectionTableRows(segments, $currentLang);
   $: actionFlags = getWindowActionFlags(mergedTask, { isPending });
   $: speedState = buildSpeedLimitState({ speed_limit_kbps: speedLimitKbps }, $currentLang);
+
+  // Speed limit tab state
+  let speedLimitEnabled = speedState.enabled;
+  let { value: speedLimitValue, unit: speedLimitUnit } = kbpsToDisplayUnit(speedLimitKbps);
+  let speedLimitError = "";
+  let speedLimitSaving = false;
+
+  function parseAndValidateInput() {
+    const res = parseSpeedLimitInput(speedLimitValue, speedLimitUnit);
+    if (!res.ok) {
+      speedLimitError = $t(`downloadWindow.speedLimitError.${res.error}`);
+      return null;
+    }
+    speedLimitError = "";
+    return res.kbps; // null means unlimited
+  }
+
+  async function applySpeedLimit() {
+    const kbps = parseAndValidateInput();
+    if (kbps === null && speedLimitError) return;
+    if (kbps === undefined) return;
+
+    speedLimitSaving = true;
+    try {
+      if (typeof window !== "undefined" && (window.__TAURI_INTERNALS__ || window.__TAURI__)) {
+        const { invoke } = await import("@tauri-apps/api/core");
+        await invoke("set_task_speed_limit", {
+          id: mergedTask.id,
+          kbps,
+        });
+      }
+      // Update local state immediately for responsive UI
+      speedLimitKbps = kbps;
+      speedLimitEnabled = kbps !== null;
+      // Persist the "remember" preference for this task
+      if (typeof window !== "undefined" && kbps !== null) {
+        try {
+          localStorage.setItem(`sayl:speedLimit:${mergedTask.id}`, String(kbps));
+        } catch {}
+      }
+    } catch (e) {
+      console.error("Failed to set speed limit:", e);
+      speedLimitError = $t("downloadWindow.speedLimitError.applyFailed");
+    } finally {
+      speedLimitSaving = false;
+    }
+  }
+
+  function onSpeedLimitEnableChange() {
+    if (!speedLimitEnabled) {
+      applySpeedLimit(); // Will pass null (unlimited)
+    }
+  }
+
   $: writtenText = formatBytes(mergedTask?.written ?? 0, $currentLang);
   $: totalText =
     mergedTask?.total_size && mergedTask.total_size > 0
@@ -163,6 +220,14 @@
             </span>
           </div>
         {/each}
+
+        <!-- Per-task speed limit on status tab -->
+        {#if speedLimitKbps !== null && speedLimitKbps !== undefined}
+          <div class="status-row">
+            <span class="status-label">{$t("downloadWindow.speedLimit")}:</span>
+            <span class="status-value" dir="auto"><bdi>{formatSpeedLimit(speedLimitKbps, $currentLang)}</bdi></span>
+          </div>
+        {/if}
       </div>
 
       {#if isFailed}
@@ -223,16 +288,74 @@
         </div>
       {/if}
     {:else}
-      <!-- «حدود السرعة» tab: read-only summary of the configured limits -->
-      <div class="status-grid">
-        <div class="status-row">
-          <span class="status-label">{$t("downloadWindow.speedLimit")}:</span>
-          <span class="status-value" dir="ltr"><bdi dir="ltr">{speedState.label}</bdi></span>
+      <!-- «حدود السرعة» tab: interactive per-task speed limit like IDM -->
+      <div class="speed-limit-form">
+        <div class="option-row speed-limit-toggle">
+          <label class="option-label">
+            <input
+              type="checkbox"
+              class="option-checkbox"
+              checked={speedLimitEnabled}
+              on:change={onSpeedLimitEnableChange}
+            />
+            <span>{$t("downloadWindow.speedLimitEnable")}</span>
+          </label>
         </div>
-        <div class="status-row">
-          <span class="status-label">{$t("downloadWindow.maxConnections")}:</span>
-          <span class="status-value" dir="ltr">
-            <bdi dir="ltr">{connectionsLabel > 0 ? connectionsLabel : (maxConnections ?? "—")}</bdi>
+
+        <div class="speed-limit-inputs" class:disabled={!speedLimitEnabled}>
+          <div class="input-group">
+            <label for="speedLimitValue" class="input-label">
+              {$t("downloadWindow.speedLimitKbps")}
+            </label>
+            <div class="input-with-unit">
+              <input
+                id="speedLimitValue"
+                type="number"
+                class="speed-input"
+                bind:value={speedLimitValue}
+                min="0"
+                step="1"
+                disabled={!speedLimitEnabled}
+                placeholder={$t("downloadWindow.unlimited")}
+              />
+              <select
+                class="unit-select"
+                bind:value={speedLimitUnit}
+                disabled={!speedLimitEnabled}
+              >
+                <option value="kbps">{$t("units.kbps")}</option>
+                <option value="mbps">{$t("units.mbps")}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label class="input-label remember-label">
+              <input
+                type="checkbox"
+                class="option-checkbox"
+                checked={speedLimitKbps !== null}
+                disabled={!speedLimitEnabled}
+              />
+              <span>{$t("downloadWindow.rememberLimit")}</span>
+            </label>
+          </div>
+
+          {#if speedLimitError}
+            <div class="error-message">{speedLimitError}</div>
+          {/if}
+        </div>
+
+        <div class="speed-limit-actions">
+          <button
+            class="btn btn-primary"
+            on:click={applySpeedLimit}
+            disabled={!speedLimitEnabled || speedLimitSaving || speedLimitError}
+          >
+            {speedLimitSaving ? $t("common.saving") : $t("downloadWindow.speedLimitSave")}
+          </button>
+          <span class="current-limit-hint">
+            {$t("downloadWindow.currentLimit")}: {formatSpeedLimit(speedLimitKbps, $currentLang)}
           </span>
         </div>
       </div>
@@ -306,10 +429,9 @@
 </div>
 
 <style>
-  /* Navy #0b1a4e and turquoise #00b6bd appear as accents only. */
+  /* Navy #0b1a4e and turquoise #00b6bd appear as accents only (progress fill, primary button, focus).
+     All text/surface/border colors come from the app's theme CSS variables so both light/dark work. */
   .idm-window {
-    --navy: #0b1a4e;
-    --turquoise: #00b6bd;
     box-sizing: border-box;
     width: 100%;
     height: 100%;
@@ -319,11 +441,11 @@
     flex-direction: column;
     gap: 8px;
     padding: 10px 12px;
-    background: var(--color-bg-card, #ffffff);
-    color: var(--text, #1f2937);
-    border: 1px solid var(--color-border, #d8dee9);
+    background: var(--color-bg-card);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
     border-radius: 0;
-    font-family: var(--font-family, "Segoe UI", Tahoma, Arial, sans-serif);
+    font-family: var(--font-family);
     font-size: 0.8125rem;
     user-select: none;
     overflow: hidden;
@@ -341,7 +463,7 @@
     height: 400px;
     min-height: 320px;
     border-radius: 8px;
-    box-shadow: var(--shadow-md, 0 6px 18px rgba(11, 26, 78, 0.18));
+    box-shadow: var(--shadow-md);
   }
 
   /* Title row */
@@ -371,14 +493,10 @@
 
   .file-name {
     font-weight: 600;
-    color: var(--navy);
+    color: var(--color-text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .idm-window.rtl .file-name {
-    color: var(--navy);
   }
 
   .title-end {
@@ -395,23 +513,23 @@
     align-items: center;
     justify-content: center;
     background: transparent;
-    color: var(--text-muted, #6b7280);
+    color: var(--color-text-muted);
     border: 1px solid transparent;
     border-radius: 4px;
     cursor: pointer;
   }
 
   .icon-btn:hover {
-    background: var(--color-bg-card-hover, #eef1f6);
-    color: var(--navy);
-    border-color: var(--color-border, #d8dee9);
+    background: var(--color-bg-card-hover);
+    color: var(--color-text);
+    border-color: var(--color-border);
   }
 
   /* Tabs */
   .tab-strip {
     display: flex;
     gap: 2px;
-    border-bottom: 1px solid var(--color-border, #d8dee9);
+    border-bottom: 1px solid var(--color-border);
     flex-shrink: 0;
   }
 
@@ -421,7 +539,7 @@
     border: 1px solid transparent;
     border-bottom: none;
     border-radius: 6px 6px 0 0;
-    color: var(--text-muted, #6b7280);
+    color: var(--color-text-muted);
     font-family: inherit;
     font-size: 0.8125rem;
     font-weight: 600;
@@ -429,14 +547,14 @@
   }
 
   .tab:hover {
-    color: var(--navy);
+    color: var(--color-text);
   }
 
   .tab.active {
-    color: var(--navy);
-    background: var(--color-bg-card, #ffffff);
-    border-color: var(--color-border, #d8dee9);
-    box-shadow: inset 0 2px 0 0 var(--turquoise);
+    color: var(--color-text);
+    background: var(--color-bg-card);
+    border-color: var(--color-border);
+    box-shadow: inset 0 2px 0 0 var(--color-accent);
   }
 
   .tab-body {
@@ -457,8 +575,8 @@
     position: relative;
     height: 22px;
     width: 100%;
-    background: var(--color-bg-subtle, #eef1f6);
-    border: 1px solid var(--color-border, #d8dee9);
+    background: var(--color-bg-subtle);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
     overflow: hidden;
   }
@@ -469,7 +587,7 @@
 
   .progress-fill {
     height: 100%;
-    background: var(--turquoise);
+    background: var(--color-accent);
     transition: width 200ms linear;
   }
 
@@ -482,15 +600,25 @@
     padding: 0 8px;
     font-size: 0.75rem;
     font-weight: 600;
-    color: var(--navy);
+    color: var(--color-text);
     font-variant-numeric: tabular-nums;
     pointer-events: none;
     direction: ltr;
   }
 
+  /* The caption sits over both the empty track and the turquoise fill, so each
+     value gets a card-coloured pill: --color-text on --color-bg-card stays
+     >= 7.5:1 in light and >= 9.9:1 in dark no matter what is underneath. */
+  .progress-caption bdi {
+    background: var(--color-bg-card);
+    color: var(--color-text);
+    padding: 0 5px;
+    border-radius: 3px;
+    line-height: 1.35;
+  }
+
   .progress-pct {
-    color: #ffffff;
-    text-shadow: 0 0 2px rgba(11, 26, 78, 0.65);
+    font-weight: 700;
   }
 
   /* Status rows */
@@ -510,14 +638,14 @@
   }
 
   .status-label {
-    color: var(--turquoise);
+    color: var(--color-text-muted);
     font-weight: 600;
     flex-shrink: 0;
     white-space: nowrap;
   }
 
   .status-value {
-    color: var(--navy);
+    color: var(--color-text);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     overflow: hidden;
@@ -534,10 +662,10 @@
   /* Error */
   .error-banner {
     padding: 5px 8px;
-    border: 1px solid var(--color-danger, #b42318);
+    border: 1px solid var(--color-danger);
     border-radius: 4px;
-    background: var(--color-danger-light, #fdecea);
-    color: var(--color-danger, #b42318);
+    background: var(--color-danger-light);
+    color: var(--color-text);
     font-size: 0.75rem;
     flex-shrink: 0;
   }
@@ -555,31 +683,31 @@
     gap: 2px;
     height: 14px;
     flex-shrink: 0;
-    border: 1px solid var(--color-border, #d8dee9);
+    border: 1px solid var(--color-border);
     border-radius: 3px;
     padding: 1px;
-    background: var(--color-bg-subtle, #eef1f6);
+    background: var(--color-bg-subtle);
     overflow: hidden;
   }
 
   .segment-cell {
     flex: 1 1 0;
     min-width: 2px;
-    background: var(--color-border, #d8dee9);
+    background: var(--color-border);
     border-radius: 1px;
     overflow: hidden;
   }
 
   .segment-fill {
     height: 100%;
-    background: var(--turquoise);
+    background: var(--color-accent);
     transition: width 200ms linear;
   }
 
   .segment-legend {
     display: flex;
     justify-content: flex-end;
-    color: var(--text-muted, #6b7280);
+    color: var(--color-text-muted);
     font-size: 0.75rem;
     flex-shrink: 0;
   }
@@ -593,7 +721,7 @@
     flex: 1;
     min-height: 80px;
     overflow: auto;
-    border: 1px solid var(--color-border, #d8dee9);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
   }
 
@@ -607,19 +735,19 @@
   .conn-table thead th {
     position: sticky;
     top: 0;
-    background: var(--color-bg-subtle, #eef1f6);
-    color: var(--navy);
+    background: var(--color-bg-subtle);
+    color: var(--color-text-muted);
     font-weight: 600;
     text-align: start;
     padding: 3px 6px;
-    border-bottom: 1px solid var(--color-border, #d8dee9);
+    border-bottom: 1px solid var(--color-border);
     white-space: nowrap;
   }
 
   .conn-table tbody td {
     padding: 2px 6px;
-    border-bottom: 1px solid var(--color-border-subtle, #edf0f4);
-    color: var(--text, #1f2937);
+    border-bottom: 1px solid var(--color-border-subtle);
+    color: var(--color-text);
     text-align: start;
     white-space: nowrap;
   }
@@ -643,27 +771,34 @@
 
   .empty-row {
     text-align: center !important;
-    color: var(--text-muted, #6b7280);
+    color: var(--color-text-muted) !important;
     padding: 10px 6px !important;
   }
 
+  /* Status text stays readable (AA); the accent only marks the active row. */
   .conn-status {
-    color: var(--text-muted, #6b7280);
+    color: var(--color-text-muted);
   }
 
   .conn-status.active {
-    color: var(--turquoise);
+    color: var(--color-text);
     font-weight: 600;
   }
 
+  .conn-status.active::before {
+    content: "•";
+    color: var(--color-accent);
+    margin-inline-end: 4px;
+  }
+
   .conn-status.done {
-    color: var(--navy);
+    color: var(--color-text);
     font-weight: 600;
   }
 
   .tab-note {
     margin: 0;
-    color: var(--text-muted, #6b7280);
+    color: var(--color-text-muted);
     font-size: 0.75rem;
   }
 
@@ -685,42 +820,54 @@
     font-size: 0.8125rem;
     font-weight: 600;
     cursor: pointer;
-    border: 1px solid var(--color-border, #d8dee9);
+    border: 1px solid var(--color-border);
     transition: background-color 120ms ease;
   }
 
+  /* Secondary buttons read as normal text on the card surface in both themes;
+     the border uses --color-text-subtle so it clears 3:1 against the card in
+     light (4.8:1) and dark (5.8:1) instead of vanishing in the dark palette. */
   .btn-secondary {
-    background: var(--color-bg-card, #ffffff);
-    color: var(--navy);
+    background: var(--color-bg-card);
+    color: var(--color-text);
+    border-color: var(--color-text-subtle);
   }
 
-  .btn-secondary:hover {
-    background: var(--color-bg-card-hover, #eef1f6);
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--color-bg-card-hover);
   }
 
+  /* Navy stays the accent for the primary action (white on #0b1a4e = 16.4:1). */
   .btn-primary {
-    background: var(--navy);
+    background: #0b1a4e;
     color: #ffffff;
-    border-color: var(--navy);
+    border-color: #0b1a4e;
   }
 
-  .btn-primary:hover {
+  .btn-primary:hover:not(:disabled) {
     background: #16296b;
+    border-color: #16296b;
   }
 
   .btn-danger {
-    background: var(--color-bg-card, #ffffff);
-    color: var(--color-danger, #b42318);
-    border-color: var(--color-danger, #b42318);
+    background: var(--color-bg-card);
+    color: var(--color-danger);
+    border-color: var(--color-danger);
     margin-inline-start: auto;
   }
 
-  .btn-danger:hover {
-    background: var(--color-danger-light, #fdecea);
+  .btn-danger:hover:not(:disabled) {
+    background: var(--color-danger-light);
   }
 
-  .btn:disabled {
-    opacity: 0.6;
+  /* Disabled: visibly inert yet still legible (muted text on the subtle surface). */
+  .btn:disabled,
+  .btn:disabled:hover {
+    background: var(--color-bg-subtle);
+    color: var(--color-text-muted);
+    border-color: var(--color-text-subtle);
+    border-style: dashed;
+    opacity: 1;
     cursor: not-allowed;
   }
 
@@ -737,7 +884,7 @@
     align-items: center;
     gap: 5px;
     font-size: 0.75rem;
-    color: var(--text-muted, #6b7280);
+    color: var(--color-text-muted);
     cursor: pointer;
   }
 
@@ -745,7 +892,7 @@
     width: 14px;
     height: 14px;
     cursor: pointer;
-    accent-color: var(--turquoise);
+    accent-color: var(--color-accent);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -754,4 +901,21 @@
       transition: none !important;
     }
   }
+  /* Speed-limit tab controls: theme variables only, readable in light and dark. */
+  .speed-limit-form { display: flex; flex-direction: column; gap: 10px; color: var(--color-text); }
+  .speed-limit-inputs, .input-with-unit, .speed-limit-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .speed-input, .unit-select {
+    font: inherit;
+    padding: 4px 8px;
+    color: var(--color-text);
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+  }
+  .speed-input { width: 120px; }
+  .speed-input:focus-visible, .unit-select:focus-visible { outline: 2px solid var(--color-accent, #00b6bd); outline-offset: 1px; }
+  .speed-input:disabled, .unit-select:disabled { opacity: 0.6; }
+  .input-label { color: var(--color-text-muted); }
+  .current-limit-hint { color: var(--color-text-muted); font-size: 0.85rem; }
+  .error-message { color: var(--color-danger); font-size: 0.85rem; }
 </style>

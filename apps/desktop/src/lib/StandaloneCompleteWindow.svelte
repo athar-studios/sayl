@@ -107,14 +107,16 @@
     margin: 0;
     padding: 0;
     overflow: hidden;
-    background: var(--color-bg, #f5f8fc);
+    background: var(--color-bg);
+    color: var(--color-text);
   }
 
   .standalone-complete-container {
     width: 100vw;
     height: 100vh;
     display: flex;
-    background: var(--color-bg, #f5f8fc);
+    background: var(--color-bg);
+    color: var(--color-text);
   }
 
   .loading-state {
@@ -122,6 +124,6 @@
     align-items: center;
     justify-content: center;
     width: 100%;
-    color: #4b5563;
+    color: var(--color-text-muted);
   }
 </style>

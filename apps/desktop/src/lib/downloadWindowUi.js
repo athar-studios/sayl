@@ -20,7 +20,9 @@ import {
 export { mergeTaskMonotonic, mergeTasksMonotonic, isProgressResetState } from "./monotonic.js";
 
 const MIN_SPEED_LIMIT_KBPS = 1;
-const MAX_SPEED_LIMIT_KBPS = 10_000_000;
+// No user-facing cap; values saturate at u32::MAX only because the backend stores KB/s as u32.
+const MAX_SPEED_LIMIT_KBPS = 4_294_967_295;
+const KBPS_PER_MBPS = 1024;
 
 /** Coerces anything to a finite number, or `null` when it is not numeric. */
 function toFiniteNumber(value) {
@@ -405,7 +407,7 @@ export function buildConnectionSegments(task) {
 
 /**
  * Validates a KB/s limit typed by the user.
- * Returns an integer inside `[1, 10_000_000]`, or `null` for junk input.
+ * Returns a positive integer (saturated at u32::MAX), or `null` for junk input.
  *
  * @param {unknown} kbps
  * @returns {number|null}
@@ -414,6 +416,67 @@ export function normalizeSpeedLimit(kbps) {
   const n = toFiniteNumber(kbps);
   if (n === null) return null;
   return clamp(Math.round(n), MIN_SPEED_LIMIT_KBPS, MAX_SPEED_LIMIT_KBPS);
+}
+
+/**
+ * Parses a user-typed speed limit into KB/s.
+ * - Empty/zero → unlimited (kbps: null)
+ * - Negative → error
+ * - Returns KB/s as integer (rounded)
+ *
+ * @param {string|number|null|undefined} raw
+ * @param {"kbps"|"mbps"} unit
+ * @returns {{ ok: true, kbps: number|null } | { ok: false, error: 'negative'|'invalid' }}
+ */
+export function parseSpeedLimitInput(raw, unit = "kbps") {
+  if (raw === "" || raw === null || raw === undefined) {
+    return { ok: true, kbps: null };
+  }
+  const n = toFiniteNumber(raw);
+  if (n === null) {
+    return { ok: false, error: "invalid" };
+  }
+  if (n < 0) {
+    return { ok: false, error: "negative" };
+  }
+  if (n === 0) {
+    return { ok: true, kbps: null }; // unlimited
+  }
+  const kbps = Math.round(unit === "mbps" ? n * KBPS_PER_MBPS : n);
+  return { ok: true, kbps: Math.min(kbps, MAX_SPEED_LIMIT_KBPS) };
+}
+
+/**
+ * Converts KB/s to a human-readable string for the given locale.
+ * null/0 → localized "Unlimited".
+ *
+ * @param {number|null|undefined} kbps
+ * @param {string} lang
+ * @returns {string}
+ */
+export function formatSpeedLimit(kbps, lang = "ar") {
+  if (!kbps || kbps <= 0) {
+    return resolveTranslation(lang, "downloadWindow.unlimited");
+  }
+  if (kbps >= KBPS_PER_MBPS && kbps % KBPS_PER_MBPS === 0) {
+    return `${kbps / KBPS_PER_MBPS} ${resolveTranslation(lang, "units.mbps")}`;
+  }
+  return `${kbps} ${resolveTranslation(lang, "units.kbps")}`;
+}
+
+/**
+ * Determines a sensible display unit and value for prefilling the input.
+ * Returns { value: number, unit: "kbps"|"mbps" }.
+ *
+ * @param {number|null|undefined} kbps
+ * @returns {{ value: number, unit: "kbps"|"mbps" }}
+ */
+export function kbpsToDisplayUnit(kbps) {
+  if (!kbps || kbps <= 0) return { value: 0, unit: "kbps" };
+  if (kbps >= KBPS_PER_MBPS && kbps % KBPS_PER_MBPS === 0) {
+    return { value: kbps / KBPS_PER_MBPS, unit: "mbps" };
+  }
+  return { value: kbps, unit: "kbps" };
 }
 
 /**

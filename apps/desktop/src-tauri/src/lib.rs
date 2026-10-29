@@ -224,6 +224,9 @@ pub struct TaskView {
     pub completed_at: Option<String>,
     #[serde(default)]
     pub folder: String,
+    /// Per-task speed cap in KB/s; `None` means unlimited.
+    #[serde(default)]
+    pub speed_limit_kbps: Option<u32>,
 }
 
 impl TaskView {
@@ -269,6 +272,7 @@ impl TaskView {
             created_at: Some(rec.created_at.to_rfc3339()),
             completed_at,
             folder: rec.save_path.to_string_lossy().into_owned(),
+            speed_limit_kbps: rec.speed_limit_kbps,
         }
     }
 }
@@ -724,6 +728,24 @@ pub mod commands {
         }
         let active = state.active_count.load(Ordering::Relaxed);
         update_sleep_inhibition_with_count(&state.settings, &state.sleep_inhibitor, active);
+
+        Ok(())
+    }
+
+    #[tauri::command]
+    pub async fn set_task_speed_limit(
+        state: State<'_, AppState>,
+        id: String,
+        kbps: Option<u32>,
+    ) -> Result<(), String> {
+        let task_id = id
+            .parse::<TaskId>()
+            .map_err(|e| format!("Invalid task ID: {e}"))?;
+
+        state
+            .engine
+            .set_speed_limit(task_id, kbps)
+            .map_err(|e| format!("Failed to set speed limit: {e}"))?;
 
         Ok(())
     }
@@ -1261,6 +1283,7 @@ pub fn run() {
             commands::start_task,
             commands::pause_task,
             commands::cancel_task,
+            commands::set_task_speed_limit,
             commands::delete_tasks,
             commands::delete_task,
             commands::list_tasks,
@@ -1935,6 +1958,7 @@ mod tests {
                     created_at: None,
                     completed_at: None,
                     folder: String::new(),
+                    speed_limit_kbps: None,
                 }]
             },
         );
@@ -1967,6 +1991,7 @@ mod tests {
                     created_at: None,
                     completed_at: None,
                     folder: String::new(),
+                    speed_limit_kbps: None,
                 })
             },
             Vec::new,

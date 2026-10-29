@@ -15,6 +15,7 @@ use tokio_util::sync::CancellationToken;
 use url::Url;
 
 use crate::lease::{LeaseReport, LeaseTable, DEFAULT_CHUNK_SIZE, DEFAULT_LEASE_TTL};
+use crate::queue::TokenBucket;
 use crate::sequential::DownloadOutcome;
 
 /// Options configuring parallel multi-connection transfers.
@@ -49,6 +50,7 @@ pub async fn run_parallel_download(
     pause_token: CancellationToken,
     event_sender: &EventSender,
     store: Arc<Store>,
+    speed_limit: Option<Arc<AtomicU64>>,
 ) -> Result<DownloadOutcome, CoreError> {
     let (outcome, _report) = run_parallel_download_with_options(
         client,
@@ -64,6 +66,7 @@ pub async fn run_parallel_download(
         store,
         &[], // No completed ranges for fresh download
         DEFAULT_LEASE_TTL,
+        speed_limit,
     )
     .await?;
     Ok(outcome)
@@ -85,6 +88,7 @@ pub async fn run_parallel_download_with_report(
     store: Arc<Store>,
     completed_ranges: &[(u64, u64)],
     lease_ttl: Duration,
+    speed_limit: Option<Arc<AtomicU64>>,
 ) -> Result<(DownloadOutcome, LeaseReport), CoreError> {
     run_parallel_download_with_options(
         client,
@@ -100,6 +104,7 @@ pub async fn run_parallel_download_with_report(
         store,
         completed_ranges,
         lease_ttl,
+        speed_limit,
     )
     .await
 }
@@ -120,6 +125,7 @@ pub async fn run_parallel_download_with_options(
     store: Arc<Store>,
     completed_ranges: &[(u64, u64)],
     lease_ttl: Duration,
+    speed_limit: Option<Arc<AtomicU64>>,
 ) -> Result<(DownloadOutcome, LeaseReport), CoreError> {
     if cancel_token.is_cancelled() {
         return Ok((
@@ -210,6 +216,10 @@ pub async fn run_parallel_download_with_options(
     let throttled = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let range_unsupported = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let start_time = Instant::now();
+    // One shared bucket so the per-task cap covers all connections together,
+    // not each connection separately. The limit cell is read live so the user
+    // can change the cap of a running task.
+    let speed_limiter: Arc<Mutex<Option<TokenBucket>>> = Arc::new(Mutex::new(None));
 
     let mut handles = Vec::with_capacity(num_workers);
 
@@ -287,6 +297,8 @@ pub async fn run_parallel_download_with_options(
         let fatal_error = Arc::clone(&fatal_error);
         let throttled = Arc::clone(&throttled);
         let range_unsupported = Arc::clone(&range_unsupported);
+        let speed_limiter = Arc::clone(&speed_limiter);
+        let speed_limit = speed_limit.clone();
         let cancel_token = cancel_token.clone();
         let pause_token = pause_token.clone();
         // `lease_ttl` is Copy and captured by the worker task below through the
@@ -519,6 +531,30 @@ pub async fn run_parallel_download_with_options(
                             match item {
                                 Ok(Some(Ok(chunk_bytes))) => {
                                     if !chunk_bytes.is_empty() {
+                                        // Shared live per-task throttle across all workers.
+                                        // 0 or absent in the cell means unlimited.
+                                        {
+                                            let limit_bps = speed_limit
+                                                .as_ref()
+                                                .map(|cell| cell.load(Ordering::Relaxed))
+                                                .unwrap_or(0);
+                                            let mut limiter = speed_limiter.lock().await;
+                                            if limit_bps > 0 {
+                                                let bucket = limiter.get_or_insert_with(|| {
+                                                    TokenBucket::new(limit_bps)
+                                                });
+                                                bucket.set_rate(limit_bps);
+                                                let wait = bucket.take(
+                                                    chunk_bytes.len() as u64,
+                                                    Instant::now(),
+                                                );
+                                                if wait > Duration::ZERO {
+                                                    tokio::time::sleep(wait).await;
+                                                }
+                                            } else {
+                                                *limiter = None;
+                                            }
+                                        }
                                         if worker_offset + (chunk_bytes.len() as u64) > expected_end {
                                             let mut tbl = table.lock().await;
                                             tbl.release(lease);

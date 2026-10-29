@@ -45,6 +45,9 @@ pub struct TaskRecord {
     /// Classification kind of the error (e.g. "http_429", "too_many_redirects").
     #[serde(default)]
     pub error_kind: Option<String>,
+    /// Optional per-task speed limit in KB/s. `None` or `0` means unlimited.
+    #[serde(default)]
+    pub speed_limit_kbps: Option<u32>,
 }
 
 impl TaskRecord {
@@ -71,6 +74,7 @@ impl TaskRecord {
             updated_at: now,
             error: None,
             error_kind: None,
+            speed_limit_kbps: None,
         }
     }
 
@@ -98,6 +102,7 @@ impl TaskRecord {
             updated_at: now,
             error: None,
             error_kind: None,
+            speed_limit_kbps: None,
         }
     }
 }

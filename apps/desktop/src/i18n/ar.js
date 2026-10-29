@@ -207,7 +207,15 @@ export default {
     no: "لا",
     unlimited: "غير محدود",
     maxConnections: "أقصى عدد الاتصالات",
-    speedLimitNote: "حد السرعة عام لكل التنزيلات؛ لا يمكن تحديد حد مستقل لهذا التنزيل من هذه النافذة.",
+    speedLimitNote: "يمكنك تحديد حد سرعة لهذا التنزيل؛ سيُحفظ تلقائيًا عند تغيير القيمة، أو اضغط «حفظ» لتثبيته.",
+    speedLimitSave: "حفظ",
+    rememberLimit: "تذكر هذا الحد لهذا الملف",
+    currentLimit: "الحد الحالي",
+    speedLimitError: {
+      negative: "القيمة لا يمكن أن تكون سالبة",
+      invalid: "أدخل رقماً صالحاً",
+      applyFailed: "تعذر تطبيق حد السرعة، يرجى المحاولة مرة أخرى",
+    },
     autoCloseOnComplete: "إغلاق النافذة عند الانتهاء",
     openFolderOnComplete: "فتح المجلد عند الانتهاء",
     tabs: {
@@ -244,6 +252,9 @@ export default {
     preventSleep: "منع السكون",
     autoShutdown: "إطفاء الجهاز بعد الانتهاء",
     shutdownArmed: "إطفاء الجهاز: جاهز",
+  },
+  common: {
+    saving: "جاري الحفظ...",
   },
   dialog: {
     addTitle: "إضافة رابط تنزيل جديد",

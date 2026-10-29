@@ -75,10 +75,10 @@
 </div>
 
 <style>
-  /* Navy #0b1a4e and turquoise #00b6bd appear as accents only. */
+  /* Navy #0b1a4e and turquoise #00b6bd are accents only (primary button, focus,
+     checkboxes). Every text/surface/border colour comes from the app theme
+     variables shared with the main window, so light and dark both stay legible. */
   .complete-window {
-    --navy: #0b1a4e;
-    --turquoise: #00b6bd;
     box-sizing: border-box;
     width: 100%;
     height: 100%;
@@ -86,9 +86,9 @@
     flex-direction: column;
     gap: 10px;
     padding: 12px 14px;
-    background: var(--color-bg-card, #ffffff);
-    color: var(--text, #1f2937);
-    font-family: var(--font-family, "Segoe UI", Tahoma, Arial, sans-serif);
+    background: var(--color-bg-card);
+    color: var(--color-text);
+    font-family: var(--font-family);
     font-size: 0.8125rem;
     user-select: none;
     overflow: hidden;
@@ -114,7 +114,7 @@
 
   .heading {
     font-weight: 700;
-    color: var(--navy);
+    color: var(--color-text);
     font-size: 0.9375rem;
   }
 
@@ -135,15 +135,16 @@
     line-height: 1.4;
   }
 
+  /* Labels muted, values normal text colour. */
   .label {
-    color: var(--turquoise);
+    color: var(--color-text-muted);
     font-weight: 600;
     flex-shrink: 0;
     white-space: nowrap;
   }
 
   .value {
-    color: var(--navy);
+    color: var(--color-text);
     font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -167,7 +168,7 @@
     align-items: center;
     gap: 5px;
     font-size: 0.75rem;
-    color: var(--text-muted, #6b7280);
+    color: var(--color-text-muted);
     cursor: pointer;
     flex-shrink: 0;
   }
@@ -176,7 +177,7 @@
     width: 14px;
     height: 14px;
     cursor: pointer;
-    accent-color: var(--turquoise);
+    accent-color: var(--color-accent);
   }
 
   .actions {
@@ -195,26 +196,41 @@
     font-size: 0.8125rem;
     font-weight: 600;
     cursor: pointer;
-    border: 1px solid var(--color-border, #d8dee9);
+    border: 1px solid var(--color-border);
     transition: background-color 120ms ease;
   }
 
+  /* Navy stays the accent for the primary action (white on #0b1a4e = 16.4:1). */
   .btn-primary {
-    background: var(--navy);
+    background: #0b1a4e;
     color: #ffffff;
-    border-color: var(--navy);
+    border-color: #0b1a4e;
   }
 
-  .btn-primary:hover {
+  .btn-primary:hover:not(:disabled) {
     background: #16296b;
+    border-color: #16296b;
   }
 
   .btn-secondary {
-    background: var(--color-bg-card, #ffffff);
-    color: var(--navy);
+    background: var(--color-bg-card);
+    color: var(--color-text);
+    border-color: var(--color-text-subtle);
   }
 
-  .btn-secondary:hover {
-    background: var(--color-bg-card-hover, #eef1f6);
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-text-subtle);
+  }
+
+  /* Disabled: visibly inert yet still legible (muted text on the subtle surface). */
+  .btn:disabled,
+  .btn:disabled:hover {
+    background: var(--color-bg-subtle);
+    color: var(--color-text-muted);
+    border-color: var(--color-text-subtle);
+    border-style: dashed;
+    opacity: 1;
+    cursor: not-allowed;
   }
 </style>

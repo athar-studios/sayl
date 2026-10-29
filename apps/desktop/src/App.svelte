@@ -1718,6 +1718,7 @@
           {autoShutdown}
           autoClose={settings.close_download_window_on_finish}
           maxConnections={settings.max_connections_per_task}
+          speedLimitKbps={floatingTask?.speed_limit_kbps ?? null}
           on:close={(e) => handleCloseDownloadWindow(e.detail)}
           on:pause={(e) => handlePauseTask(e.detail)}
           on:resume={(e) => handleResumeTask(e.detail)}

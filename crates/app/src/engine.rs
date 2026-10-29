@@ -58,6 +58,9 @@ struct EngineInner {
     next_scheduler_id: Mutex<u64>,
     /// In-memory custom request headers per task (never persisted to journal).
     task_headers: Mutex<HashMap<TaskId, Vec<(String, String)>>>,
+    /// Live per-task speed caps in bytes/sec (0 = unlimited), shared with the
+    /// running transfer so a UI edit throttles without restarting the task.
+    speed_limit_cells: Mutex<HashMap<TaskId, Arc<AtomicU64>>>,
     /// Duration of stall timeout without progress in milliseconds.
     stall_timeout_ms: AtomicU64,
 }
@@ -149,12 +152,50 @@ impl Engine {
             scheduler_id_map,
             next_scheduler_id,
             task_headers,
+            speed_limit_cells: Mutex::new(HashMap::new()),
             stall_timeout_ms,
         };
 
         Ok(Self {
             inner: Arc::new(inner),
         })
+    }
+
+    /// Returns the live speed-limit cell (bytes/sec) for a task, creating it on
+    /// first use and seeding it with the task's persisted limit.
+    fn speed_limit_cell(&self, task_id: TaskId, initial_kbps: Option<u32>) -> Arc<AtomicU64> {
+        let cell = {
+            let mut cells = match self.inner.speed_limit_cells.lock() {
+                Ok(cells) => cells,
+                Err(_) => return Arc::new(AtomicU64::new(0)),
+            };
+            Arc::clone(
+                cells
+                    .entry(task_id)
+                    .or_insert_with(|| Arc::new(AtomicU64::new(0))),
+            )
+        };
+        cell.store(initial_kbps.unwrap_or(0) as u64 * 1024, Ordering::Relaxed);
+        cell
+    }
+
+    /// Sets or clears a task speed cap in KB/s. `None` and `0` mean unlimited.
+    ///
+    /// The value is persisted and, when the task is running, applied live to
+    /// the transfer's token bucket.
+    pub fn set_speed_limit(&self, task_id: TaskId, kbps: Option<u32>) -> Result<(), CoreError> {
+        let normalized = kbps.filter(|kbps| *kbps > 0);
+        if let Some(mut record) = self.inner.store.get_task(task_id)? {
+            record.speed_limit_kbps = normalized;
+            record.updated_at = Utc::now();
+            self.inner.store.upsert_task(&record)?;
+        }
+        if let Ok(cells) = self.inner.speed_limit_cells.lock() {
+            if let Some(cell) = cells.get(&task_id) {
+                cell.store(normalized.unwrap_or(0) as u64 * 1024, Ordering::Relaxed);
+            }
+        }
+        Ok(())
     }
 
     /// Probes the specified URL, derives a safe filename, persists a TaskRecord in Queued state,
@@ -486,6 +527,9 @@ impl Engine {
         // Register active task control (no semaphore needed - scheduler manages concurrency)
         let cancel_token = CancellationToken::new();
         let pause_token = CancellationToken::new();
+        // Live per-task speed cap (bytes/sec, 0 = unlimited); UI edits update
+        // this cell and the running transfer picks them up on the next chunk.
+        let speed_limit = self.speed_limit_cell(task_id, record.speed_limit_kbps);
         {
             let mut active = self
                 .inner
@@ -717,6 +761,7 @@ impl Engine {
                         &self.inner.store,
                         stall_timeout,
                         custom_headers_ref,
+                        Some(speed_limit.clone()),
                     )
                     .await;
 
@@ -1103,6 +1148,7 @@ impl Engine {
                     self.inner.store.clone(),
                     &checkpoint_ranges, // Pass completed ranges for resume
                     DEFAULT_LEASE_TTL,
+                    Some(speed_limit.clone()),
                 )
                 .await;
 
@@ -1206,6 +1252,7 @@ impl Engine {
                                 &self.inner.store,
                                 self.stall_timeout(),
                                 custom_headers_ref,
+                                Some(speed_limit.clone()),
                             )
                             .await;
                             match seq_result {
@@ -1360,6 +1407,7 @@ impl Engine {
                         &self.inner.store,
                         stall_timeout,
                         custom_headers_ref,
+                        Some(speed_limit.clone()),
                     )
                     .await;
 

@@ -306,6 +306,7 @@ async fn test_end_to_end_fixture_server_max_connections_4() {
         store.clone(),
         &[], // No completed ranges for fresh download
         DEFAULT_LEASE_TTL,
+        None, // no per-task speed limit
     )
     .await
     .expect("parallel download succeeds");
@@ -431,6 +432,7 @@ async fn test_slow_worker_triggers_steal_and_file_is_correct() {
         store.clone(),
         &[], // No completed ranges for fresh download
         lease_ttl,
+        None, // no per-task speed limit
     )
     .await
     .expect("download completes with steal");
@@ -544,6 +546,7 @@ async fn test_worker_failing_mid_chunk_retried_by_another_worker_and_completes()
         store.clone(),
         &[], // No completed ranges for fresh download
         DEFAULT_LEASE_TTL,
+        None, // no per-task speed limit
     )
     .await
     .expect("download succeeds through retry by worker");
@@ -601,6 +604,7 @@ async fn test_persistent_worker_failure_fails_cleanly() {
         store.clone(),
         &[], // No completed ranges for fresh download
         DEFAULT_LEASE_TTL,
+        None, // no per-task speed limit
     )
     .await;
 
