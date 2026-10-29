@@ -361,6 +361,10 @@ export default {
     catFolderCompressed: "المضغوطة: Compressed/",
     catFolderOther: "أخرى: Other/",
 
+    categoryFoldersDesc: "مجلد الحفظ لكل تصنيف. اتركه كما هو ليبقى داخل مجلد التنزيل، أو اختر مجلداً خاصاً:",
+    categoryFolderDefault: "افتراضي",
+    categoryResetDefaults: "إعادة الضبط الافتراضي",
+
     notificationsTitle: "إشعارات النظام",
     notificationsDesc: "إرسال إشعار للنظام عند اكتمال التنزيل أو حدوث خطأ.",
     notificationsDisabled: "الإشعارات غير مدعومة في هذه النسخة حالياً.",

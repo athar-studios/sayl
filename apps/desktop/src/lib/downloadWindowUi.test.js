@@ -29,6 +29,9 @@ import {
   buildSpeedLimitState,
   getWindowActionFlags,
   buildCompleteDetails,
+  normalizeConnectionRanges,
+  mergeConnectionRowsMonotonic,
+  createConnectionTableTracker,
 } from "./downloadWindowUi.js";
 
 describe("downloadWindowUi — pure helpers", () => {
@@ -794,5 +797,119 @@ describe("downloadWindowUi — kbpsToDisplayUnit", () => {
   it("keeps KB/s for non-multiples", () => {
     expect(kbpsToDisplayUnit(512)).toEqual({ value: 512, unit: "kbps" });
     expect(kbpsToDisplayUnit(1025)).toEqual({ value: 1025, unit: "kbps" });
+  });
+});
+
+describe("downloadWindowUi — live connections table", () => {
+  it("reads real per-connection ranges when the payload carries them", () => {
+    const rows = normalizeConnectionRanges({
+      total_size: 2048,
+      segment_ranges: [
+        { start: 0, end: 1024, written: 1024 },
+        { start: 1024, end: 2048, written: 256 },
+      ],
+    });
+
+    expect(rows.map((r) => r.index)).toEqual([1, 2]);
+    expect(rows.map((r) => r.downloaded)).toEqual([1024, 256]);
+    expect(rows.map((r) => r.status)).toEqual(["done", "downloading"]);
+  });
+
+  it("accepts a per-connection array on `connections` or `parts`", () => {
+    const rows = normalizeConnectionRanges({
+      connections: [
+        { start: 0, end: 100, written: 100 },
+        { from: 100, to: 200, downloaded: 50 },
+      ],
+    });
+
+    expect(rows).toHaveLength(2);
+    expect(rows[1].downloaded).toBe(50);
+    expect(rows[1].status).toBe("downloading");
+  });
+
+  it("falls back to synthesised bands when only counts are known", () => {
+    const rows = normalizeConnectionRanges({ total_size: 1000, written: 500, parts: 4 });
+    expect(rows.map((r) => r.downloaded)).toEqual([250, 250, 0, 0]);
+    expect(rows.map((r) => r.status)).toEqual(["done", "done", "pending", "pending"]);
+  });
+
+  it("never throws on a missing payload or junk fields", () => {
+    expect(normalizeConnectionRanges(null)).toEqual([]);
+    expect(normalizeConnectionRanges({ connections: 3 })).toEqual([]);
+    expect(normalizeConnectionRanges({ total_size: "nope", parts: "x" })).toEqual([]);
+    // A list without any range object is not usable per-connection data.
+    expect(normalizeConnectionRanges({ segment_ranges: [null, "junk"] })).toEqual([]);
+  });
+
+  it("keeps a connection's downloaded bytes monotonic", () => {
+    const previous = [
+      { key: "conn-0", index: 1, start: 0, end: 1000, downloaded: 800, status: "downloading" },
+    ];
+    const next = [
+      { key: "conn-0", index: 1, start: 0, end: 1000, downloaded: 100, status: "downloading" },
+    ];
+
+    const merged = mergeConnectionRowsMonotonic(previous, next);
+    expect(merged[0].downloaded).toBe(800);
+    expect(merged[0].status).toBe("downloading");
+  });
+
+  it("never reports more bytes than a connection's own span", () => {
+    const previous = [
+      { key: "conn-0", index: 1, start: 0, end: 1000, downloaded: 900, status: "downloading" },
+    ];
+    const next = [
+      { key: "conn-0", index: 1, start: 0, end: 500, downloaded: 100, status: "downloading" },
+    ];
+
+    expect(mergeConnectionRowsMonotonic(previous, next)[0].downloaded).toBe(500);
+  });
+
+  it("tolerates missing inputs", () => {
+    expect(mergeConnectionRowsMonotonic(null, null)).toEqual([]);
+    expect(mergeConnectionRowsMonotonic([], [{ key: "conn-0", index: 1, start: 0, end: 10, downloaded: 10, status: "done" }])).toHaveLength(1);
+  });
+
+  it("tracks live updates monotonically and restarts the numbers on a retry", () => {
+    const tracker = createConnectionTableTracker();
+
+    const first = tracker.rows(
+      { id: "t1", state: "Downloading", total_size: 1000, written: 500, parts: 2 },
+      "en"
+    );
+    expect(first.map((r) => r.downloaded)).toEqual(["500 B", "0 B"]);
+    expect(first.map((r) => r.status)).toEqual(["done", "pending"]);
+    expect(first[0].info).toBe("0 B – 500 B");
+
+    // An out-of-order update must not shrink connection 1.
+    const second = tracker.rows(
+      { id: "t1", state: "Downloading", total_size: 1000, written: 200, parts: 2 },
+      "en"
+    );
+    expect(second.map((r) => r.downloaded)).toEqual(["500 B", "0 B"]);
+
+    // Retry (Downloading -> Queued) is a new attempt: the numbers may restart.
+    const retry = tracker.rows(
+      { id: "t1", state: "Queued", total_size: 1000, written: 100, parts: 2 },
+      "en"
+    );
+    expect(retry.map((r) => r.downloaded)).toEqual(["100 B", "0 B"]);
+  });
+
+  it("resets the history for a different task id", () => {
+    const tracker = createConnectionTableTracker();
+    tracker.rows({ id: "t1", state: "Downloading", total_size: 1000, written: 800, parts: 2 }, "en");
+    const other = tracker.rows(
+      { id: "t2", state: "Downloading", total_size: 1000, written: 100, parts: 2 },
+      "en"
+    );
+    expect(other.map((r) => r.downloaded)).toEqual(["100 B", "0 B"]);
+  });
+
+  it("returns no rows when the payload has no connection information", () => {
+    const tracker = createConnectionTableTracker();
+    expect(tracker.rows(null)).toEqual([]);
+    expect(tracker.rows({ id: "t1", state: "Probing" }, "en")).toEqual([]);
   });
 });

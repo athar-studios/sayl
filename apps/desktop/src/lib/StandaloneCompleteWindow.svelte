@@ -9,8 +9,18 @@
 
   let task = null;
   let settings = { ...DEFAULT_SETTINGS };
+  /** True while «فتح» / «فتح المجلد» is still running; that run closes the window. */
+  let commandInFlight = false;
+  /** True once the webview has been asked to close, so it is never asked twice. */
+  let closing = false;
 
+  /**
+   * Closes this native window: the webview first, then the Rust-side
+   * `close_complete_window` as a fallback when the webview API is unavailable.
+   */
   async function closeNativeWindow() {
+    if (closing) return;
+    closing = true;
     try {
       if (typeof window !== "undefined" && (window.__TAURI_INTERNALS__ || window.__TAURI__)) {
         const { getCurrentWebviewWindow } = await import("@tauri-apps/api/webviewWindow");
@@ -22,21 +32,33 @@
       }
     } catch {}
     try {
-      await safeInvoke("close_complete_window", { id: taskId });
+      await safeInvoke("close_complete_window", { id: taskId }, { suppressToast: true });
     } catch {}
   }
 
   /**
-   * «لا تعرض هذه النافذة مرة أخرى»: persists the Rust-backed setting
-   * `show_download_complete_window`, so the host stops opening this window.
+   * «فتح» / «فتح المجلد»: run the Rust command and close the window once it
+   * settles — including when it fails, so a dead window is never left open.
+   * `commandInFlight` is set synchronously, before the first `await`, so the
+   * `close` event that CompleteWindow emits right after the action cannot tear
+   * the webview down before the command resolves.
    */
-  async function handleDontShowAgain() {
-    settings = { ...settings, show_download_complete_window: false };
+  async function runCommand(command, id) {
+    const taskIdToUse = id || taskId;
+    commandInFlight = true;
     try {
-      await safeInvoke("set_settings", { settings });
-    } catch (e) {
-      console.warn("Could not persist show_download_complete_window:", e);
+      await safeInvoke(command, { id: taskIdToUse }, { suppressToast: true });
+    } catch {
+      // The Rust side reports its own failure; the window still closes.
+    } finally {
+      commandInFlight = false;
+      await closeNativeWindow();
     }
+  }
+
+  function handleCloseEvent() {
+    if (commandInFlight) return;
+    closeNativeWindow();
   }
 
   function applyActiveTheme(theme) {
@@ -92,10 +114,9 @@
   {#if task}
     <CompleteWindow
       {task}
-      on:close={closeNativeWindow}
-      on:reveal={(e) => safeInvoke("reveal_task", { id: e.detail })}
-      on:openFile={(e) => safeInvoke("open_task_file", { id: e.detail })}
-      on:dontShowAgain={handleDontShowAgain}
+      on:close={handleCloseEvent}
+      on:reveal={(e) => runCommand("reveal_task", e.detail)}
+      on:openFile={(e) => runCommand("open_task_file", e.detail)}
     />
   {:else}
     <div class="loading-state"><span>...</span></div>

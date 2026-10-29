@@ -1,7 +1,15 @@
 <script>
   import { t, currentLang, setLanguage } from "./i18n.js";
   import { safeInvoke } from "./tauri.js";
-  import { DEFAULT_SETTINGS, normalizeSettings, SETTINGS_SECTIONS } from "./settings.js";
+  import {
+    DEFAULT_SETTINGS,
+    normalizeSettings,
+    SETTINGS_SECTIONS,
+    categoryFolderRows,
+    normalizeCategoryOverrides,
+    pruneCategoryOverrides,
+  } from "./settings.js";
+  import { getCategoryLabel } from "./classify.js";
   import iconSvg from "../assets/icon.svg";
   import { BROWSER_ICONS, hasInstalledBrowsers } from "./browsers.js";
   import ExtensionGuideDialog from "./ExtensionGuideDialog.svelte";
@@ -27,6 +35,10 @@
   let stagedExtensionDir = "";
   let copiedDiagnostic = false;
 
+  /** Per-category folder overrides being edited (empty keeps the default folder). */
+  let categoryOverrides = normalizeCategoryOverrides(settings.category_folders);
+  $: categoryRows = categoryFolderRows(localSettings.download_dir, categoryOverrides);
+
   const sections = SETTINGS_SECTIONS;
 
   let wasOpen = false;
@@ -43,6 +55,7 @@
       saveSuccess = false;
       saveError = null;
       activeSection = initialSection || "general";
+      categoryOverrides = normalizeCategoryOverrides(settings.category_folders);
     }
   }
 
@@ -140,6 +153,44 @@
     }
   }
 
+  /**
+   * Picks the save folder for one category with the OS dialog.
+   * @param {string} categoryId
+   */
+  async function handleBrowseCategoryFolder(categoryId) {
+    saveError = null;
+    try {
+      if (typeof window !== "undefined" && (window.__TAURI_INTERNALS__ || window.__TAURI__)) {
+        const row = categoryRows.find((entry) => entry.id === categoryId);
+        const { open: openDialog } = await import("@tauri-apps/plugin-dialog");
+        const selected = await openDialog({
+          directory: true,
+          multiple: false,
+          defaultPath: row?.folder || localSettings.download_dir || undefined,
+        });
+        if (selected && typeof selected === "string") {
+          setCategoryFolder(categoryId, selected);
+        }
+      }
+    } catch (err) {
+      saveError = typeof err === "string" ? err : err?.message || String(err);
+    }
+  }
+
+  /**
+   * Stores the edited folder for one category.
+   * @param {string} categoryId
+   * @param {string} value
+   */
+  function setCategoryFolder(categoryId, value) {
+    categoryOverrides = { ...categoryOverrides, [categoryId]: value || "" };
+  }
+
+  /** Drops every override so each category follows the download directory again. */
+  function handleResetCategoryFolders() {
+    categoryOverrides = normalizeCategoryOverrides({});
+  }
+
   async function handleSave() {
     saving = true;
     saveError = null;
@@ -152,10 +203,14 @@
       if (!payload.download_dir || !payload.download_dir.trim()) {
         payload.download_dir = settings.download_dir || "C:\\Users\\User\\Downloads";
       }
+      // Only folders the user actually changed are stored; everything else keeps
+      // following the download directory.
+      payload.category_folders = pruneCategoryOverrides(categoryOverrides, payload.download_dir);
       const updated = await safeInvoke("set_settings", { settings: payload });
       if (updated) {
         settings = { ...updated };
         localSettings = normalizeSettings(updated);
+        categoryOverrides = normalizeCategoryOverrides(updated.category_folders);
         if (updated.language) {
           setLanguage(updated.language);
         }
@@ -403,54 +458,50 @@
               <h4 id="section-heading" class="section-heading">{$t("settings.navCategories")}</h4>
               <p class="section-intro">{$t("settings.categoriesDesc")}</p>
 
-              <div class="categories-grid">
-                <div class="cat-card">
-                  <span class="cat-icon">📄</span>
-                  <div class="cat-info">
-                    <strong>{$t("settings.catFolderDocuments")}</strong>
-                    <small>pdf, doc, docx, txt, epub, xlsx, pptx</small>
-                  </div>
+              <div class="category-folders">
+                <div class="category-folder-head">
+                  <p class="section-intro">{$t("settings.categoryFoldersDesc")}</p>
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-sm"
+                    on:click={handleResetCategoryFolders}
+                  >
+                    {$t("settings.categoryResetDefaults")}
+                  </button>
                 </div>
 
-                <div class="cat-card">
-                  <span class="cat-icon">⚙️</span>
-                  <div class="cat-info">
-                    <strong>{$t("settings.catFolderPrograms")}</strong>
-                    <small>exe, msi, apk, appimage, deb, rpm</small>
+                {#each categoryRows as row (row.id)}
+                  <div class="category-folder-row">
+                    <div class="category-folder-meta">
+                      <strong class="category-folder-title">
+                        {getCategoryLabel(row.id, $currentLang)}
+                      </strong>
+                      {#if !row.isCustom}
+                        <span class="category-folder-badge">
+                          {$t("settings.categoryFolderDefault")}
+                        </span>
+                      {/if}
+                    </div>
+                    <div class="dir-input-row">
+                      <input
+                        id={`category-folder-${row.id}`}
+                        class="form-control"
+                        type="text"
+                        dir="ltr"
+                        value={row.folder}
+                        aria-label={getCategoryLabel(row.id, $currentLang)}
+                        on:input={(event) => setCategoryFolder(row.id, event.currentTarget.value)}
+                      />
+                      <button
+                        type="button"
+                        class="btn btn-browse"
+                        on:click={() => handleBrowseCategoryFolder(row.id)}
+                      >
+                        {$t("settings.browse")}
+                      </button>
+                    </div>
                   </div>
-                </div>
-
-                <div class="cat-card">
-                  <span class="cat-icon">🎬</span>
-                  <div class="cat-info">
-                    <strong>{$t("settings.catFolderVideo")}</strong>
-                    <small>mp4, mkv, webm, avi, mov, flv</small>
-                  </div>
-                </div>
-
-                <div class="cat-card">
-                  <span class="cat-icon">🎵</span>
-                  <div class="cat-info">
-                    <strong>{$t("settings.catFolderAudio")}</strong>
-                    <small>mp3, wav, flac, aac, m4a, ogg</small>
-                  </div>
-                </div>
-
-                <div class="cat-card">
-                  <span class="cat-icon">📦</span>
-                  <div class="cat-info">
-                    <strong>{$t("settings.catFolderCompressed")}</strong>
-                    <small>zip, rar, 7z, tar, gz, bz2, iso</small>
-                  </div>
-                </div>
-
-                <div class="cat-card">
-                  <span class="cat-icon">📁</span>
-                  <div class="cat-info">
-                    <strong>{$t("settings.catFolderOther")}</strong>
-                    <small>other file extensions</small>
-                  </div>
-                </div>
+                {/each}
               </div>
             </div>
 
@@ -1090,38 +1141,48 @@
     color: var(--text-muted);
   }
 
-  /* Categories Grid */
-  .categories-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  /* Category folder overrides */
+  .category-folders {
+    display: flex;
+    flex-direction: column;
     gap: 0.75rem;
   }
 
-  .cat-card {
+  .category-folder-head {
     display: flex;
-    align-items: center;
-    gap: 0.75rem;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .category-folder-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
     padding: 0.75rem;
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
   }
 
-  .cat-icon {
-    font-size: 1.5rem;
+  .category-folder-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
-  .cat-info strong {
-    display: block;
+  .category-folder-title {
     font-size: 0.85rem;
     color: var(--text);
   }
 
-  .cat-info small {
+  .category-folder-badge {
+    font-size: 0.72rem;
     color: var(--text-muted);
-    font-size: 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 0.1rem 0.45rem;
   }
-
   /* Extension Section Styles */
   .host-status-box {
     display: flex;

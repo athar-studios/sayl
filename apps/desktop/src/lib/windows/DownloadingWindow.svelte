@@ -18,7 +18,7 @@
   import {
     buildStatusRows,
     buildConnectionSegments,
-    buildConnectionTableRows,
+    createConnectionTableTracker,
     buildSegmentBars,
     progressPercent,
     getWindowActionFlags,
@@ -65,7 +65,12 @@
   $: segBars = buildSegmentBars(segments, {
     maxCells: Math.max(1, Math.min(32, segments.length || 1)),
   });
-  $: connRows = buildConnectionTableRows(segments, $currentLang);
+  // Live per-connection table: one row per connection, fed by every task
+  // update. The tracker keeps each connection's bytes monotonic for the same
+  // attempt and restarts them on a retry; it tolerates a payload without any
+  // per-range data by synthesising bands from `parts` / `connections`.
+  const connectionTable = createConnectionTableTracker();
+  $: connRows = connectionTable.rows(mergedTask, $currentLang);
   $: actionFlags = getWindowActionFlags(mergedTask, { isPending });
   $: speedState = buildSpeedLimitState({ speed_limit_kbps: speedLimitKbps }, $currentLang);
 
@@ -210,34 +215,6 @@
         </div>
       </div>
 
-      <!-- Status rows -->
-      <div class="status-grid">
-        {#each statusRows as row (row.key)}
-          <div class="status-row">
-            <span class="status-label">{$t(row.labelKey)}:</span>
-            <span class="status-value" dir={row.valueDir}>
-              <bdi dir={row.valueDir}>{rowValue(row)}</bdi>
-            </span>
-          </div>
-        {/each}
-
-        <!-- Per-task speed limit on status tab -->
-        {#if speedLimitKbps !== null && speedLimitKbps !== undefined}
-          <div class="status-row">
-            <span class="status-label">{$t("downloadWindow.speedLimit")}:</span>
-            <span class="status-value" dir="auto"><bdi>{formatSpeedLimit(speedLimitKbps, $currentLang)}</bdi></span>
-          </div>
-        {/if}
-      </div>
-
-      {#if isFailed}
-        <div class="error-banner" role="alert">
-          <span class="error-text" title={mergedTask?.error || errInfo?.hint || ""}>
-            <bdi dir="auto">{mergedTask?.error || errInfo?.hint || $t("state.Failed")}</bdi>
-          </span>
-        </div>
-      {/if}
-
       <!-- Segmented connection strip -->
       {#if segBars.length > 0}
         <div class="segment-strip" aria-label={$t("downloadWindow.connections")}>
@@ -285,6 +262,34 @@
               {/if}
             </tbody>
           </table>
+        </div>
+      {/if}
+
+      <!-- Status rows -->
+      <div class="status-grid">
+        {#each statusRows as row (row.key)}
+          <div class="status-row">
+            <span class="status-label">{$t(row.labelKey)}:</span>
+            <span class="status-value" dir={row.valueDir}>
+              <bdi dir={row.valueDir}>{rowValue(row)}</bdi>
+            </span>
+          </div>
+        {/each}
+
+        <!-- Per-task speed limit on status tab -->
+        {#if speedLimitKbps !== null && speedLimitKbps !== undefined}
+          <div class="status-row">
+            <span class="status-label">{$t("downloadWindow.speedLimit")}:</span>
+            <span class="status-value" dir="auto"><bdi>{formatSpeedLimit(speedLimitKbps, $currentLang)}</bdi></span>
+          </div>
+        {/if}
+      </div>
+
+      {#if isFailed}
+        <div class="error-banner" role="alert">
+          <span class="error-text" title={mergedTask?.error || errInfo?.hint || ""}>
+            <bdi dir="auto">{mergedTask?.error || errInfo?.hint || $t("state.Failed")}</bdi>
+          </span>
         </div>
       {/if}
     {:else}
@@ -918,4 +923,21 @@
   .input-label { color: var(--color-text-muted); }
   .current-limit-hint { color: var(--color-text-muted); font-size: 0.85rem; }
   .error-message { color: var(--color-danger); font-size: 0.85rem; }
+
+  /* Dark theme keeps every text element on the theme's light text colour.
+     --color-danger is a semantic accent, so on a dark card the red moves to the
+     border/marker and the label itself uses --color-text (13.34:1 on #1f2937)
+     instead of #f87171 (5.31:1). Light theme is untouched. Both the explicit
+     [data-theme="dark"] attribute (set by the app and by the standalone windows)
+     and a dark OS preference without an attribute are covered. */
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme="light"])) .error-message,
+    :global(:root:not([data-theme="light"])) .btn-danger {
+      color: var(--color-text);
+    }
+  }
+  :global([data-theme="dark"]) .error-message,
+  :global([data-theme="dark"]) .btn-danger {
+    color: var(--color-text);
+  }
 </style>

@@ -12,8 +12,14 @@
   let autoShutdown = false;
   let unlistenProgress = null;
   let unlistenTasksChanged = null;
+  /** True while «فتح» / «فتح المجلد» is still running; that run closes the window. */
+  let commandInFlight = false;
+  /** True once the webview has been asked to close, so it is never asked twice. */
+  let closing = false;
 
   async function closeNativeWindow() {
+    if (closing) return;
+    closing = true;
     try {
       if (typeof window !== "undefined" && (window.__TAURI_INTERNALS__ || window.__TAURI__)) {
         const { getCurrentWebviewWindow } = await import("@tauri-apps/api/webviewWindow");
@@ -25,8 +31,33 @@
       }
     } catch {}
     try {
-      await safeInvoke("close_download_window", { id: taskId });
+      await safeInvoke("close_download_window", { id: taskId }, { suppressToast: true });
     } catch {}
+  }
+
+  /**
+   * «فتح» / «فتح المجلد» once this window has switched to the completion layout:
+   * run the Rust command, then close — including when the command fails, so the
+   * window never stays open as a dead end. `commandInFlight` is set before the
+   * first `await` so the `close` event emitted right after the action is ignored
+   * instead of tearing the webview down mid-command.
+   */
+  async function runCommand(command, id) {
+    const taskIdToUse = id || taskId;
+    commandInFlight = true;
+    try {
+      await safeInvoke(command, { id: taskIdToUse }, { suppressToast: true });
+    } catch {
+      // The Rust side reports its own failure; the window still closes.
+    } finally {
+      commandInFlight = false;
+      await closeNativeWindow();
+    }
+  }
+
+  function handleCloseEvent() {
+    if (commandInFlight) return;
+    closeNativeWindow();
   }
 
   function handleTaskUpdate(updatedTask) {
@@ -139,7 +170,7 @@
       maxConnections={settings.max_connections_per_task}
       speedLimitKbps={task?.speed_limit_kbps ?? null}
       isNativeWindow={true}
-      on:close={closeNativeWindow}
+      on:close={handleCloseEvent}
       on:pause={(e) => safeInvoke("pause_task", { id: e.detail })}
       on:resume={(e) => safeInvoke("start_task", { id: e.detail })}
       on:retry={(e) => safeInvoke("start_task", { id: e.detail })}
@@ -147,8 +178,8 @@
         await safeInvoke("cancel_task", { id: e.detail });
         closeNativeWindow();
       }}
-      on:reveal={(e) => safeInvoke("reveal_task", { id: e.detail })}
-      on:openFile={(e) => safeInvoke("open_task_file", { id: e.detail })}
+      on:reveal={(e) => runCommand("reveal_task", e.detail)}
+      on:openFile={(e) => runCommand("open_task_file", e.detail)}
       on:toggleAutoShutdown={(e) => (autoShutdown = e.detail)}
       on:toggleAutoClose={async (e) => {
         settings.close_download_window_on_finish = e.detail;

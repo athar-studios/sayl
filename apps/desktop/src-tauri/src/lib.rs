@@ -27,12 +27,14 @@ pub use shutdown::{
     SHUTDOWN_COUNTDOWN_SECS,
 };
 
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::collections::{BTreeMap, HashMap};
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 
+use sayl_app::parallel::SegmentRange;
 use sayl_app::{Engine, EngineConfig};
+use sayl_core::category::{categorize, FileCategory};
 use sayl_core::id::TaskId;
 use sayl_core::state::DownloadState;
 use sayl_storage::TaskRecord;
@@ -78,6 +80,13 @@ pub struct Settings {
     pub close_notice_shown: bool,
     #[serde(default = "default_true")]
     pub clipboard_monitor: bool,
+    /// Per-category destination overrides, keyed by category id
+    /// (`programs`, `video`, `audio`, `documents`, `compressed`, `other`).
+    ///
+    /// A missing or empty entry means "use `<download_dir>\<subfolder>`", so an
+    /// existing settings file without this field keeps the built-in folders.
+    #[serde(default)]
+    pub category_folders: BTreeMap<String, String>,
 }
 
 impl Default for Settings {
@@ -98,6 +107,7 @@ impl Default for Settings {
             run_at_startup: false,
             close_notice_shown: false,
             clipboard_monitor: true,
+            category_folders: BTreeMap::new(),
         }
     }
 }
@@ -178,6 +188,143 @@ pub fn validate_settings(settings: &Settings) -> Result<(), String> {
     Ok(())
 }
 
+/// Resolves the folder a file of `category` is saved into.
+///
+/// A per-category override from [`Settings::category_folders`] wins as long as
+/// it is a usable absolute path; otherwise the category subfolder is appended to
+/// the configured download directory (`...\Programs`, `...\Video`, `...\Music`,
+/// `...\Documents`, `...\Compressed`, `...\Other`).
+pub fn resolve_category_folder(settings: &Settings, category: FileCategory) -> PathBuf {
+    let custom = settings
+        .category_folders
+        .get(category.as_str())
+        .map(|folder| folder.trim())
+        .filter(|folder| !folder.is_empty() && validate_download_dir(folder).is_ok());
+    match custom {
+        Some(folder) => PathBuf::from(folder),
+        None => category.folder_in(Path::new(&settings.download_dir)),
+    }
+}
+
+/// Ensures the category folder exists and returns the folder to save into.
+///
+/// Creating the folder must never fail a download, so a folder that cannot be
+/// created falls back to the base download directory instead of an error.
+pub fn ensure_category_folder(settings: &Settings, category: FileCategory) -> PathBuf {
+    let folder = resolve_category_folder(settings, category);
+    match std::fs::create_dir_all(&folder) {
+        Ok(()) => folder,
+        Err(error) => {
+            tracing::warn!(
+                "failed to create category folder {} ({error}); using the download directory",
+                folder.display()
+            );
+            PathBuf::from(&settings.download_dir)
+        }
+    }
+}
+
+/// Clones the current settings snapshot, defaulting when the lock is poisoned.
+pub fn settings_snapshot(state: &AppState) -> Settings {
+    state.settings.read().map(|s| s.clone()).unwrap_or_default()
+}
+
+/// Applies the IDM-style category folder to a queued task's destination.
+///
+/// The category comes from the frontend when it already knows it (browser
+/// capture), otherwise it is derived from the task's file name and MIME type.
+/// The resolved folder is created when missing and stored as the task's save
+/// path. Any failure leaves the previous destination untouched, so a folder
+/// problem never blocks the download itself.
+pub fn apply_category_folder(
+    engine: &Engine,
+    settings: &Settings,
+    task_id: TaskId,
+    category: Option<FileCategory>,
+) -> Option<PathBuf> {
+    let record = engine.get_task(task_id).ok().flatten()?;
+    let category =
+        category.unwrap_or_else(|| categorize(&record.filename, record.content_type.as_deref()));
+    let folder = ensure_category_folder(settings, category);
+    if folder == record.save_path {
+        return Some(folder);
+    }
+    match engine.update_queued_destination(task_id, folder.clone(), record.filename) {
+        Ok(()) => Some(folder),
+        Err(error) => {
+            tracing::warn!("failed to apply category folder: {error}");
+            None
+        }
+    }
+}
+
+/// Compares two folders, ignoring case and trailing separators.
+///
+/// Windows paths are case-insensitive and the frontend may hand a folder back
+/// with a trailing separator, so a plain `==` is not reliable here.
+pub fn same_folder(left: &Path, right: &Path) -> bool {
+    let normalized = |path: &Path| {
+        path.to_string_lossy()
+            .trim_end_matches(['/', '\\'])
+            .replace('/', "\\")
+            .to_lowercase()
+    };
+    normalized(left) == normalized(right)
+}
+
+/// Encodes a string as a NUL-terminated UTF-16 buffer for `W` Win32 calls.
+#[cfg(target_os = "windows")]
+fn to_wide_string(value: &str) -> Vec<u16> {
+    value.encode_utf16().chain(Some(0)).collect()
+}
+
+/// Opens `path` with the application registered as its default handler.
+///
+/// `explorer.exe <file>` cannot do that: Explorer is a file manager, so it only
+/// reveals the containing folder instead of launching the file. ShellExecuteW
+/// with the `"open"` verb asks the shell for the default action of the file type,
+/// which is exactly what the «فتح» button needs.
+#[cfg(target_os = "windows")]
+pub fn open_path_with_default_app(path: &Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::UI::Shell::ShellExecuteW;
+    use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+    let operation = to_wide_string("open");
+    let file: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+    // SAFETY: both buffers are NUL-terminated UTF-16 and outlive the call; the
+    // shell only reads them, and a null owner window has no message loop needs.
+    let result = unsafe {
+        ShellExecuteW(
+            std::ptr::null_mut(),
+            operation.as_ptr(),
+            file.as_ptr(),
+            std::ptr::null(),
+            std::ptr::null(),
+            SW_SHOWNORMAL,
+        )
+    };
+    // ShellExecuteW reports success as a handle value greater than 32; 0 and the
+    // values up to 32 are legacy error codes.
+    let code = result as isize;
+    if code > 32 {
+        Ok(())
+    } else {
+        Err(format!(
+            "Failed to open '{}' with its default application (shell error {code})",
+            path.display()
+        ))
+    }
+}
+
+/// Builds the single Explorer argument that reveals `path` with the file selected.
+///
+/// Explorer expects `/select,<path>` as ONE argv element; keeping the path inside
+/// that element is what lets spaces and Arabic characters survive the hand-off.
+pub fn reveal_argument(path: &Path) -> String {
+    format!("/select,{}", path.display())
+}
+
 /// Active worker count estimate: for Downloading use min(parts, settings.max_connections_per_task) else 1/None.
 ///
 /// Approximation rationale: In `sayl-app`, tasks in `Downloading` state allocate workers up to the number of
@@ -227,6 +374,16 @@ pub struct TaskView {
     /// Per-task speed cap in KB/s; `None` means unlimited.
     #[serde(default)]
     pub speed_limit_kbps: Option<u32>,
+    /// Live per-connection table of a running parallel transfer.
+    ///
+    /// One entry per connection slot with the byte range it owns, the bytes
+    /// written inside that range and its coarse state (`pending` /
+    /// `downloading` / `done`). Empty when the task is not transferring in
+    /// parallel, so the window can fall back to its `parts` estimate. Entries
+    /// are ordered by `index`; a connection's `written` never decreases while
+    /// its `start`/`end` range is unchanged.
+    #[serde(default)]
+    pub segment_ranges: Vec<SegmentRange>,
 }
 
 impl TaskView {
@@ -273,7 +430,17 @@ impl TaskView {
             completed_at,
             folder: rec.save_path.to_string_lossy().into_owned(),
             speed_limit_kbps: rec.speed_limit_kbps,
+            segment_ranges: Vec::new(),
         }
+    }
+
+    /// Attaches the live per-connection snapshot to this view.
+    ///
+    /// The snapshot comes from [`Engine::connection_snapshot`] and is empty for
+    /// every task that is not running a parallel transfer.
+    pub fn with_segment_ranges(mut self, segment_ranges: Vec<SegmentRange>) -> Self {
+        self.segment_ranges = segment_ranges;
+        self
     }
 }
 
@@ -343,6 +510,11 @@ pub struct ProgressPayload {
     pub written: u64,
     pub total: Option<u64>,
     pub speed_bps: u64,
+    /// Live per-connection snapshot of this task, same shape as
+    /// [`TaskView::segment_ranges`]. Empty when the task is not transferring in
+    /// parallel, and defaulted so older payloads still parse.
+    #[serde(default)]
+    pub segment_ranges: Vec<SegmentRange>,
 }
 
 /// Shared application state managed by Tauri.
@@ -414,19 +586,63 @@ impl AppState {
 }
 
 /// Default download directory resolution.
+///
+/// `SAYL_DOWNLOAD_DIR` (tests, portable installs) wins, then the real Windows
+/// Downloads known folder, then a `downloads` folder beside the working
+/// directory.
 pub fn default_download_dir() -> PathBuf {
     if let Some(dir) = std::env::var_os("SAYL_DOWNLOAD_DIR") {
         return PathBuf::from(dir);
     }
-    if let Some(user_dirs) = std::env::var_os("USERPROFILE") {
-        let downloads = PathBuf::from(user_dirs).join("Downloads");
-        if downloads.exists() {
-            return downloads;
-        }
+    if let Some(downloads) = known_downloads_dir() {
+        return downloads;
     }
     std::env::current_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join("downloads")
+}
+
+/// Resolves the user's real Downloads folder through the shell.
+///
+/// `FOLDERID_Downloads` is the folder Explorer shows, which may be redirected to
+/// another drive or renamed; `%USERPROFILE%\Downloads` is only the default and is
+/// not necessarily where the user's downloads land. Returns `None` when the shell
+/// has no Downloads folder.
+#[cfg(target_os = "windows")]
+pub fn known_downloads_dir() -> Option<PathBuf> {
+    use std::ffi::OsString;
+    use std::os::windows::ffi::OsStringExt;
+    use windows_sys::Win32::System::Com::CoTaskMemFree;
+    use windows_sys::Win32::UI::Shell::{FOLDERID_Downloads, SHGetKnownFolderPath};
+
+    let mut raw: *mut u16 = std::ptr::null_mut();
+    // SAFETY: `raw` is a valid out-pointer; the shell writes a NUL-terminated
+    // buffer there that is released with `CoTaskMemFree` below.
+    let status =
+        unsafe { SHGetKnownFolderPath(&FOLDERID_Downloads, 0, std::ptr::null_mut(), &mut raw) };
+    if status < 0 || raw.is_null() {
+        return None;
+    }
+
+    let mut len = 0usize;
+    // SAFETY: on success `raw` points at a NUL-terminated UTF-16 buffer owned by
+    // the shell allocator until `CoTaskMemFree` runs.
+    while unsafe { *raw.add(len) } != 0 {
+        len += 1;
+    }
+    // SAFETY: `0..len` stays inside that NUL-terminated buffer.
+    let wide = unsafe { std::slice::from_raw_parts(raw, len) };
+    let path = PathBuf::from(OsString::from_wide(wide));
+    // SAFETY: the buffer came from the shell allocator and is freed exactly once.
+    unsafe { CoTaskMemFree(raw as *const std::ffi::c_void) };
+    Some(path)
+}
+
+/// Non-Windows targets have no known-folder API; callers fall back to the
+/// working directory.
+#[cfg(not(target_os = "windows"))]
+pub fn known_downloads_dir() -> Option<PathBuf> {
+    None
 }
 
 /// Default data directory for SAYL database and config.
@@ -560,7 +776,8 @@ pub mod commands {
                     stats.and_then(|s| s.eta_secs),
                     parts,
                     connections,
-                );
+                )
+                .with_segment_ranges(state.engine.connection_snapshot(existing_rec.id));
                 return Ok(AddTaskOutcome::Duplicate { existing: view });
             }
         }
@@ -570,6 +787,12 @@ pub mod commands {
             .add(clean_url)
             .await
             .map_err(|e| format!("Failed to add task: {e}"))?;
+
+        // IDM-style category folder, applied before the task starts so the first
+        // byte already lands in Programs/Video/Music/Documents/Compressed/Other.
+        // A folder that cannot be created leaves the base download directory.
+        let settings = settings_snapshot(&state);
+        let _ = apply_category_folder(&state.engine, &settings, task_id, None);
 
         // Auto-start the newly added task
         state.engine.spawn_start(task_id);
@@ -586,7 +809,8 @@ pub mod commands {
         let connections = estimate_connections(record.state, parts, max_conn);
 
         Ok(AddTaskOutcome::Added {
-            task: TaskView::from_record_full(&record, None, None, parts, connections),
+            task: TaskView::from_record_full(&record, None, None, parts, connections)
+                .with_segment_ranges(state.engine.connection_snapshot(task_id)),
         })
     }
 
@@ -630,7 +854,8 @@ pub mod commands {
                     stats.and_then(|s| s.eta_secs),
                     parts,
                     connections,
-                );
+                )
+                .with_segment_ranges(state.engine.connection_snapshot(existing_rec.id));
                 return Ok(AddTaskOutcome::Duplicate { existing: view });
             }
         }
@@ -640,6 +865,11 @@ pub mod commands {
             .add(clean_url)
             .await
             .map_err(|e| format!("Failed to add task: {e}"))?;
+
+        // Same IDM-style category folder as `add_task`: the record is still
+        // Queued here, so a folder that cannot be created cannot block it.
+        let settings = settings_snapshot(&state);
+        let _ = apply_category_folder(&state.engine, &settings, task_id, None);
 
         let record = state
             .engine
@@ -651,24 +881,42 @@ pub mod commands {
         let connections = estimate_connections(record.state, parts, max_conn);
 
         Ok(AddTaskOutcome::Added {
-            task: TaskView::from_record_full(&record, None, None, parts, connections),
+            task: TaskView::from_record_full(&record, None, None, parts, connections)
+                .with_segment_ranges(state.engine.connection_snapshot(task_id)),
         })
     }
 
+    /// Applies the confirmed file name and folder to a queued capture task.
+    ///
+    /// `category` lets the browser capture path pass the category it already
+    /// knows. It is only used when the requested folder is the base download
+    /// directory itself, so a folder the user picked stays exactly as chosen.
     #[tauri::command]
     pub async fn prepare_capture_task(
         state: State<'_, AppState>,
         id: String,
         filename: String,
         save_path: String,
+        category: Option<String>,
     ) -> Result<(), String> {
         validate_download_dir(&save_path)?;
         let task_id = id
             .parse::<TaskId>()
             .map_err(|e| format!("Invalid task ID: {e}"))?;
+
+        let settings = settings_snapshot(&state);
+        let requested = PathBuf::from(save_path.trim());
+        let destination = if same_folder(&requested, Path::new(&settings.download_dir)) {
+            let explicit = category.as_deref().map(FileCategory::from_id);
+            let resolved = explicit.unwrap_or_else(|| categorize(&filename, None));
+            ensure_category_folder(&settings, resolved)
+        } else {
+            requested
+        };
+
         state
             .engine
-            .update_queued_destination(task_id, PathBuf::from(save_path), filename)
+            .update_queued_destination(task_id, destination, filename)
             .map_err(|e| e.to_string())
     }
 
@@ -839,6 +1087,7 @@ pub mod commands {
                         parts,
                         connections,
                     )
+                    .with_segment_ranges(engine.connection_snapshot(rec.id))
                 })
                 .collect();
 
@@ -936,6 +1185,7 @@ pub mod commands {
         Ok(())
     }
 
+    /// Reveals a task's file in Explorer with the file itself selected.
     #[tauri::command]
     pub fn reveal_task(state: State<'_, AppState>, id: String) -> Result<(), String> {
         let task_id = id
@@ -954,12 +1204,15 @@ pub mod commands {
         {
             use std::os::windows::process::CommandExt;
             if file_path.exists() {
+                // One `/select,<path>` argv element: spaces and Arabic file names
+                // inside that single argument survive the hand-off to Explorer.
                 let mut cmd = std::process::Command::new("explorer");
-                cmd.arg(format!("/select,{}", file_path.display()));
+                cmd.arg(reveal_argument(&file_path));
                 cmd.creation_flags(0x08000000);
                 cmd.spawn()
                     .map_err(|e| format!("Failed to reveal file: {e}"))?;
             } else {
+                // Not downloaded yet or already moved: show the folder instead.
                 let mut cmd = std::process::Command::new("explorer");
                 cmd.arg(&record.save_path);
                 cmd.creation_flags(0x08000000);
@@ -976,6 +1229,7 @@ pub mod commands {
         Ok(())
     }
 
+    /// Opens a finished download with its registered default application.
     #[tauri::command]
     pub fn open_task_file(state: State<'_, AppState>, id: String) -> Result<(), String> {
         let task_id = id
@@ -988,6 +1242,9 @@ pub mod commands {
             .map_err(|e| format!("Failed to get task: {e}"))?
             .ok_or_else(|| "Task not found".to_string())?;
 
+        // A task stores a destination directory plus a file name, and finalize
+        // renames `<file>.part` to exactly `save_path\filename`, so the joined
+        // path is the completed file for every finished task.
         let file_path = record.save_path.join(&record.filename);
         if !file_path.exists() {
             return Err(format!("File does not exist: {}", file_path.display()));
@@ -995,20 +1252,30 @@ pub mod commands {
 
         #[cfg(target_os = "windows")]
         {
-            use std::os::windows::process::CommandExt;
-            let mut cmd = std::process::Command::new("explorer");
-            cmd.arg(&file_path);
-            cmd.creation_flags(0x08000000);
-            cmd.spawn()
-                .map_err(|e| format!("Failed to open file: {e}"))?;
-        }
-
-        #[cfg(not(target_os = "windows"))]
-        {
-            let _ = file_path;
+            open_path_with_default_app(&file_path)?;
         }
 
         Ok(())
+    }
+
+    /// Returns the folder a category saves into, creating it when missing.
+    ///
+    /// The pre-download window asks for this so the path it pre-fills is exactly
+    /// the path the backend uses. `category` may be omitted, in which case the
+    /// file name decides the category.
+    #[tauri::command]
+    pub fn resolve_category_folder(
+        state: State<'_, AppState>,
+        category: Option<String>,
+        filename: Option<String>,
+    ) -> Result<String, String> {
+        let settings = settings_snapshot(&state);
+        let resolved = match category.as_deref() {
+            Some(id) => FileCategory::from_id(id),
+            None => categorize(filename.as_deref().unwrap_or_default(), None),
+        };
+        let folder = ensure_category_folder(&settings, resolved);
+        Ok(folder.to_string_lossy().into_owned())
     }
 
     #[tauri::command]
@@ -1294,6 +1561,7 @@ pub fn run() {
             commands::open_download_folder,
             commands::reveal_task,
             commands::open_task_file,
+            commands::resolve_category_folder,
             commands::arm_shutdown,
             commands::cancel_shutdown,
             commands::get_shutdown_status,
@@ -1519,6 +1787,7 @@ pub fn run() {
                                 let parts = get_cached_parts(&eng, &pc, rec.id);
                                 let connections = estimate_connections(rec.state, parts, max_c);
                                 TaskView::from_record_full(&rec, None, None, parts, connections)
+                                    .with_segment_ranges(eng.connection_snapshot(rec.id))
                             })
                             .collect();
                         (views, active)
@@ -1612,6 +1881,7 @@ pub fn run() {
                                         written: *downloaded_bytes,
                                         total: *total_bytes,
                                         speed_bps: *speed_bps,
+                                        segment_ranges: engine.connection_snapshot(task_id),
                                     };
                                     let _ = app_handle.emit("sayl://progress", &progress);
                                 }
@@ -1718,6 +1988,7 @@ pub fn run() {
                                                     parts,
                                                     connections,
                                                 )
+                                                .with_segment_ranges(eng.connection_snapshot(id))
                                             })
                                         },
                                         Vec::new,
@@ -1891,7 +2162,7 @@ mod tests {
 
         let val: serde_json::Value = serde_json::to_value(&settings).expect("serializes");
         let obj = val.as_object().expect("object");
-        assert_eq!(obj.len(), 15);
+        assert_eq!(obj.len(), 16);
         let expected_keys = [
             "download_dir",
             "max_concurrent_tasks",
@@ -1908,6 +2179,7 @@ mod tests {
             "run_at_startup",
             "close_notice_shown",
             "clipboard_monitor",
+            "category_folders",
         ];
         for key in expected_keys {
             assert!(obj.contains_key(key), "missing key: {key}");
@@ -1959,6 +2231,7 @@ mod tests {
                     completed_at: None,
                     folder: String::new(),
                     speed_limit_kbps: None,
+                    segment_ranges: Vec::new(),
                 }]
             },
         );
@@ -1992,6 +2265,7 @@ mod tests {
                     completed_at: None,
                     folder: String::new(),
                     speed_limit_kbps: None,
+                    segment_ranges: Vec::new(),
                 })
             },
             Vec::new,
@@ -2206,12 +2480,51 @@ mod tests {
             written: 1024,
             total: Some(2048),
             speed_bps: 512,
+            segment_ranges: vec![SegmentRange {
+                index: 0,
+                start: 0,
+                end: 1024,
+                written: 512,
+                completed: false,
+                state: sayl_app::parallel::SegmentState::Downloading,
+            }],
         };
 
         let json = serde_json::to_string(&p).expect("serialization succeeds");
         let decoded: ProgressPayload =
             serde_json::from_str(&json).expect("deserialization succeeds");
         assert_eq!(p, decoded);
+    }
+
+    #[test]
+    fn test_legacy_task_view_and_progress_payload_still_parse() {
+        // `segment_ranges` must stay optional: payloads and saved data written
+        // before the per-connection snapshot existed still deserialize.
+        let legacy_task = r#"{
+            "id": "01900000-0000-7000-8000-000000000002",
+            "url": "https://example.com/legacy.bin",
+            "filename": "legacy.bin",
+            "state": "Downloading",
+            "total_size": 4096,
+            "written": 1024,
+            "speed_bps": 256,
+            "eta_secs": 12,
+            "error": null,
+            "mime": null,
+            "parts": 2
+        }"#;
+        let view: TaskView = serde_json::from_str(legacy_task).expect("legacy task view parses");
+        assert!(view.segment_ranges.is_empty());
+
+        let legacy_progress = r#"{
+            "id": "01900000-0000-7000-8000-000000000002",
+            "written": 1024,
+            "total": 4096,
+            "speed_bps": 256
+        }"#;
+        let progress: ProgressPayload =
+            serde_json::from_str(legacy_progress).expect("legacy progress payload parses");
+        assert!(progress.segment_ranges.is_empty());
     }
 
     #[test]
@@ -2230,5 +2543,114 @@ mod tests {
         let resolved = default_download_dir();
         std::env::remove_var("SAYL_DOWNLOAD_DIR");
         assert_eq!(resolved, custom_dir);
+    }
+
+    #[test]
+    fn test_settings_category_folders_default_and_backward_compat() {
+        let defaults = Settings::default();
+        assert!(defaults.category_folders.is_empty());
+
+        let legacy = r#"{"download_dir":"C:\\Downloads"}"#;
+        let parsed: Settings = serde_json::from_str(legacy).expect("legacy settings parse");
+        assert!(parsed.category_folders.is_empty());
+
+        let json = r#"{
+            "download_dir": "C:\\Downloads",
+            "category_folders": { "video": "D:\\Media" }
+        }"#;
+        let parsed: Settings = serde_json::from_str(json).expect("override settings parse");
+        let video = parsed.category_folders.get("video");
+        assert_eq!(video.map(String::as_str), Some("D:\\Media"));
+    }
+
+    #[test]
+    fn test_resolve_category_folder_uses_subfolders_and_overrides() {
+        let mut settings = Settings {
+            download_dir: "C:\\Users\\User\\Downloads".to_string(),
+            ..Settings::default()
+        };
+        let base = Path::new("C:\\Users\\User\\Downloads");
+
+        for category in FileCategory::ALL {
+            let expected = category.folder_in(base);
+            assert_eq!(resolve_category_folder(&settings, category), expected);
+        }
+        // An unknown extension still lands somewhere: the `other` folder.
+        let unknown = categorize("mystery.qqq", None);
+        assert_eq!(
+            resolve_category_folder(&settings, unknown),
+            base.join("Other")
+        );
+
+        settings
+            .category_folders
+            .insert("video".to_string(), "D:\\Media".to_string());
+        assert_eq!(
+            resolve_category_folder(&settings, FileCategory::Video),
+            PathBuf::from("D:\\Media")
+        );
+
+        // An unusable override is ignored instead of scattering the file.
+        settings
+            .category_folders
+            .insert("audio".to_string(), "relative\\music".to_string());
+        assert_eq!(
+            resolve_category_folder(&settings, FileCategory::Audio),
+            base.join("Music")
+        );
+    }
+
+    #[test]
+    fn test_ensure_category_folder_creates_and_falls_back() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let downloads = temp.path().join("Downloads");
+        let settings = Settings {
+            download_dir: downloads.to_string_lossy().into_owned(),
+            ..Settings::default()
+        };
+
+        let folder = ensure_category_folder(&settings, FileCategory::Audio);
+        assert_eq!(folder, downloads.join("Music"));
+        assert!(folder.is_dir());
+
+        // A folder that cannot be created must not fail the download: the base
+        // download directory is returned instead of an error.
+        let blocker = temp.path().join("blocker");
+        std::fs::write(&blocker, b"not a folder").expect("write blocker");
+        let broken = Settings {
+            download_dir: blocker.to_string_lossy().into_owned(),
+            ..Settings::default()
+        };
+        assert_eq!(
+            ensure_category_folder(&broken, FileCategory::Video),
+            blocker
+        );
+    }
+
+    #[test]
+    fn test_same_folder_ignores_case_and_trailing_separators() {
+        let left = Path::new("C:\\Users\\A\\Downloads");
+        let right = Path::new("c:\\users\\a\\downloads\\");
+        assert!(same_folder(left, right));
+        assert!(same_folder(
+            Path::new("C:/Users/A"),
+            Path::new("C:\\Users\\A")
+        ));
+        assert!(!same_folder(
+            Path::new("C:\\Downloads\\Video"),
+            Path::new("C:\\Downloads")
+        ));
+    }
+
+    #[test]
+    fn test_reveal_argument_keeps_spaces_and_arabic_in_one_argument() {
+        let path = Path::new("C:\\Users\\أحمد\\Downloads\\Video\\مقطع نهائي.mp4");
+        let argument = reveal_argument(path);
+        assert!(argument.starts_with("/select,"));
+        assert_eq!(argument, format!("/select,{}", path.display()));
+        assert!(argument.ends_with("مقطع نهائي.mp4"));
+        // A single argv element: no added quoting, no embedded line breaks.
+        assert!(!argument.contains('"'));
+        assert!(!argument.contains("\n"));
     }
 }

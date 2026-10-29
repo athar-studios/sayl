@@ -361,6 +361,10 @@ export default {
     catFolderCompressed: "Compressed: Compressed/",
     catFolderOther: "Other: Other/",
 
+    categoryFoldersDesc: "Save folder for each category. Keep the default to stay inside your download folder, or pick a custom folder:",
+    categoryFolderDefault: "Default",
+    categoryResetDefaults: "Reset to defaults",
+
     notificationsTitle: "System Notifications",
     notificationsDesc: "Send desktop notifications when downloads finish or encounter an error.",
     notificationsDisabled: "Desktop notifications are currently not supported in this build.",

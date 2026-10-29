@@ -113,3 +113,130 @@ export function normalizeSettings(settings = {}) {
         : DEFAULT_SETTINGS.clipboard_monitor,
   };
 }
+
+/**
+ * Default subfolder created under the download directory for each category.
+ *
+ * Keep the names in sync with `FileCategory::subfolder` in
+ * `crates/core/src/category.rs`: the backend owns the folders it resolves itself.
+ */
+export const CATEGORY_SUBFOLDER_DEFAULTS = {
+  programs: "Programs",
+  video: "Video",
+  audio: "Music",
+  documents: "Documents",
+  compressed: "Compressed",
+  other: "Other",
+};
+
+/** Category ids that own a save folder, in the order the settings panel lists them. */
+export const CATEGORY_FOLDER_IDS = [
+  "programs",
+  "video",
+  "audio",
+  "documents",
+  "compressed",
+  "other",
+];
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function trimFolder(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * Normalizes the backend `category_folders` map, keeping only known category ids.
+ *
+ * @param {Record<string, unknown>|null|undefined} raw
+ * @returns {Record<string, string>}
+ */
+export function normalizeCategoryOverrides(raw) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  const overrides = {};
+  for (const id of CATEGORY_FOLDER_IDS) {
+    overrides[id] = trimFolder(source[id]);
+  }
+  return overrides;
+}
+
+/**
+ * Appends a category subfolder to `base`, matching the base folder's separator.
+ *
+ * @param {string} base
+ * @param {string} categoryId
+ * @returns {string}
+ */
+export function joinCategoryFolder(base, categoryId) {
+  const root = trimFolder(base).replace(/[/\\]+$/, "");
+  if (!root) return "";
+  const sub = CATEGORY_SUBFOLDER_DEFAULTS[categoryId] || CATEGORY_SUBFOLDER_DEFAULTS.other;
+  const sep = root.includes("\\") ? "\\" : "/";
+  return `${root}${sep}${sub}`;
+}
+
+/**
+ * Compares two folders the way Windows does: case and trailing separators ignored.
+ *
+ * @param {string} left
+ * @param {string} right
+ * @returns {boolean}
+ */
+export function sameFolderPath(left, right) {
+  const normalize = (value) =>
+    trimFolder(value).replace(/[/\\]+$/, "").replace(/\//g, "\\").toLowerCase();
+  const a = normalize(left);
+  return a.length > 0 && a === normalize(right);
+}
+
+/**
+ * Resolves a category folder: explicit override first, else the default subfolder.
+ *
+ * @param {string} downloadDir
+ * @param {string} categoryId
+ * @param {Record<string, string>|null|undefined} overrides
+ * @returns {string}
+ */
+export function resolveCategoryFolder(downloadDir, categoryId, overrides) {
+  const custom = normalizeCategoryOverrides(overrides)[categoryId];
+  if (custom) return custom;
+  return joinCategoryFolder(downloadDir, categoryId);
+}
+
+/**
+ * Rows rendered by the settings panel, one per category.
+ *
+ * @param {string} downloadDir
+ * @param {Record<string, string>|null|undefined} overrides
+ * @returns {Array<{ id: string, folder: string, isCustom: boolean }>}
+ */
+export function categoryFolderRows(downloadDir, overrides) {
+  const normalized = normalizeCategoryOverrides(overrides);
+  return CATEGORY_FOLDER_IDS.map((id) => ({
+    id,
+    folder: normalized[id] || joinCategoryFolder(downloadDir, id),
+    isCustom: Boolean(normalized[id]),
+  }));
+}
+
+/**
+ * Drops overrides that only repeat the default, so the saved settings stay minimal
+ * and keep following the download directory when the user changes it later.
+ *
+ * @param {Record<string, string>|null|undefined} overrides
+ * @param {string} downloadDir
+ * @returns {Record<string, string>}
+ */
+export function pruneCategoryOverrides(overrides, downloadDir) {
+  const normalized = normalizeCategoryOverrides(overrides);
+  const result = {};
+  for (const id of CATEGORY_FOLDER_IDS) {
+    const value = normalized[id];
+    if (!value) continue;
+    if (sameFolderPath(value, joinCategoryFolder(downloadDir, id))) continue;
+    result[id] = value;
+  }
+  return result;
+}

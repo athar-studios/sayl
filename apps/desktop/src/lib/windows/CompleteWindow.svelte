@@ -4,24 +4,69 @@
    *
    * Shows the file name, size and saved path with «فتح» / «فتح المجلد» /
    * «إغلاق», plus «لا تعرض هذه النافذة مرة أخرى» which dispatches
-   * `dontShowAgain` so the host can persist `show_download_complete_window`.
+   * `dontShowAgain` and persists `show_download_complete_window`.
+   *
+   * Every action dismisses the window: the checkbox is persisted first, then the
+   * action event is emitted (the payload is always the task id string, matching
+   * the `{ id }` argument the Rust commands take) and `close` follows, so the
+   * host removes the window deterministically.
    */
   import { createEventDispatcher } from "svelte";
   import { t, currentLang } from "../i18n.js";
+  import { DEFAULT_SETTINGS, normalizeSettings } from "../settings.js";
   import { buildCompleteDetails } from "../downloadWindowUi.js";
   import iconSvg from "../../assets/icon.svg";
 
   export let task;
+  /**
+   * Persist «لا تعرض هذه النافذة مرة أخرى» from inside the window. Default on,
+   * because the in-app floating host (App.svelte) does not listen for
+   * `dontShowAgain`; a host that persists it itself can pass `false`.
+   */
+  export let persistDontShowAgain = true;
 
   const dispatch = createEventDispatcher();
   let dontShowAgain = false;
+  let busy = false;
 
   $: isRtl = $currentLang === "ar";
   $: details = buildCompleteDetails(task, $currentLang);
 
-  function close() {
-    if (dontShowAgain) dispatch("dontShowAgain", true);
-    dispatch("close", task?.id);
+  /**
+   * Writes `show_download_complete_window = false`. `set_settings` replaces the
+   * whole Settings struct, so the current snapshot is read and normalised first —
+   * a partial payload would reset every other key to its default.
+   */
+  async function persistDontShowAgainSetting() {
+    if (!persistDontShowAgain) return;
+    if (typeof window === "undefined") return;
+    if (!(window.__TAURI_INTERNALS__ || window.__TAURI__)) return;
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const current = await invoke("get_settings");
+      const next = normalizeSettings({
+        ...(current && typeof current === "object" ? current : DEFAULT_SETTINGS),
+        show_download_complete_window: false,
+      });
+      await invoke("set_settings", { settings: next });
+    } catch {
+      // Best effort: a failed preference write must never keep the window open.
+    }
+  }
+
+  /**
+   * @param {"openFile"|"reveal"|null} action
+   */
+  async function dismiss(action) {
+    if (busy) return;
+    busy = true;
+    const id = task?.id;
+    if (dontShowAgain) {
+      await persistDontShowAgainSetting();
+      dispatch("dontShowAgain", true);
+    }
+    if (action) dispatch(action, id);
+    dispatch("close", id);
   }
 </script>
 
@@ -57,18 +102,33 @@
   </div>
 
   <label class="option-label">
-    <input type="checkbox" class="option-checkbox" bind:checked={dontShowAgain} />
+    <input
+      type="checkbox"
+      class="option-checkbox"
+      bind:checked={dontShowAgain}
+      disabled={busy}
+    />
     <span>{$t("completeWindow.dontShowAgain")}</span>
   </label>
 
   <div class="actions">
-    <button class="btn btn-primary" type="button" on:click={() => dispatch("openFile", task?.id)}>
+    <button
+      class="btn btn-primary"
+      type="button"
+      disabled={busy}
+      on:click={() => dismiss("openFile")}
+    >
       {$t("completeWindow.openFile")}
     </button>
-    <button class="btn btn-secondary" type="button" on:click={() => dispatch("reveal", task?.id)}>
+    <button
+      class="btn btn-secondary"
+      type="button"
+      disabled={busy}
+      on:click={() => dismiss("reveal")}
+    >
       {$t("completeWindow.openFolder")}
     </button>
-    <button class="btn btn-secondary" type="button" on:click={close}>
+    <button class="btn btn-secondary" type="button" disabled={busy} on:click={() => dismiss(null)}>
       {$t("completeWindow.close")}
     </button>
   </div>

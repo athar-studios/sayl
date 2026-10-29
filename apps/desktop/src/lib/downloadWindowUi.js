@@ -17,7 +17,13 @@ import {
   canCancel,
 } from "./format.js";
 
-export { mergeTaskMonotonic, mergeTasksMonotonic, isProgressResetState } from "./monotonic.js";
+import {
+  mergeTaskMonotonic,
+  mergeTasksMonotonic,
+  isProgressResetState,
+} from "./monotonic.js";
+
+export { mergeTaskMonotonic, mergeTasksMonotonic, isProgressResetState };
 
 const MIN_SPEED_LIMIT_KBPS = 1;
 // No user-facing cap; values saturate at u32::MAX only because the backend stores KB/s as u32.
@@ -352,36 +358,70 @@ export function buildSegmentDetailRows(segments) {
 }
 
 /**
+ * Payload keys that may carry a per-connection / per-range array. The backend
+ * currently sends `parts` and `connections` as plain counts, so every key is
+ * read defensively: the first non-empty array of objects wins, and anything
+ * else (missing, `null`, a number) falls through to the synthesised fallback.
+ */
+const RANGE_LIST_KEYS = [
+  "segment_ranges",
+  "connection_ranges",
+  "ranges",
+  "connections",
+  "parts",
+];
+
+function pickRangeList(task) {
+  for (const key of RANGE_LIST_KEYS) {
+    const value = task[key];
+    if (Array.isArray(value) && value.length > 0) {
+      const looksLikeRanges = value.some(
+        (entry) => entry && typeof entry === "object"
+      );
+      if (looksLikeRanges) return value;
+    }
+  }
+  return null;
+}
+
+/** Normalises one entry of a per-connection array; tolerates junk entries. */
+function segmentFromRangeEntry(range) {
+  const raw = range && typeof range === "object" ? range : {};
+  const start = Math.max(
+    0,
+    Math.floor(toFiniteNumber(raw.start) ?? toFiniteNumber(raw.from) ?? 0)
+  );
+  const endRaw = toFiniteNumber(raw.end) ?? toFiniteNumber(raw.to);
+  const end = Math.max(start, Math.floor(endRaw ?? start));
+  const span = end - start;
+  const explicit = toFiniteNumber(raw.written) ?? toFiniteNumber(raw.downloaded);
+  const completed = raw.completed === true || raw.total_completed === true;
+
+  return {
+    start,
+    end,
+    written: explicit !== null ? clamp(explicit, 0, span) : completed ? span : 0,
+    total_completed: completed || (span > 0 && explicit !== null && explicit >= span),
+  };
+}
+
+/**
  * Connection ranges for the segmented bar and the per-connection table.
  *
- * Prefers real checkpoint ranges (`task.segment_ranges`) when the backend sends
- * them; otherwise synthesises `parts` equal byte bands and fills them
- * sequentially from the task's `written` total, so the window still shows the
- * connection regions IDM draws before per-range data is available.
+ * Prefers real checkpoint ranges (`task.segment_ranges`, or any other
+ * per-connection array the backend may start sending) when present; otherwise
+ * synthesises `parts` equal byte bands and fills them sequentially from the
+ * task's `written` total, so the window still shows the connection regions IDM
+ * draws before per-range data is available.
  *
- * @param {{ total_size?: number|null, written?: number, parts?: number|null, connections?: number|null, segment_ranges?: Array<object> }} task
+ * @param {{ total_size?: number|null, written?: number, parts?: number|Array<object>|null, connections?: number|Array<object>|null, segment_ranges?: Array<object> }} task
  * @returns {Array<{ start: number, end: number, written: number, total_completed: boolean }>}
  */
 export function buildConnectionSegments(task) {
   const t = task && typeof task === "object" ? task : {};
 
-  if (Array.isArray(t.segment_ranges) && t.segment_ranges.length > 0) {
-    return t.segment_ranges.map((range) => {
-      const raw = range && typeof range === "object" ? range : {};
-      const start = Math.max(0, Math.floor(toFiniteNumber(raw.start) ?? 0));
-      const end = Math.max(start, Math.floor(toFiniteNumber(raw.end) ?? start));
-      const span = end - start;
-      const explicit = toFiniteNumber(raw.written);
-      const completed = raw.completed === true || raw.total_completed === true;
-
-      return {
-        start,
-        end,
-        written: explicit !== null ? clamp(explicit, 0, span) : completed ? span : 0,
-        total_completed: completed || (span > 0 && explicit !== null && explicit >= span),
-      };
-    });
-  }
+  const list = pickRangeList(t);
+  if (list) return list.map(segmentFromRangeEntry);
 
   const total = toFiniteNumber(t.total_size);
   const parts = Math.floor(toFiniteNumber(t.parts) ?? toFiniteNumber(t.connections) ?? 0);
@@ -678,6 +718,101 @@ export function buildConnectionTableRows(segments, lang = "ar") {
     info: formatRangeInfo(detail.start, detail.end, lang),
     status: detail.status,
   }));
+}
+
+/**
+ * Per-connection rows for the live table, derived from whatever the payload
+ * currently carries: a real per-range array when one exists, otherwise the
+ * synthesised `parts`/`connections` byte bands. Never throws on a missing field.
+ *
+ * @param {object|null|undefined} task
+ * @returns {Array<{ key: string, index: number, start: number, end: number, downloaded: number, status: string }>}
+ */
+export function normalizeConnectionRanges(task) {
+  return buildSegmentDetailRows(buildConnectionSegments(task));
+}
+
+/**
+ * Keeps each connection's downloaded bytes monotonic across updates of one
+ * attempt: `previous` and `next` are keyed by connection (`conn-<n>`), and a
+ * value can only grow. Values are clamped to the connection's own span so a
+ * re-planned range can never report more bytes than it covers.
+ *
+ * @param {Array<{ key: string, start: number, end: number, downloaded: number, status: string }>} previous
+ * @param {Array<{ key: string, start: number, end: number, downloaded: number, status: string }>} next
+ * @returns {Array<{ key: string, index: number, start: number, end: number, downloaded: number, status: string }>}
+ */
+export function mergeConnectionRowsMonotonic(previous, next) {
+  const before = new Map(
+    (Array.isArray(previous) ? previous : []).map((row) => [row.key, row])
+  );
+
+  return (Array.isArray(next) ? next : []).map((row) => {
+    const span = Math.max(row.end - row.start, 0);
+    const prior = before.get(row.key);
+    const downloaded = prior
+      ? Math.max(prior.downloaded, row.downloaded)
+      : row.downloaded;
+    const bounded = span > 0 ? clamp(downloaded, 0, span) : downloaded;
+
+    let status;
+    if (span > 0 && bounded >= span) status = "done";
+    else if (bounded > 0) status = "downloading";
+    else status = row.status;
+
+    return { ...row, downloaded: bounded, status };
+  });
+}
+
+/**
+ * Stateful tracker for the live connections table. `rows(task, lang)` returns
+ * formatted table rows and keeps each connection's downloaded bytes monotonic
+ * for the same attempt; a new task id or a restart/retry state transition
+ * (see `isProgressResetState`) clears the history so the numbers may restart.
+ *
+ * @returns {{ rows: (task: object|null|undefined, lang?: string) => Array<{ key: string, index: number, downloaded: string, info: string, status: string }>, reset: () => void }}
+ */
+export function createConnectionTableTracker() {
+  /** @type {string|null} */
+  let lastId = null;
+  /** @type {string|null} */
+  let lastState = null;
+  /** @type {Array<object>} */
+  let previousRows = [];
+
+  function reset() {
+    lastId = null;
+    lastState = null;
+    previousRows = [];
+  }
+
+  return {
+    rows(task, lang = "ar") {
+      const t = task && typeof task === "object" ? task : {};
+      const id = typeof t.id === "string" ? t.id : "";
+      const state = typeof t.state === "string" ? t.state : "";
+      const isNewAttempt =
+        id !== lastId || isProgressResetState(state, lastState);
+
+      if (isNewAttempt) previousRows = [];
+
+      const current = normalizeConnectionRanges(t);
+      const merged = mergeConnectionRowsMonotonic(previousRows, current);
+
+      lastId = id;
+      lastState = state;
+      previousRows = merged;
+
+      return merged.map((row) => ({
+        key: row.key,
+        index: row.index,
+        downloaded: formatBytes(row.downloaded, lang),
+        info: formatRangeInfo(row.start, row.end, lang),
+        status: row.status,
+      }));
+    },
+    reset,
+  };
 }
 
 /**

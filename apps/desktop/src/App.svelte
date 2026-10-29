@@ -264,6 +264,62 @@
     }
   }
 
+  /**
+   * Clamps the live per-connection rows a task carries (`segment_ranges`).
+   *
+   * The backend publishes one row per connection — `{ index, start, end,
+   * written, completed, state }` with `state` one of `pending` / `downloading` /
+   * `done` — while a parallel transfer runs. `lib/monotonic.js` adopts an
+   * incoming array wholesale, which would let a late or stale snapshot shrink a
+   * row, so a row keeps its larger `written`/`completed` while its `[start, end)`
+   * range is unchanged. A connection that moves to another range (work stealing)
+   * or a restarted attempt wins as it is, because that reset is real progress.
+   *
+   * @param {Array<object>|undefined} previousRanges - Rows currently on screen
+   * @param {Array<object>|undefined} incomingRanges - Rows from the last event
+   * @returns {Array<object>}
+   */
+  function mergeSegmentRanges(previousRanges, incomingRanges) {
+    if (!Array.isArray(incomingRanges)) {
+      return Array.isArray(previousRanges) ? previousRanges : [];
+    }
+    if (!Array.isArray(previousRanges) || previousRanges.length === 0) {
+      return incomingRanges;
+    }
+    const previousByIndex = new Map(previousRanges.map((range) => [range?.index, range]));
+    return incomingRanges.map((range) => {
+      const previous = previousByIndex.get(range?.index);
+      if (!previous || previous.start !== range.start || previous.end !== range.end) {
+        return range;
+      }
+      const previousWritten = typeof previous.written === "number" ? previous.written : 0;
+      const written = typeof range.written === "number" ? range.written : 0;
+      return {
+        ...range,
+        written: Math.max(previousWritten, written),
+        completed: previous.completed === true || range.completed === true,
+      };
+    });
+  }
+
+  /**
+   * Merges one task update: the shared monotonic merge for the task totals plus
+   * the per-connection clamp above, so both update paths hand the downloading
+   * window rows that never move backwards.
+   *
+   * @param {object|undefined} existing - Task already in the store
+   * @param {object|undefined} incoming - Task data from an event
+   * @returns {object|undefined} Merged task
+   */
+  function mergeTaskUpdate(existing, incoming) {
+    if (!incoming) return existing;
+    const merged = mergeTaskMonotonic(existing, incoming);
+    return {
+      ...merged,
+      segment_ranges: mergeSegmentRanges(existing?.segment_ranges, incoming.segment_ranges),
+    };
+  }
+
   // Handle batched tasks-changed event contract (Req 11)
   function handleTasksChanged(payload) {
     if (!payload || typeof payload !== "object") return;
@@ -274,7 +330,13 @@
       // the live Progress stream already showed. Merging keeps the UI from
       // jumping backwards mid-download.
       const incoming = Array.isArray(payload.upsert) ? payload.upsert : [];
-      const merged = mergeTasksMonotonic(tasks, incoming);
+      const previousById = new Map(tasks.map((t) => [t.id, t]));
+      const merged = mergeTasksMonotonic(tasks, incoming).map((t) => {
+        const previous = previousById.get(t.id);
+        return previous
+          ? { ...t, segment_ranges: mergeSegmentRanges(previous.segment_ranges, t.segment_ranges) }
+          : t;
+      });
       // A full refresh is authoritative for membership: drop tasks it no longer lists.
       const incomingIds = new Set(incoming.map((t) => t.id));
       tasks = merged.filter((t) => incomingIds.has(t.id));
@@ -305,7 +367,7 @@
         }
         next = next.map((t) => {
           if (upsertMap.has(t.id)) {
-            const updated = mergeTaskMonotonic(t, upsertMap.get(t.id));
+            const updated = mergeTaskUpdate(t, upsertMap.get(t.id));
             upsertMap.delete(t.id);
             return updated;
           }
@@ -1337,8 +1399,11 @@
                 speed_bps: payload.speed_bps,
                 eta_secs: eta,
                 state: t.state === "Queued" || t.state === "Probing" ? "Downloading" : t.state,
+                // Live per-connection rows: the downloading window renders this
+                // table instead of guessing equal bands from `parts`.
+                segment_ranges: payload.segment_ranges,
               };
-              return mergeTaskMonotonic(t, incoming);
+              return mergeTaskUpdate(t, incoming);
             }
             return t;
           });

@@ -1,8 +1,9 @@
 //! Bounded parallel multi-connection download implementation using dynamic lease scheduling.
 
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use futures_util::StreamExt;
@@ -10,11 +11,12 @@ use sayl_core::error::CoreError;
 use sayl_core::event::{EventKind, EventPayload, EventSender};
 use sayl_core::id::TaskId;
 use sayl_storage::{Checkpoint, Store};
+use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 use url::Url;
 
-use crate::lease::{LeaseReport, LeaseTable, DEFAULT_CHUNK_SIZE, DEFAULT_LEASE_TTL};
+use crate::lease::{LeaseReport, LeaseTable, WorkerId, DEFAULT_CHUNK_SIZE, DEFAULT_LEASE_TTL};
 use crate::queue::TokenBucket;
 use crate::sequential::DownloadOutcome;
 
@@ -32,6 +34,212 @@ impl Default for ParallelOptions {
         Self {
             chunk_size: DEFAULT_CHUNK_SIZE,
             lease_ttl: DEFAULT_LEASE_TTL,
+        }
+    }
+}
+
+/// Maximum number of per-connection entries published in one snapshot.
+///
+/// One row per active connection is all the downloading window needs; connections
+/// beyond this cap are not published individually, so an absurd connection count
+/// can never flood the webview. Their bytes are still counted in the aggregate
+/// progress that drives the bar.
+pub const MAX_SEGMENT_ENTRIES: usize = 64;
+
+/// Coarse lifecycle state of one connection in a [`SegmentRange`] snapshot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SegmentState {
+    /// The connection slot exists but does not own a byte range yet.
+    #[default]
+    Pending,
+    /// The connection is streaming the range it owns.
+    Downloading,
+    /// The connection finished the range it owns.
+    Done,
+}
+
+/// One connection of a running parallel transfer, as published to the frontend.
+///
+/// Monotonicity contract: while `start`/`end` stay unchanged for one `index`, the
+/// `written` counter never decreases. A connection that moves on to another byte
+/// range rebases `written` to `0`, and a new attempt starts a fresh snapshot, so
+/// consumers detect both cases by comparing the range instead of assuming a
+/// single global counter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SegmentRange {
+    /// Zero-based connection slot index, stable for the whole attempt.
+    pub index: u32,
+    /// First byte owned by this connection (inclusive).
+    pub start: u64,
+    /// Last byte owned by this connection (exclusive).
+    pub end: u64,
+    /// Bytes written inside `[start, end)` during this attempt.
+    pub written: u64,
+    /// `true` once the whole `[start, end)` range is durably written.
+    pub completed: bool,
+    /// Coarse connection state: `pending`, `downloading`, or `done`.
+    pub state: SegmentState,
+}
+
+/// Mutable state of one connection slot inside [`ConnectionRegistry`].
+#[derive(Debug, Clone, Copy)]
+struct SegmentSlot {
+    start: u64,
+    end: u64,
+    written: u64,
+    state: SegmentState,
+}
+
+impl SegmentSlot {
+    /// Slot state before it claims any byte range.
+    const PENDING: Self = Self {
+        start: 0,
+        end: 0,
+        written: 0,
+        state: SegmentState::Pending,
+    };
+
+    /// Length in bytes of the owned range.
+    fn span(&self) -> u64 {
+        self.end.saturating_sub(self.start)
+    }
+}
+
+/// Live per-connection progress of one running parallel transfer.
+///
+/// Workers publish on chunk boundaries; updates are lock-scoped and O(1), so the
+/// 500 ms progress cadence is never delayed and no extra event is emitted per
+/// chunk. [`connection_snapshot`] reads the current state on demand.
+#[derive(Debug)]
+struct ConnectionRegistry {
+    slots: StdMutex<Vec<SegmentSlot>>,
+}
+
+impl ConnectionRegistry {
+    /// Creates a registry with one slot per worker, capped at [`MAX_SEGMENT_ENTRIES`].
+    fn new(workers: usize) -> Self {
+        let count = workers.clamp(1, MAX_SEGMENT_ENTRIES);
+        Self {
+            slots: StdMutex::new(vec![SegmentSlot::PENDING; count]),
+        }
+    }
+
+    /// Records that `worker` now owns `[start, end)`.
+    ///
+    /// Re-claiming the same range keeps the byte count so the published value
+    /// stays monotonic; a different range starts that slot over.
+    fn begin(&self, worker: WorkerId, start: u64, end: u64) {
+        let mut slots = self.slots.lock().unwrap_or_else(|e| e.into_inner());
+        let Some(slot) = slots.get_mut(worker) else {
+            return;
+        };
+        if slot.start != start || slot.end != end {
+            *slot = SegmentSlot {
+                start,
+                end,
+                written: 0,
+                state: SegmentState::Downloading,
+            };
+        } else {
+            slot.state = SegmentState::Downloading;
+        }
+    }
+
+    /// Adds `bytes` freshly written bytes to `worker`'s current range.
+    fn advance(&self, worker: WorkerId, bytes: u64) {
+        let mut slots = self.slots.lock().unwrap_or_else(|e| e.into_inner());
+        let Some(slot) = slots.get_mut(worker) else {
+            return;
+        };
+        let span = slot.span();
+        slot.written = slot.written.saturating_add(bytes).min(span);
+    }
+
+    /// Marks `worker`'s current range as fully written.
+    fn finish(&self, worker: WorkerId) {
+        let mut slots = self.slots.lock().unwrap_or_else(|e| e.into_inner());
+        let Some(slot) = slots.get_mut(worker) else {
+            return;
+        };
+        let span = slot.span();
+        slot.written = span;
+        slot.state = SegmentState::Done;
+    }
+
+    /// Copies the current state, ordered by connection index.
+    fn snapshot(&self) -> Vec<SegmentRange> {
+        let slots = self.slots.lock().unwrap_or_else(|e| e.into_inner());
+        slots
+            .iter()
+            .enumerate()
+            .map(|(index, slot)| SegmentRange {
+                index: index as u32,
+                start: slot.start,
+                end: slot.end,
+                written: slot.written,
+                completed: slot.state == SegmentState::Done,
+                state: slot.state,
+            })
+            .collect()
+    }
+}
+
+/// Registries of the parallel transfers running in this process, keyed by task.
+///
+/// The snapshot is a process-local UI detail: keeping it here lets
+/// [`connection_snapshot`] stay a plain synchronous accessor instead of adding
+/// another argument to the public transfer entry points.
+static ACTIVE_CONNECTIONS: OnceLock<StdMutex<HashMap<TaskId, Arc<ConnectionRegistry>>>> =
+    OnceLock::new();
+
+/// Shared map of live connection registries.
+fn active_connections() -> &'static StdMutex<HashMap<TaskId, Arc<ConnectionRegistry>>> {
+    ACTIVE_CONNECTIONS.get_or_init(|| StdMutex::new(HashMap::new()))
+}
+
+/// Returns the live per-connection snapshot of the parallel transfer for `task_id`.
+///
+/// The list holds one [`SegmentRange`] per connection slot (capped at
+/// [`MAX_SEGMENT_ENTRIES`]) and is empty when the task is not running a parallel
+/// transfer, so callers may read it unconditionally while building a task view.
+pub fn connection_snapshot(task_id: TaskId) -> Vec<SegmentRange> {
+    let registry = active_connections()
+        .lock()
+        .ok()
+        .and_then(|map| map.get(&task_id).cloned());
+    match registry {
+        Some(registry) => registry.snapshot(),
+        None => Vec::new(),
+    }
+}
+
+/// Publishes one transfer's registry while it runs and withdraws it on every exit path.
+struct SnapshotRegistration {
+    task_id: TaskId,
+    registry: Arc<ConnectionRegistry>,
+}
+
+impl SnapshotRegistration {
+    /// Registers `registry` as the live snapshot of `task_id`.
+    fn new(task_id: TaskId, registry: Arc<ConnectionRegistry>) -> Self {
+        if let Ok(mut map) = active_connections().lock() {
+            map.insert(task_id, Arc::clone(&registry));
+        }
+        Self { task_id, registry }
+    }
+}
+
+impl Drop for SnapshotRegistration {
+    fn drop(&mut self) {
+        if let Ok(mut map) = active_connections().lock() {
+            // Only withdraw our own entry: a newer attempt of the same task keeps its own.
+            let ours = map
+                .get(&self.task_id)
+                .is_some_and(|current| Arc::ptr_eq(current, &self.registry));
+            if ours {
+                map.remove(&self.task_id);
+            }
         }
     }
 }
@@ -110,6 +318,10 @@ pub async fn run_parallel_download_with_report(
 }
 
 /// Executes a parallel download with fully configurable [`ParallelOptions`].
+///
+/// While the transfer runs, a live per-connection snapshot is available through
+/// [`connection_snapshot`]; it disappears as soon as this call returns, on both
+/// the success and the failure path.
 #[allow(clippy::too_many_arguments)]
 pub async fn run_parallel_download_with_options(
     client: &reqwest::Client,
@@ -211,6 +423,12 @@ pub async fn run_parallel_download_with_options(
     let total_chunks = { table.lock().await.total_chunks() };
     let num_workers = max_connections.min(total_chunks).max(1);
 
+    // Live per-connection snapshot: one slot per worker, read on demand through
+    // `connection_snapshot` on the same 500 ms cadence as `Progress`. The
+    // registration withdraws the snapshot on every exit path of this transfer.
+    let connections = Arc::new(ConnectionRegistry::new(num_workers));
+    let _snapshot = SnapshotRegistration::new(task_id, Arc::clone(&connections));
+
     let total_downloaded = Arc::new(AtomicU64::new(0));
     let fatal_error = Arc::new(Mutex::new(None::<CoreError>));
     let throttled = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -294,6 +512,7 @@ pub async fn run_parallel_download_with_options(
         let shared_file = Arc::clone(&shared_file);
         let total_downloaded = Arc::clone(&total_downloaded);
         let table = Arc::clone(&table);
+        let connections = Arc::clone(&connections);
         let fatal_error = Arc::clone(&fatal_error);
         let throttled = Arc::clone(&throttled);
         let range_unsupported = Arc::clone(&range_unsupported);
@@ -341,6 +560,9 @@ pub async fn run_parallel_download_with_options(
                         }
                     }
                 };
+
+                // Publish the byte range this connection now owns.
+                connections.begin(worker_id, lease.start, lease.end_inclusive + 1);
 
                 // 2. Fetch Range with retry on transient failures
                 let range_header_val =
@@ -594,6 +816,7 @@ pub async fn run_parallel_download_with_options(
                                         worker_offset += chunk_bytes.len() as u64;
                                         total_downloaded
                                             .fetch_add(chunk_bytes.len() as u64, Ordering::Relaxed);
+                                        connections.advance(worker_id, chunk_bytes.len() as u64);
                                     }
                                 }
                                 Ok(Some(Err(err))) => {
@@ -667,6 +890,7 @@ pub async fn run_parallel_download_with_options(
                     let mut tbl = table.lock().await;
                     let completed = tbl.complete(lease);
                     if completed {
+                        connections.finish(worker_id);
                         consecutive_failures = 0;
                     }
                 }

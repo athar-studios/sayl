@@ -8,7 +8,7 @@ import { resolveTranslation } from "./i18n.js";
 /** Subfolder names under download_dir (matches Settings categories copy). */
 export const CATEGORY_SUBFOLDERS = {
   video: "Video",
-  audio: "Audio",
+  audio: "Music",
   documents: "Documents",
   programs: "Programs",
   compressed: "Compressed",

@@ -20,6 +20,7 @@ use url::Url;
 
 use crate::config::EngineConfig;
 use crate::lease::DEFAULT_LEASE_TTL;
+use crate::parallel::SegmentRange;
 use crate::queue::{Scheduler, TaskStatus as QueueTaskStatus};
 use crate::sequential::DownloadOutcome;
 
@@ -2202,6 +2203,16 @@ impl Engine {
             .store
             .load_checkpoint(task_id)
             .map_err(CoreError::from)
+    }
+
+    /// Returns the live per-connection snapshot of a running parallel transfer.
+    ///
+    /// Each entry names one connection slot with the byte range it owns, the
+    /// bytes written inside that range and its coarse state. The list is empty
+    /// when the task is not transferring in parallel, so callers may read it
+    /// unconditionally while building a task view.
+    pub fn connection_snapshot(&self, task_id: TaskId) -> Vec<SegmentRange> {
+        crate::parallel::connection_snapshot(task_id)
     }
 
     /// Deletes a task from the store.

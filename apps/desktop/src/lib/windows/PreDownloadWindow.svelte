@@ -3,7 +3,8 @@
   import { t, currentLang } from "../i18n.js";
   import { formatBytes } from "../format.js";
   import { CATEGORIES, classifyFile, getCategoryLabel } from "../classify.js";
-  import { defaultSavePathForCapture } from "../capture.js";
+  import { joinCategoryFolder, sameFolderPath } from "../settings.js";
+  import { safeInvoke } from "../tauri.js";
   import iconSvg from "../../assets/icon.svg";
 
   export let open = false;
@@ -19,6 +20,13 @@
   let busy = false;
   let errorMsg = null;
 
+  /** Backend settings snapshot used for the category-folder prefill. */
+  let settings = { download_dir: "", category_folders: {} };
+  /** Set once the user types or browses a folder; the prefill then stays away. */
+  let folderEdited = false;
+  /** Guards against a slow prefill overwriting a newer category choice. */
+  let prefillRequest = 0;
+
   const dispatch = createEventDispatcher();
 
   $: if (open && offer) {
@@ -26,12 +34,73 @@
     url = offer.url || "";
     fileSize = offer.size != null && offer.size > 0 ? offer.size : null;
     selectedCategory = classifyFile(filename, offer.mime || null);
-    folder =
-      defaultFolder && defaultFolder.trim()
-        ? defaultSavePathForCapture(defaultFolder, selectedCategory, filename)
-        : "";
+    folderEdited = false;
+    // Instant guess from the base folder; the async prefill refines it below.
+    folder = defaultFolder ? joinCategoryFolder(defaultFolder, selectedCategory) : "";
     errorMsg = null;
     busy = false;
+    bootstrapPrefill();
+  }
+
+  /** Loads the settings the backend uses to resolve category folders. */
+  async function loadSettings() {
+    try {
+      const loaded = await safeInvoke("get_settings", {}, { suppressToast: true });
+      if (loaded && typeof loaded === "object") {
+        settings = { ...settings, ...loaded };
+      }
+    } catch {
+      // Browser preview or a backend error: the local path is a good default.
+    }
+  }
+
+  /**
+   * Prefills the save folder from the task category.
+   *
+   * Priority: a remembered folder (the `defaultFolder` prop, which the app
+   * derives from "remember this path") wins, then the backend-resolved category
+   * folder (per-category override or `<download dir>\<subfolder>`). The backend
+   * is asked so this window shows exactly the path the engine will use.
+   */
+  async function refreshPrefill() {
+    const request = ++prefillRequest;
+    const remembered = (defaultFolder || "").trim();
+    const downloadDir = (settings.download_dir || "").trim();
+    const base = remembered || downloadDir;
+    if (!base) return;
+
+    const local = joinCategoryFolder(base, selectedCategory);
+    const keepsRemembered =
+      Boolean(remembered) && (!downloadDir || !sameFolderPath(remembered, downloadDir));
+    if (!folderEdited && request === prefillRequest) {
+      folder = local;
+    }
+    if (keepsRemembered) return;
+
+    try {
+      const resolved = await safeInvoke(
+        "resolve_category_folder",
+        { category: selectedCategory, filename },
+        { suppressToast: true }
+      );
+      const trimmed = typeof resolved === "string" ? resolved.trim() : "";
+      if (!folderEdited && request === prefillRequest && trimmed) {
+        folder = trimmed;
+      }
+    } catch {
+      // Keep the locally computed category path.
+    }
+  }
+
+  /** Loads settings first, then prefills, so category overrides are applied. */
+  async function bootstrapPrefill() {
+    await loadSettings();
+    await refreshPrefill();
+  }
+
+  /** Re-prefills when the user picks another category. */
+  function handleCategoryChange() {
+    refreshPrefill();
   }
 
   $: categoryOptions = CATEGORIES.filter((c) => c.id !== "all");
@@ -53,6 +122,7 @@
         });
         if (selected && typeof selected === "string") {
           folder = selected;
+          folderEdited = true;
         }
       }
     } catch (err) {
@@ -170,7 +240,13 @@
         <!-- Category -->
         <div class="form-group">
           <label for="pre-category" class="form-label">{$t("preDownload.category")}</label>
-          <select id="pre-category" class="form-control" bind:value={selectedCategory} disabled={busy}>
+          <select
+            id="pre-category"
+            class="form-control"
+            bind:value={selectedCategory}
+            on:change={handleCategoryChange}
+            disabled={busy}
+          >
             {#each categoryOptions as cat (cat.id)}
               <option value={cat.id}>{getCategoryLabel(cat.id, $currentLang)}</option>
             {/each}
@@ -187,6 +263,7 @@
               bind:value={folder}
               type="text"
               dir="ltr"
+              on:input={() => (folderEdited = true)}
               disabled={busy}
             />
             <button type="button" class="btn btn-secondary btn-sm" on:click={handleBrowseFolder} disabled={busy}>
