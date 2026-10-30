@@ -72,7 +72,7 @@ FINAL RESULT:  PASS
    - **الخلاصة:** لا توجد أي مسارات خاصة بمطوري المشروع أو أسماء مستخدمين حقيقية مسربة داخل الكود البرمجي للمنتج.
 
 2. **روابط التوثيق ومستودع الكود (Documentation & Repository URLs):**
-   - `crates/http/src/client.rs:160`: رابط مستودع المشروع `https://github.com/` المضمن داخل ترويسة `User-Agent` المعيارية (`SAYL/<version> (+https://github.com/)`) لتعريف هوية العميل البرمجي مفتوح المصدر.
+   - `crates/http/src/client.rs:160`: رابط مستودع المشروع `https://github.com/` المضمن داخل ترويسة `User-Agent` المعيارية (`SAYL/<version> (+https://github.com/)`) لتعريف هوية العميل البرمجي متاح المصدر (source-available).
    - `apps/website/index.html:61, 301, 302`: روابط توثيقية ظاهرة للمستخدم في موقع الويب تنقله إلى مستودع الكود وصفحة الإبلاغ عن المشاكل `issues`.
 
 3. **خوادم الاسترجاع والـ IPC المحلي (Loopback & IPC Fixtures):**
