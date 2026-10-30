@@ -5,7 +5,7 @@
   const c = document.getElementById('flow');
   if (!c) return;
   const x = c.getContext('2d');
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reduce = false; // always animate (owner request), ignore OS reduced-motion
 
   const isHome = document.body.classList.contains('page-home') ||
                  window.location.pathname === '/' ||

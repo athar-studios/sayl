@@ -3,7 +3,7 @@
  * Handles:
  * - First-visit language prompt & localStorage ('sayl-lang')
  * - Header language switcher (AR <-> EN)
- * - Canvas logo color-flow animation (respects prefers-reduced-motion)
+ * - Canvas logo color-flow animation (always runs)
  * - Live download segments & progress counter
  * - Interactive mockup screenshot switcher
  * - Docs sidebar search & active section highlighting
@@ -13,7 +13,7 @@
   'use strict';
 
   const STORAGE_KEY = 'sayl-lang';
-  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const prefersReducedMotion = false; // always animate (owner request)
 
   // ---------------------------------------------------------------------------
   // 1. Language Management

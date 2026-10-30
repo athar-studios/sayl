@@ -1154,19 +1154,6 @@ details p {
 }
 
 /* Reduced Motion */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-    scroll-behavior: auto !important;
-  }
-  .seg i {
-    width: 65% !important;
-  }
-}
 
 /* Mobile header: wrap nav onto its own row so nothing overflows horizontally */
 @media (max-width: 640px) {
