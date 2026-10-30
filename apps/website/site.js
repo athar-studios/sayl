@@ -123,7 +123,7 @@
     const ctx = canvas.getContext('2d');
     const img = new Image();
     const isEn = window.location.pathname.includes('/en/');
-    img.src = isEn ? '../icon.svg' : 'icon.svg';
+    img.src = '/icon.svg';
 
     img.onload = () => {
       const W = 1024;
@@ -148,10 +148,9 @@
           const g = ctx.createLinearGradient(b - L, 0, b, 0);
           g.addColorStop(0, 'rgba(11,26,78,0)');
           g.addColorStop(0.24, 'rgba(11,26,78,0.78)');
-          g.addColorStop(0.42, 'rgba(0,182,189,0.65)');
-          g.addColorStop(0.5, 'rgba(127,240,242,0.95)');
-          g.addColorStop(0.54, 'rgba(235,255,255,0.92)');
-          g.addColorStop(0.62, 'rgba(0,182,189,0.65)');
+          g.addColorStop(0.42, 'rgba(0,182,189,0.6)');
+          g.addColorStop(0.5, 'rgba(0,182,189,0.7)');
+          g.addColorStop(0.62, 'rgba(0,182,189,0.6)');
           g.addColorStop(0.8, 'rgba(11,26,78,0.72)');
           g.addColorStop(1, 'rgba(11,26,78,0)');
 
