@@ -2629,8 +2629,8 @@ mod tests {
 
     #[test]
     fn test_same_folder_ignores_case_and_trailing_separators() {
-        let left = Path::new("C:\\Users\\A\\Downloads");
-        let right = Path::new("c:\\users\\a\\downloads\\");
+        let left = Path::new("C:\\Users\\User\\Downloads");
+        let right = Path::new("c:\\users\\user\\downloads\\");
         assert!(same_folder(left, right));
         assert!(same_folder(
             Path::new("C:/Users/A"),

@@ -705,12 +705,12 @@ describe("downloadWindowUi — getWindowActionFlags", () => {
 describe("downloadWindowUi — buildCompleteDetails", () => {
   it("shows name, size and the saved folder", () => {
     const details = buildCompleteDetails(
-      { filename: "file.zip", total_size: 2048, folder: "C:\\Users\\me\\Downloads" },
+      { filename: "file.zip", total_size: 2048, folder: "C:\\Users\\User\\Downloads" },
       "ar"
     );
     expect(details.filename).toBe("file.zip");
     expect(details.size).toBe("2.0 KB");
-    expect(details.savedPath).toBe("C:\\Users\\me\\Downloads");
+    expect(details.savedPath).toBe("C:\\Users\\User\\Downloads");
   });
 
   it("falls back to written bytes when the total is unknown", () => {

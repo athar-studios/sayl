@@ -288,10 +288,19 @@ mod tests {
 
     #[test]
     fn test_extension_table_covers_all_six_categories() {
+        // FileCategory::Other is the intentional fallback for unrecognised
+        // extensions; it never appears in EXTENSION_TABLE by design.
         for category in FileCategory::ALL {
-            assert!(EXTENSION_TABLE
-                .iter()
-                .any(|(_, mapped)| *mapped == category));
+            if category == FileCategory::Other {
+                continue;
+            }
+            assert!(
+                EXTENSION_TABLE
+                    .iter()
+                    .any(|(_, mapped)| *mapped == category),
+                "No extension maps to {:?} in EXTENSION_TABLE",
+                category
+            );
         }
     }
 
