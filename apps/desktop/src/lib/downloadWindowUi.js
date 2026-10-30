@@ -890,3 +890,139 @@ export function buildCompleteDetails(task, lang = "ar") {
     savedPath: folder || "—",
   };
 }
+
+/**
+ * Task states that mean the origin link is still being checked.
+ * While probing, the byte counters are meaningless: the file size is not
+ * known yet, so a percent computed from it would be a lie (and would show
+ * "100%" for a download that never started).
+ */
+const PROBING_STATES = new Set(["Probing"]);
+
+/**
+ * True when the task is still probing the remote resource («فحص الرابط...»).
+ *
+ * @param {object|null|undefined} task
+ * @returns {boolean}
+ */
+export function isProbingTask(task) {
+  const state = task && typeof task === "object" ? task.state : null;
+  return typeof state === "string" && PROBING_STATES.has(state);
+}
+
+/**
+ * Percent to display for a task, suppressed while the task is probing.
+ *
+ * A row must never show "100%" while the task is still at «فحص الرابط...»:
+ * the size is unknown at that point, so the percent is `null` and the caller
+ * renders the state label only.
+ *
+ * @param {object|null|undefined} task
+ * @returns {number|null}
+ */
+export function taskPercent(task) {
+  if (!task || typeof task !== "object") return null;
+  if (isProbingTask(task)) return null;
+  const total = toFiniteNumber(task.total_size);
+  if (total === null || total <= 0) return null;
+  const written = Math.max(0, toFiniteNumber(task.written) ?? 0);
+  return clamp(Math.round((written / total) * 1000) / 10, 0, 100);
+}
+
+/**
+ * Builds a task stub from a `sayl://progress` payload.
+ *
+ * Progress events can arrive before the task record itself is loaded (the
+ * window opens while the engine is still starting the download). The event
+ * must not be dropped: it seeds a minimal task so the window shows real
+ * progress instead of an empty "...".
+ *
+ * @param {string} taskId
+ * @param {object|null|undefined} payload
+ * @returns {object|null}
+ */
+export function taskFromProgressPayload(taskId, payload) {
+  if (!payload || typeof payload !== "object") return null;
+  const written = toFiniteNumber(payload.written) ?? 0;
+  const total = toFiniteNumber(payload.total);
+  const speed = toFiniteNumber(payload.speed_bps) ?? 0;
+  return {
+    id: payload.id || taskId,
+    written,
+    total_size: total,
+    speed_bps: speed,
+    state: "Downloading",
+  };
+}
+
+/**
+ * Merges a `sayl://progress` payload into the current task.
+ *
+ * The written bytes never decrease for the same attempt, and a payload that
+ * arrives before the task record exists creates the task instead of being
+ * dropped.
+ *
+ * @param {object|null|undefined} current
+ * @param {object|null|undefined} payload
+ * @param {string} [taskId]
+ * @returns {object|null}
+ */
+export function mergeProgressPayload(current, payload, taskId) {
+  const stub = taskFromProgressPayload(taskId, payload);
+  if (!stub) return current ?? null;
+  if (!current || typeof current !== "object") return stub;
+
+  const total = stub.total_size ?? toFiniteNumber(current.total_size);
+  const written = Math.max(
+    toFiniteNumber(current.written) ?? 0,
+    toFiniteNumber(payload.written) ?? 0,
+  );
+  const speed = toFiniteNumber(payload.speed_bps) ?? toFiniteNumber(current.speed_bps) ?? 0;
+  const eta =
+    speed > 0 && total !== null && total > written
+      ? Math.round((total - written) / speed)
+      : null;
+
+  const merged = {
+    ...current,
+    written,
+    total_size: total ?? null,
+    speed_bps: speed,
+    eta_secs: eta,
+  };
+  // A progress event means the transfer is running: a task that is still
+  // queued or probing is now downloading.
+  if (current.state === "Queued" || current.state === "Probing" || !current.state) {
+    merged.state = "Downloading";
+  }
+  return merged;
+}
+
+/**
+ * Picks the task matching `taskId` out of a task list.
+ *
+ * @param {Array<object>|null|undefined} tasks
+ * @param {string} taskId
+ * @returns {object|null}
+ */
+export function findTaskById(tasks, taskId) {
+  if (!Array.isArray(tasks)) return null;
+  return tasks.find((t) => t && t.id === taskId) ?? null;
+}
+
+/**
+ * Decides what the standalone download window renders.
+ *
+ * - `loading`: the task record is not known yet, keep showing the spinner.
+ * - `error`: the task could not be loaded (timeout/command error) or it
+ *   failed; show the error container with the retry button.
+ * - `task`: a task record is available, render the window.
+ *
+ * @param {{ task?: object|null, loadError?: string|null, timedOut?: boolean }} state
+ * @returns {"loading"|"error"|"task"}
+ */
+export function resolveStandaloneView({ task = null, loadError = null, timedOut = false } = {}) {
+  if (timedOut || loadError) return "error";
+  if (task && typeof task === "object") return "task";
+  return "loading";
+}

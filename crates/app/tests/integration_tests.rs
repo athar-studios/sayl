@@ -2595,13 +2595,11 @@ async fn test_parallel_progress_monotonic_and_cancel() {
                         }
                         // Send cancel after seeing some progress - earlier threshold
                         if saw_positive_progress && !cancel_sent && downloaded_bytes > 10000 {
-                            eprintln!("DEBUG: Sending cancel at {} bytes", downloaded_bytes);
                             engine.cancel(task_id).await.expect("cancel task");
                             cancel_sent = true;
                         }
                     }
                     sayl_core::event::EventPayload::StateChanged { to, .. } => {
-                        eprintln!("DEBUG: StateChanged to {:?}", to);
                         if to == DownloadState::Cancelled {
                             break;
                         }
@@ -2683,4 +2681,227 @@ async fn test_parallel_progress_monotonic_and_cancel() {
         size
     );
     assert!(cp.written > 0, "checkpoint must record some progress");
+}
+
+// ============================================================================
+// Auto-rename on filename collision (IDM style)
+// ============================================================================
+
+/// A download must never overwrite a file that is already in the download dir:
+/// it is stored next to it as `name (1).ext`, and the old file stays untouched.
+#[tokio::test]
+async fn test_add_renames_when_target_file_already_on_disk() {
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    let size = 16384;
+    server.set_resource_size(size);
+    let addr = server.start().await.expect("start fixture server");
+
+    // A user file that already occupies the derived name.
+    let existing_path = dl_dir.path().join("test_collide.bin");
+    let existing_bytes = vec![0x11u8; 4096];
+    tokio::fs::write(&existing_path, &existing_bytes)
+        .await
+        .expect("write pre-existing file");
+
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), EngineConfig::default())
+        .expect("create engine");
+
+    let url = format!("http://{addr}/test_collide.bin");
+    let task_id = engine.add(&url).await.expect("add task");
+
+    let added = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        added.filename, "test_collide (1).bin",
+        "collision with an existing file must pick the next free name"
+    );
+
+    engine.start(task_id).await.expect("start download");
+    let done = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(done.state, DownloadState::Completed);
+    assert_eq!(
+        done.filename, "test_collide (1).bin",
+        "the resolved name must be used for the real transfer"
+    );
+
+    // The pre-existing file is untouched, the download landed beside it.
+    let kept = tokio::fs::read(&existing_path)
+        .await
+        .expect("read kept file");
+    assert_eq!(
+        kept, existing_bytes,
+        "pre-existing file must not be overwritten"
+    );
+    let downloaded = tokio::fs::read(dl_dir.path().join(&done.filename))
+        .await
+        .expect("read downloaded file");
+    assert_eq!(downloaded, generate_bytes(size));
+}
+
+/// A stale `.part` file from another attempt also claims the name.
+#[tokio::test]
+async fn test_add_renames_when_stale_part_file_exists() {
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    server.set_resource_size(8192);
+    let addr = server.start().await.expect("start fixture server");
+
+    tokio::fs::write(
+        dl_dir.path().join("test_part_collide.zip.part"),
+        vec![0x22u8; 64],
+    )
+    .await
+    .expect("write stale part file");
+
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), EngineConfig::default())
+        .expect("create engine");
+
+    let url = format!("http://{addr}/test_part_collide.zip");
+    let task_id = engine.add(&url).await.expect("add task");
+    let added = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        added.filename, "test_part_collide (1).zip",
+        "a leftover .part file must force the next free name"
+    );
+}
+
+/// Two queued downloads of the same URL must not share one destination file.
+#[tokio::test]
+async fn test_second_task_renames_against_active_task() {
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    server.set_resource_size(8192);
+    let addr = server.start().await.expect("start fixture server");
+
+    // `max_connections: 1` keeps the two tasks from racing in this check.
+    let config = EngineConfig {
+        max_connections: 1,
+        ..Default::default()
+    };
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+
+    let url = format!("http://{addr}/test_shared.bin");
+    let first = engine.add(&url).await.expect("add first task");
+    let second = engine.add(&url).await.expect("add second task");
+
+    let first_rec = engine.get_task(first).unwrap().unwrap();
+    let second_rec = engine.get_task(second).unwrap().unwrap();
+
+    assert_eq!(first_rec.filename, "test_shared.bin");
+    assert_eq!(
+        second_rec.filename, "test_shared (1).bin",
+        "a queued task already targeting the name must push the second one to the next number"
+    );
+    assert_ne!(
+        first_rec.save_path.join(&first_rec.filename),
+        second_rec.save_path.join(&second_rec.filename),
+        "two parallel downloads must never share one destination path"
+    );
+}
+
+/// The race that `add()` cannot see: the name is grabbed between add and start.
+#[tokio::test]
+async fn test_start_renames_when_name_taken_after_add() {
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    let size = 16384;
+    server.set_resource_size(size);
+    let addr = server.start().await.expect("start fixture server");
+
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), EngineConfig::default())
+        .expect("create engine");
+
+    let url = format!("http://{addr}/test_late.bin");
+    let task_id = engine.add(&url).await.expect("add task");
+    let added = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        added.filename, "test_late.bin",
+        "nothing collides at add time"
+    );
+
+    // A different file appears at the destination before the task starts.
+    // Its length deliberately differs from the payload so it cannot look complete.
+    let existing_path = dl_dir.path().join("test_late.bin");
+    let existing_bytes = vec![0x33u8; 4096];
+    tokio::fs::write(&existing_path, &existing_bytes)
+        .await
+        .expect("write late collision file");
+
+    engine.start(task_id).await.expect("start download");
+    let done = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(done.state, DownloadState::Completed);
+    assert_eq!(
+        done.filename, "test_late (1).bin",
+        "start must re-check the destination and rename before creating the .part file"
+    );
+
+    let kept = tokio::fs::read(&existing_path)
+        .await
+        .expect("read kept file");
+    assert_eq!(kept, existing_bytes, "late file must not be overwritten");
+    let downloaded = tokio::fs::read(dl_dir.path().join(&done.filename))
+        .await
+        .expect("read downloaded file");
+    assert_eq!(downloaded, generate_bytes(size));
+}
+
+/// Resuming a paused task must keep its own name and `.part` file.
+#[tokio::test]
+async fn test_resume_keeps_own_filename_after_collision_check() {
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    let size = 64 * 1024;
+    server.set_resource_size(size);
+    let addr = server.start().await.expect("start fixture server");
+
+    let config = EngineConfig {
+        max_connections: 1,
+        chunk_size: 4096,
+        ..Default::default()
+    };
+    let store = std::sync::Arc::new(Store::open(store_dir.path()).expect("open store"));
+    let engine = Engine::with_store(dl_dir.path(), std::sync::Arc::clone(&store), config)
+        .expect("create engine");
+
+    let url = format!("http://{addr}/test_resume_name.bin");
+    let filename = "test_resume_name.bin";
+    let offset = 16 * 1024usize;
+    let task_id = sayl_core::id::TaskId::new();
+
+    // A paused task owns `<filename>.part` plus a durable checkpoint at `offset`.
+    tokio::fs::write(
+        dl_dir.path().join(format!("{filename}.part")),
+        &generate_bytes(size)[..offset],
+    )
+    .await
+    .expect("write .part file");
+
+    let mut record = TaskRecord::with_id(task_id, &url, dl_dir.path(), filename);
+    record.total_size = Some(size as u64);
+    record.written = offset as u64;
+    record.state = DownloadState::Paused;
+    store.upsert_task(&record).expect("upsert record");
+    store
+        .save_checkpoint(&sayl_storage::Checkpoint::new(
+            task_id,
+            offset as u64,
+            Some(size as u64),
+            vec![(0, offset as u64)],
+        ))
+        .expect("save checkpoint");
+
+    // Resume: the task owns its own `.part` file, so the collision check must
+    // leave the name exactly as it is.
+    engine.start(task_id).await.expect("resume task");
+    let done = wait_for_terminal(&engine, task_id, Duration::from_secs(10)).await;
+    assert_eq!(done, DownloadState::Completed);
+    let record = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        record.filename, filename,
+        "resuming must not rename the task away from its own .part file"
+    );
+    let bytes = tokio::fs::read(dl_dir.path().join(&record.filename))
+        .await
+        .expect("read final file");
+    assert_eq!(bytes, generate_bytes(size));
 }

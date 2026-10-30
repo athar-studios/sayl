@@ -238,3 +238,49 @@ export function getCategoryCounts(tasks) {
 
 // Alias for flexibility
 export const countByCategory = getCategoryCounts;
+
+/**
+ * Splits a file name into its stem and its extension, dot included.
+ *
+ * Mirrors `split_stem_extension` in `crates/http/src/filename.rs`: only the last
+ * dot counts, a leading dot is part of the name (".gitignore" has no extension),
+ * and a trailing dot yields no extension.
+ *
+ * @param {string|null|undefined} name
+ * @returns {{ stem: string, extension: string }}
+ */
+export function splitStemExtension(name) {
+  const text = typeof name === "string" ? name : "";
+  const dot = text.lastIndexOf(".");
+  if (dot <= 0) return { stem: text, extension: "" };
+  return { stem: text.slice(0, dot), extension: text.slice(dot) };
+}
+
+/**
+ * Returns the next sequential numbered file name, IDM style.
+ *
+ * Mirrors `next_numbered_filename` in `crates/http/src/filename.rs`:
+ * - "Zed-x86_64.exe" -> "Zed-x86_64 (1).exe"
+ * - "Zed-x86_64 (1).exe" -> "Zed-x86_64 (2).exe"
+ * - "file1_v2.0_test3 (1).exe" -> "file1_v2.0_test3 (2).exe"
+ * - "myfile" -> "myfile (1)"
+ * - "archive.tar.gz" -> "archive.tar (1).gz"
+ *
+ * Only a trailing ` (N)` with N >= 1 and no leading zero counts as a counter.
+ * This is a name-shape helper: the backend decides what is actually free, since
+ * only it can see the disk and the task list.
+ *
+ * @param {string} name
+ * @returns {string}
+ */
+export function nextNumberedFilename(name) {
+  const { stem, extension } = splitStemExtension(name);
+  const match = /^(.*) \((\d+)\)$/.exec(stem);
+  let base = stem;
+  let next = 1;
+  if (match && !/^0\d/.test(match[2]) && Number(match[2]) > 0) {
+    base = match[1];
+    next = Number(match[2]) + 1;
+  }
+  return `${base} (${next})${extension}`;
+}

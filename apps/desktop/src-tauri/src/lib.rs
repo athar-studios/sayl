@@ -246,10 +246,14 @@ pub fn apply_category_folder(
     let category =
         category.unwrap_or_else(|| categorize(&record.filename, record.content_type.as_deref()));
     let folder = ensure_category_folder(settings, category);
-    if folder == record.save_path {
+    // The category folder may already hold that name (a previous download of the
+    // same file, or another queued task), so resolve the free name in the folder
+    // the bytes will really land in. The task itself is excluded.
+    let unique_filename = engine.unique_filename_in(&folder, &record.filename, Some(task_id));
+    if folder == record.save_path && unique_filename == record.filename {
         return Some(folder);
     }
-    match engine.update_queued_destination(task_id, folder.clone(), record.filename) {
+    match engine.update_queued_destination(task_id, folder.clone(), unique_filename) {
         Ok(()) => Some(folder),
         Err(error) => {
             tracing::warn!("failed to apply category folder: {error}");
@@ -1098,6 +1102,52 @@ pub mod commands {
     }
 
     #[tauri::command]
+    pub async fn get_task(
+        state: State<'_, AppState>,
+        id: String,
+    ) -> Result<Option<TaskView>, String> {
+        let task_id = id
+            .parse::<TaskId>()
+            .map_err(|e| format!("Invalid task ID: {e}"))?;
+
+        let engine = state.engine.clone();
+        let live_stats = Arc::clone(&state.live_stats);
+        let parts_cache = Arc::clone(&state.parts_cache);
+        let max_conn = state
+            .settings
+            .read()
+            .map(|s| s.max_connections_per_task)
+            .unwrap_or(4);
+
+        tauri::async_runtime::spawn_blocking(move || {
+            let record = engine
+                .get_task(task_id)
+                .map_err(|e| format!("Failed to get task: {e}"))?;
+
+            let Some(rec) = record else {
+                return Ok(None);
+            };
+
+            let stats_guard = live_stats.lock().ok();
+            let stats = stats_guard.as_ref().and_then(|m| m.get(&rec.id).copied());
+            let parts = get_cached_parts(&engine, &parts_cache, rec.id);
+            let connections = estimate_connections(rec.state, parts, max_conn);
+            let view = TaskView::from_record_full(
+                &rec,
+                stats.map(|s| s.speed_bps),
+                stats.and_then(|s| s.eta_secs),
+                parts,
+                connections,
+            )
+            .with_segment_ranges(engine.connection_snapshot(rec.id));
+
+            Ok(Some(view))
+        })
+        .await
+        .map_err(|e| format!("Join error in get_task: {e}"))?
+    }
+
+    #[tauri::command]
     pub fn get_settings(state: State<'_, AppState>) -> Result<Settings, String> {
         state
             .settings
@@ -1276,6 +1326,39 @@ pub mod commands {
         };
         let folder = ensure_category_folder(&settings, resolved);
         Ok(folder.to_string_lossy().into_owned())
+    }
+
+    /// Resolves the free (IDM style) name a download would use in `folder`.
+    ///
+    /// The pre-download and duplicate windows call this so the name they show is
+    /// the one the engine will actually write: the first name that is neither an
+    /// existing file, nor a leftover `.part` file, nor the target of a queued or
+    /// running task. `task_id` excludes the task being edited, so re-opening its
+    /// own window never renames it.
+    #[tauri::command]
+    pub fn get_unique_filename(
+        state: State<'_, AppState>,
+        folder: String,
+        filename: String,
+        task_id: Option<String>,
+    ) -> Result<String, String> {
+        let requested = folder.trim();
+        if requested.is_empty() {
+            return Err("Folder cannot be empty".to_string());
+        }
+        if filename.trim().is_empty() {
+            return Err("File name cannot be empty".to_string());
+        }
+        let exclude = match task_id.as_deref() {
+            Some(id) if !id.is_empty() => Some(
+                id.parse::<TaskId>()
+                    .map_err(|e| format!("Invalid task ID: {e}"))?,
+            ),
+            _ => None,
+        };
+        Ok(state
+            .engine
+            .unique_filename_in(Path::new(requested), &filename, exclude))
     }
 
     #[tauri::command]
@@ -1554,6 +1637,7 @@ pub fn run() {
             commands::delete_tasks,
             commands::delete_task,
             commands::list_tasks,
+            commands::get_task,
             commands::get_settings,
             commands::set_settings,
             commands::get_clipboard_url,
@@ -1562,6 +1646,7 @@ pub fn run() {
             commands::reveal_task,
             commands::open_task_file,
             commands::resolve_category_folder,
+            commands::get_unique_filename,
             commands::arm_shutdown,
             commands::cancel_shutdown,
             commands::get_shutdown_status,

@@ -1,13 +1,56 @@
 <script>
   import { t, currentLang } from "./i18n.js";
   import { formatBytes } from "./format.js";
+  import { nextNumberedFilename } from "./classify.js";
   import StatusPill from "./StatusPill.svelte";
+  import { safeInvoke } from "./tauri.js";
   import { createEventDispatcher } from "svelte";
 
   export let open = false;
   export let existingTask = null;
 
   const dispatch = createEventDispatcher();
+
+  /**
+   * The free (IDM style) name "Download again" will use.
+   *
+   * The existing download already holds `<task.filename>` in its folder, so the
+   * engine picks `file (1).ext` instead of overwriting it. Resolving the name in
+   * the backend keeps this dialog honest about what will really be written, and
+   * the engine re-checks it again at start time.
+   */
+  let suggestedFilename = "";
+  let suggestionToken = 0;
+
+  $: if (open && existingTask) {
+    loadSuggestedFilename(existingTask);
+  } else if (!open) {
+    suggestedFilename = "";
+  }
+
+  async function loadSuggestedFilename(task) {
+    const token = ++suggestionToken;
+    // Optimistic guess: the existing download holds its own name in its folder,
+    // so "Download again" lands on the next number. The backend answer below
+    // replaces it whenever it can see the disk and the task list.
+    suggestedFilename = nextNumberedFilename(task.filename);
+    const folder = (task.folder || "").trim();
+    if (!folder) {
+      return;
+    }
+    try {
+      const unique = await safeInvoke(
+        "get_unique_filename",
+        { folder, filename: task.filename, taskId: task.id },
+        { suppressToast: true }
+      );
+      if (token === suggestionToken && typeof unique === "string") {
+        suggestedFilename = unique;
+      }
+    } catch {
+      // Browser preview or a backend error: keep the optimistic guess.
+    }
+  }
 
   function handleOpenExisting() {
     if (existingTask) {
@@ -78,6 +121,17 @@
         <div class="existing-task-card">
           <div class="task-info">
             <span class="file-name" title={existingTask.filename}><bdi>{existingTask.filename}</bdi></span>
+            {#if suggestedFilename && suggestedFilename !== existingTask.filename}
+              <span
+                class="file-name-next"
+                dir="ltr"
+                title={suggestedFilename}
+                aria-label={suggestedFilename}
+              >
+                <span class="next-arrow" aria-hidden="true">→</span>
+                <bdi>{suggestedFilename}</bdi>
+              </span>
+            {/if}
             <span class="file-url" title={existingTask.url} dir="ltr">{existingTask.url}</span>
           </div>
           <div class="task-meta">
@@ -228,6 +282,24 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* The name "Download again" will use: the existing name plus "(1)". */
+  .file-name-next {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-accent);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .next-arrow {
+    color: var(--color-text-subtle);
+    font-weight: 700;
   }
 
   .task-meta {

@@ -234,8 +234,11 @@ impl Engine {
             }
         };
 
+        let safe_filename = self.unique_filename_in(&self.inner.download_dir, &filename, None);
+
         let task_id = TaskId::new();
-        let mut record = TaskRecord::with_id(task_id, url_str, &self.inner.download_dir, &filename);
+        let mut record =
+            TaskRecord::with_id(task_id, url_str, &self.inner.download_dir, &safe_filename);
         record.final_url = final_url;
         record.total_size = total_size;
         record.etag = etag;
@@ -343,8 +346,11 @@ impl Engine {
             }
         }
 
+        let safe_filename =
+            self.unique_filename_in(&self.inner.download_dir, &final_filename, None);
+
         let mut record =
-            TaskRecord::with_id(task_id, url_str, &self.inner.download_dir, &final_filename);
+            TaskRecord::with_id(task_id, url_str, &self.inner.download_dir, &safe_filename);
         record.final_url = final_url;
         record.total_size = total_size;
         record.etag = etag;
@@ -565,15 +571,15 @@ impl Engine {
         };
 
         // Resume / destination checks
-        let safe_filename = sayl_http::filename::sanitize_filename(&record.filename);
+        let mut safe_filename = sayl_http::filename::sanitize_filename(&record.filename);
         if record.filename != safe_filename {
             record.filename = safe_filename.clone();
             let _ = self.inner.store.upsert_task(&record);
         }
-        let part_filename = format!("{safe_filename}.part");
-        let base_dir = record.save_path.as_path();
-        let part_path = self.resolve_destination_path_in(base_dir, &part_filename)?;
-        let disk_len = if part_path.exists() {
+        let mut part_filename = format!("{safe_filename}.part");
+        let base_dir = record.save_path.clone();
+        let mut part_path = self.resolve_destination_path_in(&base_dir, &part_filename)?;
+        let mut disk_len = if part_path.exists() {
             tokio::fs::metadata(&part_path)
                 .await
                 .map(|m| m.len())
@@ -582,7 +588,7 @@ impl Engine {
             0
         };
 
-        let final_path = self.resolve_destination_path_in(base_dir, &safe_filename)?;
+        let final_path = self.resolve_destination_path_in(&base_dir, &safe_filename)?;
         let final_len = if final_path.exists() {
             tokio::fs::metadata(&final_path)
                 .await
@@ -1015,6 +1021,47 @@ impl Engine {
             .or(record.last_modified.clone());
         if probe_res.content_type.is_some() {
             record.content_type = probe_res.content_type.clone();
+        }
+
+        let candidate_filename = probe_res
+            .filename
+            .clone()
+            .unwrap_or_else(|| record.filename.clone());
+
+        // Check if candidate_filename collides with existing disk files or other active tasks.
+        let is_taken = {
+            let target_file = base_dir.join(&candidate_filename);
+            let other_task_active = self
+                .inner
+                .store
+                .list_tasks()
+                .unwrap_or_default()
+                .into_iter()
+                .any(|t| {
+                    t.id != task_id
+                        && !t.state.is_terminal()
+                        && same_folder_path(&t.save_path, &base_dir)
+                        && same_filename_case(&t.filename, &candidate_filename)
+                });
+            let part_collides = candidate_filename != record.filename
+                && base_dir.join(format!("{candidate_filename}.part")).exists();
+
+            target_file.exists() || other_task_active || part_collides
+        };
+
+        if is_taken {
+            let unique_name =
+                self.unique_filename_in(&base_dir, &candidate_filename, Some(task_id));
+            if unique_name != record.filename {
+                record.filename = unique_name;
+                safe_filename = sayl_http::filename::sanitize_filename(&record.filename);
+                part_filename = format!("{safe_filename}.part");
+                part_path = self.resolve_destination_path_in(&base_dir, &part_filename)?;
+                // The new name is free by construction, so its `.part` file cannot
+                // hold any bytes: drop the length measured for the old name so the
+                // resume decision below never reads a stale partial length.
+                disk_len = 0;
+            }
         }
         self.inner.store.upsert_task(&record)?;
 
@@ -2179,9 +2226,10 @@ impl Engine {
         if safe_filename.is_empty() {
             return Err(CoreError::validation("filename", "filename is empty"));
         }
+        let unique_filename = self.unique_filename_in(&save_path, &safe_filename, Some(task_id));
         std::fs::create_dir_all(&save_path)
             .map_err(|e| CoreError::io_with_context(e, "create save_path"))?;
-        record.filename = safe_filename;
+        record.filename = unique_filename;
         record.save_path = save_path;
         record.updated_at = Utc::now();
         self.inner.store.upsert_task(&record)?;
@@ -2305,6 +2353,84 @@ impl Engine {
         Ok(target_path)
     }
 
+    /// Checks whether `filename` is taken in `dir` by either:
+    /// 1. A physical file `<dir>/<filename>` on disk
+    /// 2. A physical `.part` file `<dir>/<filename>.part` on disk
+    /// 3. An active or queued download in the store targeting `<dir>/<filename>` (excluding `exclude_task`).
+    pub fn is_filename_taken_in(
+        &self,
+        dir: &Path,
+        filename: &str,
+        exclude_task: Option<TaskId>,
+    ) -> bool {
+        let safe_name = sayl_http::filename::sanitize_filename(filename);
+        let target_file = dir.join(&safe_name);
+        if target_file.exists() {
+            return true;
+        }
+        let part_file = dir.join(format!("{safe_name}.part"));
+        if part_file.exists() {
+            return true;
+        }
+
+        if let Ok(tasks) = self.inner.store.list_tasks() {
+            for t in tasks {
+                if Some(t.id) == exclude_task || t.state.is_terminal() {
+                    continue;
+                }
+                if same_folder_path(&t.save_path, dir)
+                    && same_filename_case(&t.filename, &safe_name)
+                {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Resolves a unique, non-colliding filename in `dir` (IDM style),
+    /// appending sequential numbers `(1)`, `(2)`, ... when a collision is detected.
+    pub fn unique_filename_in(
+        &self,
+        dir: &Path,
+        base_name: &str,
+        exclude_task: Option<TaskId>,
+    ) -> String {
+        let active_names: Vec<String> = self
+            .inner
+            .store
+            .list_tasks()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|t| {
+                Some(t.id) != exclude_task
+                    && !t.state.is_terminal()
+                    && same_folder_path(&t.save_path, dir)
+            })
+            .map(|t| t.filename)
+            .collect();
+
+        sayl_http::filename::generate_unique_filename(base_name, |candidate| {
+            let target_file = dir.join(candidate);
+            if target_file.exists() {
+                return true;
+            }
+            let part_file = dir.join(format!("{candidate}.part"));
+            if part_file.exists() {
+                return true;
+            }
+            active_names
+                .iter()
+                .any(|f| same_filename_case(f, candidate))
+        })
+    }
+
+    /// Resolves a unique filename in `dir` without excluding any task.
+    pub fn unique_filename(&self, dir: &Path, base_name: &str) -> String {
+        self.unique_filename_in(dir, base_name, None)
+    }
+
     #[cfg(test)]
     pub(crate) fn poison_active_tasks_for_test(&self) {
         let lock = std::sync::Arc::clone(&self.inner.active_tasks);
@@ -2313,6 +2439,30 @@ impl Engine {
             panic!("deliberately poisoning active_tasks mutex for test");
         })
         .join();
+    }
+}
+
+fn same_folder_path(left: &Path, right: &Path) -> bool {
+    if let (Ok(c1), Ok(c2)) = (left.canonicalize(), right.canonicalize()) {
+        return c1 == c2;
+    }
+    let norm = |p: &Path| {
+        p.to_string_lossy()
+            .trim_end_matches(['/', '\\'])
+            .replace('/', "\\")
+            .to_lowercase()
+    };
+    norm(left) == norm(right)
+}
+
+fn same_filename_case(left: &str, right: &str) -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        left.eq_ignore_ascii_case(right)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        left == right
     }
 }
 
@@ -2393,5 +2543,141 @@ mod tests {
             .expect("resolves safely");
         assert!(abs_path.starts_with(engine.download_dir()));
         assert_eq!(abs_path, temp_dir.path().join("calc.exe"));
+    }
+
+    /// Creates an engine plus a scratch folder that plays the role of the
+    /// destination directory for the collision tests.
+    fn make_collision_engine() -> (tempfile::TempDir, Engine) {
+        let temp_dir = make_test_temp_dir();
+        let engine =
+            Engine::open_in_memory(temp_dir.path(), EngineConfig::default()).expect("open engine");
+        (temp_dir, engine)
+    }
+
+    fn write_file(path: &Path, len: usize) {
+        std::fs::write(path, vec![0u8; len]).expect("write fixture file");
+    }
+
+    #[test]
+    fn test_unique_filename_in_avoids_existing_disk_file() {
+        let (temp_dir, engine) = make_collision_engine();
+        let dir = temp_dir.path();
+
+        // No file yet: the requested name is used unchanged.
+        assert_eq!(
+            engine.unique_filename_in(dir, "Zed-x86_64.exe", None),
+            "Zed-x86_64.exe"
+        );
+
+        // Existing final file forces the IDM-style "(1)" suffix.
+        write_file(&dir.join("Zed-x86_64.exe"), 16);
+        assert_eq!(
+            engine.unique_filename_in(dir, "Zed-x86_64.exe", None),
+            "Zed-x86_64 (1).exe"
+        );
+
+        // Existing "(1)" increments instead of nesting: "(2)".
+        write_file(&dir.join("Zed-x86_64 (1).exe"), 16);
+        assert_eq!(
+            engine.unique_filename_in(dir, "Zed-x86_64.exe", None),
+            "Zed-x86_64 (2).exe"
+        );
+    }
+
+    #[test]
+    fn test_unique_filename_in_avoids_existing_part_file() {
+        let (temp_dir, engine) = make_collision_engine();
+        let dir = temp_dir.path();
+
+        write_file(&dir.join("archive.tar.gz.part"), 32);
+        assert_eq!(
+            engine.unique_filename_in(dir, "archive.tar.gz", None),
+            "archive.tar (1).gz"
+        );
+    }
+
+    #[test]
+    fn test_unique_filename_in_avoids_active_task_target() {
+        let (temp_dir, engine) = make_collision_engine();
+        let dir = temp_dir.path();
+
+        // A queued (non-terminal) task already targets "<dir>/report.pdf".
+        let other = TaskRecord::with_id(
+            TaskId::new(),
+            "http://example.com/report.pdf",
+            dir,
+            "report.pdf",
+        );
+        engine.inner.store.upsert_task(&other).expect("upsert task");
+
+        assert_eq!(
+            engine.unique_filename_in(dir, "report.pdf", None),
+            "report (1).pdf"
+        );
+
+        // The owning task itself may keep its own name when excluded.
+        assert_eq!(
+            engine.unique_filename_in(dir, "report.pdf", Some(other.id)),
+            "report.pdf"
+        );
+
+        // Terminal tasks stop holding the name (their disk file is gone here).
+        let mut completed = other.clone();
+        completed.state = DownloadState::Completed;
+        engine
+            .inner
+            .store
+            .upsert_task(&completed)
+            .expect("upsert completed task");
+        assert_eq!(
+            engine.unique_filename_in(dir, "report.pdf", None),
+            "report.pdf"
+        );
+    }
+
+    #[test]
+    fn test_unique_filename_in_edge_shapes_and_sequence() {
+        let (temp_dir, engine) = make_collision_engine();
+        let dir = temp_dir.path();
+
+        // Names with multiple numbers: only the trailing "(N)" increments.
+        write_file(&dir.join("file1_v2.0_test3 (1).exe"), 8);
+        assert_eq!(
+            engine.unique_filename_in(dir, "file1_v2.0_test3 (1).exe", None),
+            "file1_v2.0_test3 (2).exe"
+        );
+
+        // Names without any extension.
+        write_file(&dir.join("myfile"), 8);
+        assert_eq!(engine.unique_filename_in(dir, "myfile", None), "myfile (1)");
+
+        // Sequential increments (1), (2), (3) ... on one base name.
+        write_file(&dir.join("seq.bin"), 8);
+        for expected in ["seq (1).bin", "seq (2).bin", "seq (3).bin"] {
+            let unique = engine.unique_filename_in(dir, "seq.bin", None);
+            assert_eq!(unique, expected);
+            write_file(&dir.join(&unique), 8);
+        }
+
+        // A foreground .part file of an unrelated crash also blocks the name.
+        write_file(&dir.join("crashy.zip.part"), 8);
+        assert_eq!(
+            engine.unique_filename_in(dir, "crashy.zip", None),
+            "crashy (1).zip"
+        );
+    }
+
+    #[test]
+    fn test_is_filename_taken_in_matches_resolution() {
+        let (temp_dir, engine) = make_collision_engine();
+        let dir = temp_dir.path();
+
+        assert!(!engine.is_filename_taken_in(dir, "free.bin", None));
+        write_file(&dir.join("free.bin"), 4);
+        assert!(engine.is_filename_taken_in(dir, "free.bin", None));
+
+        write_file(&dir.join("stale.bin.part"), 4);
+        assert!(engine.is_filename_taken_in(dir, "stale.bin", None));
+        assert!(!engine.is_filename_taken_in(&temp_dir.path().join("nope"), "stale.bin", None));
     }
 }

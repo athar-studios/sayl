@@ -36,8 +36,9 @@ pub use client::{
 };
 pub use error::HttpError;
 pub use filename::{
-    derive_filename, extract_filename_from_url, parse_content_disposition, sanitize_filename,
-    DEFAULT_FALLBACK_FILENAME, MAX_FILENAME_LENGTH,
+    derive_filename, extract_filename_from_url, generate_unique_filename, next_numbered_filename,
+    parse_content_disposition, sanitize_filename, split_stem_extension, DEFAULT_FALLBACK_FILENAME,
+    MAX_FILENAME_LENGTH,
 };
 pub use headers::{
     build_request_headers, validate_header_name, validate_header_value,

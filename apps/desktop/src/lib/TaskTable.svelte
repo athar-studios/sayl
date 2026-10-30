@@ -11,6 +11,7 @@
     isTaskPending,
   } from "./format.js";
   import { friendlyError } from "./errors.js";
+  import { taskPercent } from "./downloadWindowUi.js";
   import { createEventDispatcher, onMount } from "svelte";
 
   export let tasks = [];
@@ -111,8 +112,9 @@
   $: isRowSelected = (id) => (selectedIds.length > 0 ? selectedIds.includes(id) : selectedId === id);
 
   function getPercent(task) {
-    if (!task.total_size || task.total_size <= 0) return null;
-    return Math.min(100, Math.max(0, Math.round((task.written / task.total_size) * 1000) / 10));
+    // Never show a percentage while the task is still probing the link
+    // («فحص الرابط...»): the size is unknown then, so "100%" would be a lie.
+    return taskPercent(task);
   }
 
   // Sorted tasks

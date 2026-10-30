@@ -20,7 +20,7 @@
     buildConnectionSegments,
     createConnectionTableTracker,
     buildSegmentBars,
-    progressPercent,
+    taskPercent,
     getWindowActionFlags,
     buildSpeedLimitState,
     parseSpeedLimitInput,
@@ -55,7 +55,9 @@
   $: isFailed = mergedTask?.state === "Failed";
   $: errInfo = isFailed ? friendlyError(mergedTask, $currentLang) : null;
 
-  $: percentNum = progressPercent(mergedTask?.written, mergedTask?.total_size);
+  // Never report 100% while the task is still probing («فحص الرابط...»):
+  // the size is unknown at that point, so the percent stays empty.
+  $: percentNum = taskPercent(mergedTask);
   $: percentText = percentNum === null ? "—" : formatPercent(percentNum, $currentLang);
 
   $: statusRows = buildStatusRows(mergedTask, $currentLang);

@@ -16,11 +16,14 @@ use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, COOKIE, PROXY_AUTHO
 use reqwest::Client;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpListener;
 use url::Url;
 
 use sayl_http::{
-    derive_filename, probe, sanitize_filename, stream_to_file, CancellationToken, HttpError,
-    RangeSupport, RedirectPolicy, RedirectTracker, StreamOutcome,
+    derive_filename, probe, probe_with_options, sanitize_filename, stream_to_file,
+    CancellationToken, HttpError, ProbeOptions, RangeSupport, RedirectPolicy, RedirectTracker,
+    StreamOutcome,
 };
 use sayl_test_http::{HttpFixtureServer, Scenario};
 
@@ -173,6 +176,166 @@ async fn test_scenario_head_rejected() {
     assert_eq!(result.range_support, RangeSupport::Ignored);
 
     server.shutdown();
+}
+
+/// How the scripted server answers a HEAD request.
+#[derive(Clone, Copy)]
+enum HeadMode {
+    /// Answer HEAD with this raw HTTP response (e.g. a 403 or 500 status line).
+    Status(&'static str),
+    /// Never answer HEAD at all, so the probe timeout fires.
+    Hang,
+}
+
+/// Spawns a tiny raw HTTP/1.1 server that scripts HEAD-vs-GET behaviour the
+/// deterministic fixture server does not cover (403/500/timeout on HEAD only).
+///
+/// HEAD is answered according to `head_mode`; GET always answers `200 OK`
+/// with a 1024-byte body, which is what the probe's GET fallback must see.
+async fn spawn_scripted_head_server(head_mode: HeadMode) -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+    let addr = listener.local_addr().expect("addr");
+
+    tokio::spawn(async move {
+        loop {
+            let Ok((mut stream, _)) = listener.accept().await else {
+                break;
+            };
+
+            tokio::spawn(async move {
+                let mut buf = Vec::new();
+                let mut chunk = [0u8; 1024];
+                loop {
+                    match stream.read(&mut chunk).await {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            buf.extend_from_slice(&chunk[..n]);
+                            if buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                                break;
+                            }
+                        }
+                        Err(_) => return,
+                    }
+                }
+
+                let request = String::from_utf8_lossy(&buf).to_string();
+                if request.starts_with("HEAD") {
+                    match head_mode {
+                        HeadMode::Status(response) => {
+                            let _ = stream.write_all(response.as_bytes()).await;
+                            let _ = stream.flush().await;
+                            return;
+                        }
+                        HeadMode::Hang => {
+                            // Never answer: the probe timeout must fire.
+                            std::future::pending::<()>().await;
+                            return;
+                        }
+                    }
+                }
+
+                let body = vec![b'x'; 1024];
+                let head = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                );
+                let _ = stream.write_all(head.as_bytes()).await;
+                let _ = stream.write_all(&body).await;
+                let _ = stream.flush().await;
+            });
+        }
+    });
+
+    format!("http://{addr}")
+}
+
+#[tokio::test]
+async fn test_probe_head_403_falls_back_to_get() {
+    let base = spawn_scripted_head_server(HeadMode::Status(
+        "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+    ))
+    .await;
+    let url = Url::parse(&format!("{base}/resource.bin")).unwrap();
+
+    let result = probe(url)
+        .await
+        .expect("probe must fall back to GET when HEAD returns 403");
+    assert_eq!(result.status, 200);
+    assert_eq!(result.content_length, Some(1024));
+}
+
+#[tokio::test]
+async fn test_probe_head_500_falls_back_to_get() {
+    let base = spawn_scripted_head_server(HeadMode::Status(
+        "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+    ))
+    .await;
+    let url = Url::parse(&format!("{base}/resource.bin")).unwrap();
+
+    let result = probe(url)
+        .await
+        .expect("probe must fall back to GET when HEAD returns 500");
+    assert_eq!(result.status, 200);
+    assert_eq!(result.content_length, Some(1024));
+}
+
+#[tokio::test]
+async fn test_probe_head_timeout_falls_back_to_get() {
+    let base = spawn_scripted_head_server(HeadMode::Hang).await;
+    let url = Url::parse(&format!("{base}/resource.bin")).unwrap();
+
+    let client = Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .unwrap();
+    let options = ProbeOptions {
+        timeout: std::time::Duration::from_millis(400),
+        ..Default::default()
+    };
+
+    let result = probe_with_options(&client, url, options)
+        .await
+        .expect("probe must fall back to GET after the HEAD timeout");
+    assert_eq!(result.status, 200);
+    assert_eq!(result.content_length, Some(1024));
+}
+
+#[tokio::test]
+async fn test_probe_head_and_get_timeout_returns_error() {
+    // Every request hangs, so the bounded timeout must surface an error
+    // instead of blocking the download forever.
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+    let addr = listener.local_addr().expect("addr");
+    tokio::spawn(async move {
+        let mut held = Vec::new();
+        loop {
+            let Ok((stream, _)) = listener.accept().await else {
+                break;
+            };
+            held.push(stream);
+        }
+    });
+
+    let url = Url::parse(&format!("http://{addr}/resource.bin")).unwrap();
+    let client = Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .unwrap();
+    let options = ProbeOptions {
+        timeout: std::time::Duration::from_millis(400),
+        ..Default::default()
+    };
+
+    let started = std::time::Instant::now();
+    let result = probe_with_options(&client, url, options).await;
+    assert!(
+        result.is_err(),
+        "probe must fail when the origin never answers"
+    );
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(5),
+        "probe must respect the bounded timeout"
+    );
 }
 
 #[tokio::test]

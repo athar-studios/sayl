@@ -5,6 +5,8 @@ import {
   classifyFile,
   getCategoryLabel,
   getCategoryCounts,
+  splitStemExtension,
+  nextNumberedFilename,
 } from "./classify.js";
 
 describe("File classification (classify.js)", () => {
@@ -115,5 +117,68 @@ describe("File classification (classify.js)", () => {
     expect(counts.programs).toBe(1);
     expect(counts.compressed).toBe(1);
     expect(counts.other).toBe(1);
+  });
+});
+
+describe("Auto-rename on collision (IDM style)", () => {
+  it("splits the stem from the last extension only", () => {
+    expect(splitStemExtension("Zed-x86_64.exe")).toEqual({
+      stem: "Zed-x86_64",
+      extension: ".exe",
+    });
+    expect(splitStemExtension("archive.tar.gz")).toEqual({
+      stem: "archive.tar",
+      extension: ".gz",
+    });
+    expect(splitStemExtension("myfile")).toEqual({ stem: "myfile", extension: "" });
+    // A leading dot is part of the name; a trailing dot leaves an empty extension.
+    expect(splitStemExtension(".gitignore")).toEqual({ stem: ".gitignore", extension: "" });
+    expect(splitStemExtension("trailing.")).toEqual({ stem: "trailing", extension: "." });
+    expect(splitStemExtension(null)).toEqual({ stem: "", extension: "" });
+  });
+
+  it("numbers a plain file name", () => {
+    expect(nextNumberedFilename("Zed-x86_64.exe")).toBe("Zed-x86_64 (1).exe");
+    expect(nextNumberedFilename("report.pdf")).toBe("report (1).pdf");
+  });
+
+  it("increments an existing number instead of nesting it", () => {
+    expect(nextNumberedFilename("Zed-x86_64 (1).exe")).toBe("Zed-x86_64 (2).exe");
+    expect(nextNumberedFilename("Zed-x86_64 (9).exe")).toBe("Zed-x86_64 (10).exe");
+  });
+
+  it("keeps the other numbers inside a stem untouched", () => {
+    expect(nextNumberedFilename("file1_v2.0_test3.exe")).toBe("file1_v2.0_test3 (1).exe");
+    expect(nextNumberedFilename("file1_v2.0_test3 (1).exe")).toBe("file1_v2.0_test3 (2).exe");
+    expect(nextNumberedFilename("file1_v2.0_test3 (2).exe")).toBe("file1_v2.0_test3 (3).exe");
+  });
+
+  it("handles names without an extension", () => {
+    expect(nextNumberedFilename("myfile")).toBe("myfile (1)");
+    expect(nextNumberedFilename("myfile (1)")).toBe("myfile (2)");
+    // README.md collides with a folder/file named README.md -> README (1).md
+    expect(nextNumberedFilename("README.md")).toBe("README (1).md");
+  });
+
+  it("handles names with several dots, numbering the last extension", () => {
+    expect(nextNumberedFilename("archive.tar.gz")).toBe("archive.tar (1).gz");
+    expect(nextNumberedFilename("archive.tar (1).gz")).toBe("archive.tar (2).gz");
+    expect(nextNumberedFilename("my.backup.file.tar.bz2")).toBe("my.backup.file.tar (1).bz2");
+  });
+
+  it("walks the sequential (1), (2), (3) increments", () => {
+    let name = "setup.exe";
+    const produced = [];
+    for (let i = 0; i < 3; i += 1) {
+      name = nextNumberedFilename(name);
+      produced.push(name);
+    }
+    expect(produced).toEqual(["setup (1).exe", "setup (2).exe", "setup (3).exe"]);
+  });
+
+  it("leaves a name that only looks numbered below (1) alone", () => {
+    // "(0)" and "(01)" are not counters, so they stay part of the stem.
+    expect(nextNumberedFilename("draft (0).txt")).toBe("draft (0) (1).txt");
+    expect(nextNumberedFilename("draft (01).txt")).toBe("draft (01) (1).txt");
   });
 });

@@ -24,6 +24,10 @@
   let settings = { download_dir: "", category_folders: {} };
   /** Set once the user types or browses a folder; the prefill then stays away. */
   let folderEdited = false;
+  /** Set once the user types a file name; the free-name prefill then stays away. */
+  let filenameEdited = false;
+  /** The name the offer arrived with, kept so a folder change re-resolves it. */
+  let baseFilename = "";
   /** Guards against a slow prefill overwriting a newer category choice. */
   let prefillRequest = 0;
 
@@ -31,10 +35,12 @@
 
   $: if (open && offer) {
     filename = offer.filename || "download";
+    baseFilename = filename;
     url = offer.url || "";
     fileSize = offer.size != null && offer.size > 0 ? offer.size : null;
     selectedCategory = classifyFile(filename, offer.mime || null);
     folderEdited = false;
+    filenameEdited = false;
     // Instant guess from the base folder; the async prefill refines it below.
     folder = defaultFolder ? joinCategoryFolder(defaultFolder, selectedCategory) : "";
     errorMsg = null;
@@ -75,20 +81,46 @@
     if (!folderEdited && request === prefillRequest) {
       folder = local;
     }
-    if (keepsRemembered) return;
+    if (!keepsRemembered) {
+      try {
+        const resolved = await safeInvoke(
+          "resolve_category_folder",
+          { category: selectedCategory, filename },
+          { suppressToast: true }
+        );
+        const trimmed = typeof resolved === "string" ? resolved.trim() : "";
+        if (!folderEdited && request === prefillRequest && trimmed) {
+          folder = trimmed;
+        }
+      } catch {
+        // Keep the locally computed category path.
+      }
+    }
+    await refreshUniqueFilename(request);
+  }
 
+  /**
+   * Replaces the file name with the free (IDM style) name for the current folder.
+   *
+   * The backend owns this decision: it knows which files and which queued or
+   * running downloads already claim a name. Asking it here means the user sees
+   * `file (1).ext` before the download starts instead of discovering the rename
+   * afterwards, and the field stays editable. A name the user typed is kept.
+   */
+  async function refreshUniqueFilename(request = prefillRequest) {
+    const trimmed = (folder || "").trim();
+    if (!trimmed || filenameEdited) return;
     try {
-      const resolved = await safeInvoke(
-        "resolve_category_folder",
-        { category: selectedCategory, filename },
+      const unique = await safeInvoke(
+        "get_unique_filename",
+        { folder: trimmed, filename: baseFilename || filename, taskId: offer?.task_id || null },
         { suppressToast: true }
       );
-      const trimmed = typeof resolved === "string" ? resolved.trim() : "";
-      if (!folderEdited && request === prefillRequest && trimmed) {
-        folder = trimmed;
+      if (!filenameEdited && request === prefillRequest && typeof unique === "string" && unique) {
+        filename = unique;
       }
     } catch {
-      // Keep the locally computed category path.
+      // Browser preview or a backend error: keep the probed name.
     }
   }
 
@@ -101,6 +133,11 @@
   /** Re-prefills when the user picks another category. */
   function handleCategoryChange() {
     refreshPrefill();
+  }
+
+  /** Marks the name as user-owned so the free-name prefill stops replacing it. */
+  function handleFilenameInput() {
+    filenameEdited = true;
   }
 
   $: categoryOptions = CATEGORIES.filter((c) => c.id !== "all");
@@ -123,6 +160,7 @@
         if (selected && typeof selected === "string") {
           folder = selected;
           folderEdited = true;
+          await refreshUniqueFilename(++prefillRequest);
         }
       }
     } catch (err) {
@@ -219,6 +257,7 @@
             id="pre-filename"
             class="form-control"
             bind:value={filename}
+            on:input={handleFilenameInput}
             type="text"
             dir="ltr"
             disabled={busy}

@@ -32,6 +32,12 @@ import {
   normalizeConnectionRanges,
   mergeConnectionRowsMonotonic,
   createConnectionTableTracker,
+  isProbingTask,
+  taskPercent,
+  taskFromProgressPayload,
+  mergeProgressPayload,
+  findTaskById,
+  resolveStandaloneView,
 } from "./downloadWindowUi.js";
 
 describe("downloadWindowUi — pure helpers", () => {
@@ -911,5 +917,199 @@ describe("downloadWindowUi — live connections table", () => {
     const tracker = createConnectionTableTracker();
     expect(tracker.rows(null)).toEqual([]);
     expect(tracker.rows({ id: "t1", state: "Probing" }, "en")).toEqual([]);
+  });
+});
+
+describe("downloadWindowUi — Probing percent suppression (BUG 1)", () => {
+  it("recognises probing state", () => {
+    expect(isProbingTask({ state: "Probing" })).toBe(true);
+    expect(isProbingTask({ state: "Downloading" })).toBe(false);
+    expect(isProbingTask({ state: "Queued" })).toBe(false);
+    expect(isProbingTask(null)).toBe(false);
+    expect(isProbingTask({})).toBe(false);
+  });
+
+  it("NEVER returns 100% (or any number) while task is Probing", () => {
+    // Even if written === total_size (e.g. from a prior run or 0/0 edge case),
+    // probing tasks must suppress percent to avoid showing 100% before transfer starts.
+    expect(
+      taskPercent({ state: "Probing", written: 1024, total_size: 1024 })
+    ).toBeNull();
+    expect(
+      taskPercent({ state: "Probing", written: 0, total_size: 1024 })
+    ).toBeNull();
+    expect(
+      taskPercent({ state: "Probing", written: 500, total_size: 1000 })
+    ).toBeNull();
+    expect(taskPercent({ state: "Probing" })).toBeNull();
+  });
+
+  it("calculates real percent for active downloading tasks", () => {
+    expect(
+      taskPercent({ state: "Downloading", written: 500, total_size: 1000 })
+    ).toBe(50);
+    expect(
+      taskPercent({ state: "Downloading", written: 1000, total_size: 1000 })
+    ).toBe(100);
+    expect(
+      taskPercent({ state: "Downloading", written: 0, total_size: 1000 })
+    ).toBe(0);
+    expect(
+      taskPercent({ state: "Downloading", written: 123, total_size: 1000 })
+    ).toBe(12.3);
+  });
+
+  it("returns null when total_size is missing, zero, or negative", () => {
+    expect(taskPercent({ state: "Downloading", written: 100, total_size: null })).toBeNull();
+    expect(taskPercent({ state: "Downloading", written: 100, total_size: 0 })).toBeNull();
+    expect(taskPercent({ state: "Downloading", written: 100, total_size: -10 })).toBeNull();
+    expect(taskPercent(null)).toBeNull();
+    expect(taskPercent({})).toBeNull();
+  });
+});
+
+describe("downloadWindowUi — initial-state load & early progress buffering (BUG 1)", () => {
+  it("constructs a valid task stub from an early sayl://progress payload", () => {
+    const payload = {
+      id: "task-abc",
+      written: 2048,
+      total: 10240,
+      speed_bps: 102400,
+    };
+    const stub = taskFromProgressPayload("task-abc", payload);
+    expect(stub).toEqual({
+      id: "task-abc",
+      written: 2048,
+      total_size: 10240,
+      speed_bps: 102400,
+      state: "Downloading",
+    });
+  });
+
+  it("does not drop progress when task is initially null", () => {
+    const payload = {
+      id: "task-early",
+      written: 5000,
+      total: 20000,
+      speed_bps: 50000,
+    };
+    const merged = mergeProgressPayload(null, payload, "task-early");
+    expect(merged).not.toBeNull();
+    expect(merged.id).toBe("task-early");
+    expect(merged.written).toBe(5000);
+    expect(merged.total_size).toBe(20000);
+    expect(merged.state).toBe("Downloading");
+  });
+
+  it("merges progress monotonically when task already exists", () => {
+    const initial = {
+      id: "t1",
+      filename: "test.zip",
+      written: 1000,
+      total_size: 5000,
+      speed_bps: 2000,
+      state: "Downloading",
+    };
+    const higherPayload = {
+      id: "t1",
+      written: 3000,
+      total: 5000,
+      speed_bps: 4000,
+    };
+    const updated = mergeProgressPayload(initial, higherPayload, "t1");
+    expect(updated.written).toBe(3000);
+    expect(updated.filename).toBe("test.zip");
+    expect(updated.speed_bps).toBe(4000);
+
+    // Out-of-order lower written must not regress written bytes
+    const lowerPayload = {
+      id: "t1",
+      written: 2000,
+      total: 5000,
+      speed_bps: 3000,
+    };
+    const noRegression = mergeProgressPayload(updated, lowerPayload, "t1");
+    expect(noRegression.written).toBe(3000);
+  });
+
+  it("transitions queued or probing tasks to Downloading on progress receipt", () => {
+    const queuedTask = {
+      id: "t2",
+      state: "Queued",
+      written: 0,
+      total_size: null,
+    };
+    const payload = {
+      id: "t2",
+      written: 1024,
+      total: 8192,
+      speed_bps: 1024,
+    };
+    const active = mergeProgressPayload(queuedTask, payload, "t2");
+    expect(active.state).toBe("Downloading");
+    expect(active.written).toBe(1024);
+    expect(active.total_size).toBe(8192);
+
+    const probingTask = {
+      id: "t3",
+      state: "Probing",
+      written: 0,
+      total_size: null,
+    };
+    const activeFromProbing = mergeProgressPayload(probingTask, payload, "t3");
+    expect(activeFromProbing.state).toBe("Downloading");
+  });
+
+  it("findTaskById retrieves the matching task from array", () => {
+    const tasks = [
+      { id: "1", filename: "a" },
+      { id: "2", filename: "b" },
+      { id: "3", filename: "c" },
+    ];
+    expect(findTaskById(tasks, "2")).toEqual({ id: "2", filename: "b" });
+    expect(findTaskById(tasks, "missing")).toBeNull();
+    expect(findTaskById(null, "1")).toBeNull();
+    expect(findTaskById([], "1")).toBeNull();
+  });
+});
+
+describe("downloadWindowUi — standalone window view resolution & retry (BUG 1)", () => {
+  it("resolves to loading while task is null and not timed out", () => {
+    expect(
+      resolveStandaloneView({ task: null, loadError: null, timedOut: false })
+    ).toBe("loading");
+    expect(resolveStandaloneView()).toBe("loading");
+  });
+
+  it("resolves to task when task is loaded", () => {
+    const task = { id: "t1", state: "Downloading", filename: "file.bin" };
+    expect(
+      resolveStandaloneView({ task, loadError: null, timedOut: false })
+    ).toBe("task");
+  });
+
+  it("resolves to error when timed out or when loadError is present", () => {
+    expect(
+      resolveStandaloneView({ task: null, loadError: "Network error", timedOut: false })
+    ).toBe("error");
+    expect(
+      resolveStandaloneView({ task: null, loadError: null, timedOut: true })
+    ).toBe("error");
+    expect(
+      resolveStandaloneView({ task: null, loadError: "Timeout", timedOut: true })
+    ).toBe("error");
+  });
+
+  it("enables retry action on failed tasks", () => {
+    const failedTask = {
+      id: "t-fail",
+      state: "Failed",
+      error: "404 Not Found",
+      error_kind: "not_found",
+    };
+    const flags = getWindowActionFlags(failedTask);
+    expect(flags.retry).toBe(true);
+    expect(flags.pause).toBe(false);
+    expect(flags.resume).toBe(false);
   });
 });
