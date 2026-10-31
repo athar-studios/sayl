@@ -1049,19 +1049,20 @@ impl Engine {
             target_file.exists() || other_task_active || part_collides
         };
 
-        if is_taken {
-            let unique_name =
-                self.unique_filename_in(&base_dir, &candidate_filename, Some(task_id));
-            if unique_name != record.filename {
-                record.filename = unique_name;
-                safe_filename = sayl_http::filename::sanitize_filename(&record.filename);
-                part_filename = format!("{safe_filename}.part");
-                part_path = self.resolve_destination_path_in(&base_dir, &part_filename)?;
-                // The new name is free by construction, so its `.part` file cannot
-                // hold any bytes: drop the length measured for the old name so the
-                // resume decision below never reads a stale partial length.
-                disk_len = 0;
-            }
+        let target_filename = if is_taken {
+            self.unique_filename_in(&base_dir, &candidate_filename, Some(task_id))
+        } else {
+            candidate_filename
+        };
+        if target_filename != record.filename {
+            record.filename = target_filename;
+            safe_filename = sayl_http::filename::sanitize_filename(&record.filename);
+            part_filename = format!("{safe_filename}.part");
+            part_path = self.resolve_destination_path_in(&base_dir, &part_filename)?;
+            // The new name is free by construction, so its `.part` file cannot
+            // hold any bytes: drop the length measured for the old name so the
+            // resume decision below never reads a stale partial length.
+            disk_len = 0;
         }
         self.inner.store.upsert_task(&record)?;
 

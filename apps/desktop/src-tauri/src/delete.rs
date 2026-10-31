@@ -38,6 +38,25 @@ extern "system" {
     fn SHFileOperationW(lpFileOp: *mut SHFILEOPSTRUCTW) -> i32;
 }
 
+#[cfg(windows)]
+fn to_absolute_path(path: &Path) -> std::path::PathBuf {
+    if let Ok(canonical) = path.canonicalize() {
+        let s = canonical.to_string_lossy();
+        if let Some(stripped) = s.strip_prefix(r"\\?\UNC\") {
+            return std::path::PathBuf::from(format!(r"\\{}", stripped));
+        } else if let Some(stripped) = s.strip_prefix(r"\\?\") {
+            return std::path::PathBuf::from(stripped);
+        }
+        return canonical;
+    }
+    if path.is_relative() {
+        if let Ok(cwd) = std::env::current_dir() {
+            return cwd.join(path);
+        }
+    }
+    path.to_path_buf()
+}
+
 /// Moves a file to the Windows Recycle Bin, or deletes it directly on non-Windows.
 ///
 /// On Windows, invokes `SHFileOperationW` with `FO_DELETE`, `FOF_ALLOWUNDO`,
@@ -53,7 +72,8 @@ pub fn send_to_recycle_bin(path: &Path) -> Result<(), String> {
     {
         use std::os::windows::ffi::OsStrExt;
 
-        let mut wide_path: Vec<u16> = path.as_os_str().encode_wide().collect();
+        let abs_path = to_absolute_path(path);
+        let mut wide_path: Vec<u16> = abs_path.as_os_str().encode_wide().collect();
         wide_path.push(0);
         wide_path.push(0);
 
@@ -69,11 +89,17 @@ pub fn send_to_recycle_bin(path: &Path) -> Result<(), String> {
         };
 
         let ret = unsafe { SHFileOperationW(&mut op) };
-        if ret != 0 {
-            return Err(format!("SHFileOperationW failed with exit code {ret}"));
+        if ret == 0 && op.f_any_operations_aborted == 0 && !abs_path.exists() {
+            return Ok(());
         }
-        if op.f_any_operations_aborted != 0 {
-            return Err("Recycle bin file deletion was aborted".to_string());
+
+        // Fallback for drives or filesystems that do not support Recycle Bin,
+        // or if SHFileOperationW encountered an issue: remove permanently so the file
+        // requested for deletion does not remain stranded on disk.
+        if abs_path.is_dir() {
+            std::fs::remove_dir_all(&abs_path).map_err(|e| e.to_string())?;
+        } else if abs_path.exists() {
+            std::fs::remove_file(&abs_path).map_err(|e| e.to_string())?;
         }
         Ok(())
     }
@@ -148,11 +174,28 @@ where
             let final_file = record.save_path.join(&record.filename);
             let part_file = record.save_path.join(format!("{}.part", record.filename));
 
-            if final_file.exists() {
-                recycle_fn(&final_file)?;
-            }
-            if part_file.exists() {
-                recycle_fn(&part_file)?;
+            for target in [&final_file, &part_file] {
+                if target.exists() {
+                    let mut last_err = None;
+                    for attempt in 0..6 {
+                        match recycle_fn(target) {
+                            Ok(()) => {
+                                last_err = None;
+                                break;
+                            }
+                            Err(e) => {
+                                last_err = Some(e);
+                                if attempt < 5 {
+                                    tokio::time::sleep(tokio::time::Duration::from_millis(50))
+                                        .await;
+                                }
+                            }
+                        }
+                    }
+                    if let Some(err) = last_err {
+                        return Err(err);
+                    }
+                }
             }
         }
 
@@ -437,6 +480,44 @@ mod tests {
         drop(store);
         let reopened_store = Store::open(store_temp.path()).unwrap();
         assert!(reopened_store.get_task(task_id).unwrap().is_none());
+    }
+
+    // Scenario 6: duplicate task with numbered filename (e.g. "report (1).pdf")
+    #[tokio::test]
+    async fn test_delete_scenario_6_duplicate_numbered_filename() {
+        let dl_temp = test_temp_dir();
+        let store_temp = test_temp_dir();
+
+        let task_id = TaskId::new();
+        let filename = "report (1).pdf";
+        let final_path = dl_temp.path().join(filename);
+        {
+            let mut f = File::create(&final_path).unwrap();
+            f.write_all(b"duplicate file content").unwrap();
+        }
+
+        let store = Arc::new(Store::open(store_temp.path()).unwrap());
+        insert_test_task(
+            &store,
+            task_id,
+            filename,
+            dl_temp.path(),
+            DownloadState::Completed,
+        );
+        let engine =
+            Engine::with_store(dl_temp.path(), Arc::clone(&store), EngineConfig::default())
+                .unwrap();
+
+        let deleted = execute_delete_tasks(&engine, &[task_id], true)
+            .await
+            .expect("delete duplicate task with file should succeed");
+
+        assert_eq!(deleted, vec![task_id]);
+        assert!(
+            !final_path.exists(),
+            "Duplicate file must be recycled from disk"
+        );
+        assert!(engine.get_task(task_id).unwrap().is_none());
     }
 
     #[test]

@@ -48,6 +48,7 @@ describe("delete vs cancel and delete dialog logic", () => {
     it("delete_tasks removes single or multiple tasks permanently from task list", async () => {
       const removed = await safeInvoke("delete_tasks", {
         ids: ["task-1", "task-3"],
+        deleteFiles: true,
         delete_files: true,
       });
 
