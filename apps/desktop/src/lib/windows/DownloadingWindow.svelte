@@ -77,7 +77,7 @@
   $: speedState = buildSpeedLimitState({ speed_limit_kbps: speedLimitKbps }, $currentLang);
 
   // Speed limit tab state
-  let speedLimitEnabled = speedState.enabled;
+  let speedLimitEnabled = Boolean(speedLimitKbps && speedLimitKbps > 0);
   let { value: speedLimitValue, unit: speedLimitUnit } = kbpsToDisplayUnit(speedLimitKbps);
   let speedLimitError = "";
   let speedLimitSaving = false;
