@@ -178,7 +178,6 @@ jobs:
       - name: Validate installer dialog artwork
         run: pwsh -NoProfile -File tools/check-installer-artwork.ps1
         shell: pwsh
-
       - name: Validate installer flow policies
         run: pwsh -NoProfile -File tools/check-installer-flow.ps1
         shell: pwsh
