@@ -189,7 +189,9 @@ fn neutralize_reserved_device_names(name: &str) -> String {
         None => name,
     };
     let collapsed = base_stem.split_whitespace().collect::<Vec<_>>().join(" ");
-    let normalized_stem = collapsed.trim_matches(|c| c == ' ' || c == '.').to_uppercase();
+    let normalized_stem = collapsed
+        .trim_matches(|c| c == ' ' || c == '.')
+        .to_uppercase();
 
     let is_reserved = WINDOWS_RESERVED_NAMES
         .iter()
@@ -203,7 +205,7 @@ fn neutralize_reserved_device_names(name: &str) -> String {
 }
 
 /// Splits a filename into `(stem, Option<extension>)`.
-fn split_stem_extension(name: &str) -> (&str, Option<&str>) {
+pub fn split_stem_extension(name: &str) -> (&str, Option<&str>) {
     match name.rfind('.') {
         Some(dot_idx) if dot_idx > 0 => {
             let stem = &name[..dot_idx];
@@ -212,6 +214,80 @@ fn split_stem_extension(name: &str) -> (&str, Option<&str>) {
         }
         _ => (name, None),
     }
+}
+
+/// Generates the next sequential numbered filename (IDM style).
+///
+/// Rules:
+/// - "Zed-x86_64.exe" -> "Zed-x86_64 (1).exe"
+/// - "Zed-x86_64 (1).exe" -> "Zed-x86_64 (2).exe"
+/// - "file1_v2.0_test3 (1).exe" -> "file1_v2.0_test3 (2).exe"
+/// - "myfile" -> "myfile (1)"
+/// - "archive.tar.gz" -> "archive.tar (1).gz" (using last extension)
+pub fn next_numbered_filename(name: &str) -> String {
+    let (stem, ext_opt) = split_stem_extension(name);
+
+    let (base_stem, next_num) = parse_trailing_number_in_parens(stem);
+    let new_stem = format!("{base_stem} ({next_num})");
+
+    match ext_opt {
+        Some(ext) => format!("{new_stem}.{ext}"),
+        None => new_stem,
+    }
+}
+
+/// Parses trailing ` (N)` from a stem where N >= 1.
+/// Returns `(base_stem_without_parens, next_num)`.
+/// If no valid trailing ` (N)` exists, returns `(stem, 1)`.
+fn parse_trailing_number_in_parens(stem: &str) -> (&str, u32) {
+    if let Some(open_paren_idx) = stem.rfind(" (") {
+        let after_open = &stem[open_paren_idx + 2..];
+        if let Some(num_str) = after_open.strip_suffix(')') {
+            if !num_str.is_empty() && num_str.chars().all(|c| c.is_ascii_digit()) {
+                // Disallow leading zeros unless it's just "0" (though IDM numbers start at 1)
+                // e.g. "(01)" shouldn't be treated as standard (1) counter, or can be. But if parsed as u32:
+                if let Ok(n) = num_str.parse::<u32>() {
+                    if n > 0 && (!num_str.starts_with('0') || num_str == "0") {
+                        let base = &stem[..open_paren_idx];
+                        return (base, n.saturating_add(1));
+                    }
+                }
+            }
+        }
+    }
+    (stem, 1)
+}
+
+/// Generates a unique filename by testing candidate names using `is_taken`.
+///
+/// If `candidate` is not taken, it is returned as-is.
+/// Otherwise, `(1)`, `(2)`, ... are tried sequentially until `is_taken` returns `false`.
+pub fn generate_unique_filename<F>(base_name: &str, mut is_taken: F) -> String
+where
+    F: FnMut(&str) -> bool,
+{
+    let sanitized = sanitize_filename(base_name);
+    if !is_taken(&sanitized) {
+        return sanitized;
+    }
+
+    let mut current = sanitized;
+    for _ in 1..=10_000 {
+        current = next_numbered_filename(&current);
+        if !is_taken(&current) {
+            return current;
+        }
+    }
+
+    // Fallback if somehow 10,000 attempts collided
+    format!(
+        "{}_{}",
+        current,
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+    )
 }
 
 /// Truncates a filename to at most `max_chars` UTF-8 characters, preserving the file extension.
@@ -245,7 +321,8 @@ mod tests {
 
     #[test]
     fn test_rfc5987_arabic_filename() {
-        let header = "attachment; filename*=UTF-8''%D8%AA%D9%82%D8%B1%D9%8A%D8%B1_%D8%B3%D9%8A%D9%84.pdf";
+        let header =
+            "attachment; filename*=UTF-8''%D8%AA%D9%82%D8%B1%D9%8A%D8%B1_%D8%B3%D9%8A%D9%84.pdf";
         let parsed = parse_content_disposition(header).unwrap();
         assert_eq!(parsed, "تقرير_سيل.pdf");
 
@@ -273,7 +350,10 @@ mod tests {
         assert_eq!(sanitize_filename("../../evil.exe"), "evil.exe");
         assert_eq!(sanitize_filename("..\\..\\evil.exe"), "evil.exe");
         assert_eq!(sanitize_filename("/var/log/syslog.txt"), "syslog.txt");
-        assert_eq!(sanitize_filename("C:\\Windows\\System32\\calc.exe"), "calc.exe");
+        assert_eq!(
+            sanitize_filename("C:\\Windows\\System32\\calc.exe"),
+            "calc.exe"
+        );
     }
 
     #[test]
@@ -331,7 +411,10 @@ mod tests {
 
     #[test]
     fn test_reserved_characters_replaced() {
-        assert_eq!(sanitize_filename(r#"file:name*with?bad<chars>|"#.into()), "file_name_with_bad_chars__");
+        assert_eq!(
+            sanitize_filename(r#"file:name*with?bad<chars>|"#),
+            "file_name_with_bad_chars__"
+        );
     }
 
     #[test]
@@ -364,8 +447,64 @@ mod tests {
 
     #[test]
     fn test_derive_from_url() {
-        let url = Url::parse("https://cdn.example.com/downloads/v2.1/archive.zip?token=secret").unwrap();
+        let url =
+            Url::parse("https://cdn.example.com/downloads/v2.1/archive.zip?token=secret").unwrap();
         let name = derive_filename(None, &url, None);
         assert_eq!(name, "archive.zip");
+    }
+
+    #[test]
+    fn test_next_numbered_filename_cases() {
+        // Normal extension
+        assert_eq!(
+            next_numbered_filename("Zed-x86_64.exe"),
+            "Zed-x86_64 (1).exe"
+        );
+        // Existing number
+        assert_eq!(
+            next_numbered_filename("Zed-x86_64 (1).exe"),
+            "Zed-x86_64 (2).exe"
+        );
+        assert_eq!(
+            next_numbered_filename("Zed-x86_64 (2).exe"),
+            "Zed-x86_64 (3).exe"
+        );
+        // Multiple numbers in stem
+        assert_eq!(
+            next_numbered_filename("file1_v2.0_test3 (1).exe"),
+            "file1_v2.0_test3 (2).exe"
+        );
+        assert_eq!(
+            next_numbered_filename("file1_v2.0_test3.exe"),
+            "file1_v2.0_test3 (1).exe"
+        );
+        // Without extension
+        assert_eq!(next_numbered_filename("myfile"), "myfile (1)");
+        assert_eq!(next_numbered_filename("myfile (1)"), "myfile (2)");
+        // Multiple dots
+        assert_eq!(
+            next_numbered_filename("archive.tar.gz"),
+            "archive.tar (1).gz"
+        );
+        assert_eq!(
+            next_numbered_filename("archive.tar (1).gz"),
+            "archive.tar (2).gz"
+        );
+    }
+
+    #[test]
+    fn test_generate_unique_filename_sequence() {
+        use std::collections::HashSet;
+        let mut taken = HashSet::new();
+        taken.insert("report.pdf".to_string());
+        taken.insert("report (1).pdf".to_string());
+        taken.insert("report (2).pdf".to_string());
+
+        let unique = generate_unique_filename("report.pdf", |name| taken.contains(name));
+        assert_eq!(unique, "report (3).pdf");
+
+        // Fresh file is taken as-is
+        let fresh = generate_unique_filename("other.pdf", |name| taken.contains(name));
+        assert_eq!(fresh, "other.pdf");
     }
 }

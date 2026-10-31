@@ -1,7 +1,7 @@
 //! Command-line argument parser definitions using Clap.
 
-use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
+use std::path::PathBuf;
 
 use crate::messages::Language;
 

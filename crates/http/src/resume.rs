@@ -181,7 +181,12 @@ pub fn reconcile_partial_len(info: &ResumeInfo, on_disk_len: u64) -> ResumeDecis
 mod tests {
     use super::*;
 
-    fn info(etag: Option<&str>, last_modified: Option<&str>, total: Option<u64>, written: u64) -> ResumeInfo {
+    fn info(
+        etag: Option<&str>,
+        last_modified: Option<&str>,
+        total: Option<u64>,
+        written: u64,
+    ) -> ResumeInfo {
         ResumeInfo {
             url: "https://example.com/ملف.bin".into(),
             etag: etag.map(str::to_string),
@@ -201,13 +206,27 @@ mod tests {
 
     #[test]
     fn validator_kind_classification() {
-        assert_eq!(validator_kind(&info(Some("\"s\""), None, Some(10), 1)), ValidatorKind::StrongEtag);
-        assert_eq!(validator_kind(&info(Some("W/\"w\""), None, Some(10), 1)), ValidatorKind::WeakEtag);
         assert_eq!(
-            validator_kind(&info(None, Some("Wed, 21 Oct 2015 07:28:00 GMT"), Some(10), 1)),
+            validator_kind(&info(Some("\"s\""), None, Some(10), 1)),
+            ValidatorKind::StrongEtag
+        );
+        assert_eq!(
+            validator_kind(&info(Some("W/\"w\""), None, Some(10), 1)),
+            ValidatorKind::WeakEtag
+        );
+        assert_eq!(
+            validator_kind(&info(
+                None,
+                Some("Wed, 21 Oct 2015 07:28:00 GMT"),
+                Some(10),
+                1
+            )),
             ValidatorKind::LastModified
         );
-        assert_eq!(validator_kind(&info(None, None, Some(10), 1)), ValidatorKind::None);
+        assert_eq!(
+            validator_kind(&info(None, None, Some(10), 1)),
+            ValidatorKind::None
+        );
     }
 
     #[test]
@@ -217,18 +236,29 @@ mod tests {
             Some("\"strong\"")
         );
         assert_eq!(
-            if_range_value(&info(Some("W/\"weak\""), Some("Wed, 21 Oct 2015 07:28:00 GMT"), Some(10), 1))
-                .as_deref(),
+            if_range_value(&info(
+                Some("W/\"weak\""),
+                Some("Wed, 21 Oct 2015 07:28:00 GMT"),
+                Some(10),
+                1
+            ))
+            .as_deref(),
             Some("Wed, 21 Oct 2015 07:28:00 GMT")
         );
-        assert_eq!(if_range_value(&info(Some("W/\"weak\""), None, Some(10), 1)), None);
+        assert_eq!(
+            if_range_value(&info(Some("W/\"weak\""), None, Some(10), 1)),
+            None
+        );
         assert_eq!(if_range_value(&info(None, None, Some(10), 1)), None);
     }
 
     #[test]
     fn resume_allowed_when_strong_etag_and_size_match() {
         let i = info(Some("\"v1\""), None, Some(1024), 512);
-        assert_eq!(validate_resume(&i, Some("\"v1\""), None, Some(1024)), ResumeDecision::ResumeFrom(512));
+        assert_eq!(
+            validate_resume(&i, Some("\"v1\""), None, Some(1024)),
+            ResumeDecision::ResumeFrom(512)
+        );
     }
 
     #[test]
@@ -342,10 +372,22 @@ mod tests {
     #[test]
     fn reconcile_truncates_longer_file_and_restarts_shorter_file() {
         let i = info(Some("\"v1\""), None, Some(1024), 512);
-        assert_eq!(reconcile_partial_len(&i, 512), ResumeDecision::ResumeFrom(512));
-        assert_eq!(reconcile_partial_len(&i, 900), ResumeDecision::ResumeFrom(512));
-        assert_eq!(reconcile_partial_len(&i, 100), ResumeDecision::RestartFromZero);
-        assert!(matches!(reconcile_partial_len(&i, 4096), ResumeDecision::Reject(_)));
+        assert_eq!(
+            reconcile_partial_len(&i, 512),
+            ResumeDecision::ResumeFrom(512)
+        );
+        assert_eq!(
+            reconcile_partial_len(&i, 900),
+            ResumeDecision::ResumeFrom(512)
+        );
+        assert_eq!(
+            reconcile_partial_len(&i, 100),
+            ResumeDecision::RestartFromZero
+        );
+        assert!(matches!(
+            reconcile_partial_len(&i, 4096),
+            ResumeDecision::Reject(_)
+        ));
     }
 
     #[test]

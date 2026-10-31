@@ -1,17 +1,20 @@
 <script>
   import { t } from "./i18n.js";
   import { createEventDispatcher } from "svelte";
+  import logoFullRaw from "../assets/logo-full.svg?raw";
+  import logoWhiteRaw from "../assets/logo-white.svg?raw";
 
   const dispatch = createEventDispatcher();
 </script>
 
 <div class="empty-state">
-  <div class="empty-icon-wrap">
-    <svg viewBox="0 0 64 64" fill="none" class="empty-svg" aria-hidden="true">
-      <rect x="8" y="12" width="48" height="40" rx="8" stroke="currentColor" stroke-width="2.5" />
-      <path d="M32 20v18m0 0l-7-7m7 7l7-7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-      <path d="M22 44h20" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
-    </svg>
+  <div class="empty-logo-wrap" aria-hidden="true">
+    <div class="empty-logo-svg logo-light">
+      {@html logoFullRaw}
+    </div>
+    <div class="empty-logo-svg logo-dark">
+      {@html logoWhiteRaw}
+    </div>
   </div>
   <h2 class="empty-title">{$t("empty.title")}</h2>
   <p class="empty-desc">{$t("empty.description")}</p>
@@ -34,22 +37,51 @@
     flex: 1;
   }
 
-  .empty-icon-wrap {
+  .empty-logo-wrap {
     width: 5rem;
     height: 5rem;
-    border-radius: var(--radius-lg);
-    background-color: var(--color-bg-card);
-    border: 1px dashed var(--color-border);
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 1.25rem;
-    color: var(--color-accent);
+    margin-bottom: 1.5rem;
   }
 
-  .empty-svg {
-    width: 2.75rem;
-    height: 2.75rem;
+  .empty-logo-svg {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    filter: drop-shadow(0 4px 12px rgba(0, 182, 189, 0.25));
+  }
+
+  .empty-logo-svg :global(svg) {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .logo-dark {
+    display: none;
+  }
+  .logo-light {
+    display: flex;
+  }
+
+  :global([data-theme="dark"]) .logo-dark {
+    display: flex !important;
+  }
+  :global([data-theme="dark"]) .logo-light {
+    display: none !important;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme="light"])) .logo-dark {
+      display: flex;
+    }
+    :global(:root:not([data-theme="light"])) .logo-light {
+      display: none;
+    }
   }
 
   .empty-title {
@@ -60,24 +92,35 @@
   }
 
   .empty-desc {
-    font-size: 0.875rem;
+    font-size: 0.9rem;
     color: var(--color-text-muted);
-    max-width: 26rem;
-    margin-bottom: 1.5rem;
+    max-width: 24rem;
+    margin-bottom: 1.75rem;
     line-height: 1.6;
   }
 
   .empty-action-btn {
-    background-color: var(--color-accent);
-    color: var(--color-accent-text);
-    padding: 0.65rem 1.25rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: linear-gradient(135deg, #00b6bd, #0b1a4e) !important;
+    color: #ffffff !important;
+    padding: 0.65rem 1.35rem;
     font-size: 0.925rem;
     font-weight: 600;
     border-radius: var(--radius-md);
-    box-shadow: var(--shadow-sm);
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 182, 189, 0.35);
+    transition: transform 120ms ease, box-shadow 120ms ease;
   }
 
   .empty-action-btn:hover {
-    background-color: var(--color-accent-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(0, 182, 189, 0.45);
+  }
+
+  .empty-action-btn:active {
+    transform: translateY(0);
   }
 </style>

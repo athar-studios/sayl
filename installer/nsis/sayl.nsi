@@ -36,10 +36,20 @@ RequestExecutionLevel user
 !include "MUI2.nsh"
 !include "FileFunc.nsh"
 !include "LogicLib.nsh"
+!include "WordFunc.nsh"
 
 !define MUI_ABORTWARNING
-!define MUI_ICON "${NSISDIR}\Contrib\Graphics\Icons\modern-install.ico"
-!define MUI_UNICON "${NSISDIR}\Contrib\Graphics\Icons\modern-uninstall.ico"
+; SAYL brand icon for the installer/uninstaller windows (paths are relative to
+; this script, like OutFile and BUILD_DIR above).
+!define MUI_ICON "..\..\apps\desktop\src-tauri\icons\icon.ico"
+!define MUI_UNICON "..\..\apps\desktop\src-tauri\icons\icon.ico"
+
+; Modern UI Header and Sidebar branding images
+!define MUI_HEADERIMAGE
+!define MUI_HEADERIMAGE_BITMAP "..\..\apps\desktop\src-tauri\icons\nsis-header.bmp"
+!define MUI_HEADERIMAGE_UNBITMAP "..\..\apps\desktop\src-tauri\icons\nsis-header.bmp"
+!define MUI_WELCOMEFINISHPAGE_BITMAP "..\..\apps\desktop\src-tauri\icons\nsis-sidebar.bmp"
+!define MUI_UNWELCOMEFINISHPAGE_BITMAP "..\..\apps\desktop\src-tauri\icons\nsis-sidebar.bmp"
 
 ; Installer Pages
 !insertmacro MUI_PAGE_WELCOME
@@ -68,6 +78,36 @@ Section "SAYL Core (مطلوب / Required)" SecCore
   ; Application binary
   File /nonfatal "${BUILD_DIR}\${MAIN_EXE}"
   
+  ; Native messaging host and unpacked Chromium and Firefox extensions
+  SetOutPath "$INSTDIR\host"
+  File /nonfatal "${BUILD_DIR}\sayl-bridge.exe"
+  
+  SetOutPath "$INSTDIR\extensions\browser\chromium"
+  File /r /x ".*" "..\..\extensions\browser\chromium\*.*"
+
+  SetOutPath "$INSTDIR\extensions\browser\firefox"
+  File /r /x ".*" "..\..\extensions\browser\firefox\*.*"
+
+  ; Stage browser extensions under %LOCALAPPDATA%\Sayl\extension
+  DetailPrint "Staging SAYL browser extensions to LocalAppData..."
+  RMDir /r "$LOCALAPPDATA\Sayl\extension\chromium"
+  RMDir /r "$LOCALAPPDATA\Sayl\extension\firefox"
+  CreateDirectory "$LOCALAPPDATA\Sayl\extension\chromium"
+  CreateDirectory "$LOCALAPPDATA\Sayl\extension\firefox"
+
+  ${If} ${FileExists} "$INSTDIR\extensions\browser\chromium"
+    nsExec::ExecToLog 'cmd.exe /c xcopy "$INSTDIR\extensions\browser\chromium" "$LOCALAPPDATA\Sayl\extension\chromium" /E /I /Y'
+  ${EndIf}
+  ${If} ${FileExists} "$INSTDIR\extensions\browser\firefox"
+    nsExec::ExecToLog 'cmd.exe /c xcopy "$INSTDIR\extensions\browser\firefox" "$LOCALAPPDATA\Sayl\extension\firefox" /E /I /Y'
+  ${EndIf}
+
+  ; Register native messaging host via sayl-bridge (single writer of manifests and HKCU keys)
+  DetailPrint "Registering SAYL native messaging host..."
+  ${If} ${FileExists} "$INSTDIR\host\sayl-bridge.exe"
+    nsExec::ExecToLog '"$INSTDIR\host\sayl-bridge.exe" --register-host'
+  ${EndIf}
+
   ; Write uninstaller
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   
@@ -132,9 +172,25 @@ Section "Uninstall"
   Delete "$SMPROGRAMS\SAYL\Uninstall.lnk"
   RMDir "$SMPROGRAMS\SAYL"
   
+  ; Native messaging unregistration
+  ${If} ${FileExists} "$INSTDIR\host\sayl-bridge.exe"
+    nsExec::ExecToLog '"$INSTDIR\host\sayl-bridge.exe" --unregister-host'
+  ${EndIf}
+
+  ; Clean up installer-staged extension and host directories under %LOCALAPPDATA%\Sayl
+  ; User downloads and settings are untouched.
+  ; Note: The desktop app owns HKCU\Software\Microsoft\Windows\CurrentVersion\Run\SAYL,
+  ; so the installer does not delete it on uninstall.
+  RMDir /r "$LOCALAPPDATA\Sayl\extension"
+  RMDir /r "$LOCALAPPDATA\Sayl\host"
+
   ; Remove only installed application files
   Delete "$INSTDIR\${MAIN_EXE}"
   Delete "$INSTDIR\Uninstall.exe"
+  Delete "$INSTDIR\host\com.sayl.downloader.json"
+  Delete "$INSTDIR\host\sayl-bridge.exe"
+  RMDir "$INSTDIR\host"
+  RMDir /r "$INSTDIR\extensions"
   
   ; Remove install directory only if empty
   RMDir "$INSTDIR"

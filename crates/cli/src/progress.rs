@@ -1,8 +1,8 @@
 //! Terminal progress bar and formatting helpers for streaming download status to stderr.
 
-use std::io::Write;
 use sayl_core::event::{Event, EventPayload};
 use sayl_core::id::TaskId;
+use std::io::Write;
 
 /// Formats a byte quantity into human-readable binary units (KiB, MiB, GiB, TiB).
 pub fn format_bytes(bytes: u64) -> String {
@@ -74,7 +74,10 @@ impl ProgressTracker {
                     } else {
                         0.0
                     };
-                    eprint!("\r[{:>5.1}%] {} / {} ({})   ", pct, down_str, total_str, speed_str);
+                    eprint!(
+                        "\r[{:>5.1}%] {} / {} ({})   ",
+                        pct, down_str, total_str, speed_str
+                    );
                 } else {
                     eprint!("\r{} ({})   ", down_str, speed_str);
                 }

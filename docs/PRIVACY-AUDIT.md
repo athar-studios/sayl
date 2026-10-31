@@ -14,7 +14,7 @@
 ========================================================================
  SAYL Privacy & Network Audit Report
 ========================================================================
-Scan Root:            C:\Users\Dragonfly\Downloads\Download Manager
+Scan Root:            <repo>
 Files Scanned:        176
 Excluded Directories: .git, .idea, .svelte-kit, .vscode, __pycache__, artifacts, build, dist, gen, node_modules, reports, target
 ------------------------------------------------------------------------
@@ -25,9 +25,8 @@ Excluded Directories: .git, .idea, .svelte-kit, .vscode, __pycache__, artifacts,
 
 2. Hardcoded Absolute User Paths [PASS]
   Violations: 0
-  Allowances: 4
+  Allowances: 3
   Documented Allowances:
-    - KIT-VALIDATION.json:58 -> /home/user/ (Synthetic placeholder 'User' in dev mock fallback)
     - apps/desktop/src/lib/tauri.js:127 -> C:\\Users\\User\\ (Synthetic placeholder 'User' in dev mock fallback)
     - apps/desktop/src-tauri/src/lib.rs:559 -> C:\\Users\\User\\ (Synthetic placeholder 'User' in unit test)
     - apps/desktop/src-tauri/src/lib.rs:604 -> C:\\Users\\User\\ (Synthetic placeholder 'User' in unit test)
@@ -70,11 +69,10 @@ FINAL RESULT:  PASS
 1. **مسارات المستخدمين المصطنعة (Synthetic User Paths):**
    - `apps/desktop/src-tauri/src/lib.rs:559` و `lib.rs:604`: مسار اختباري `C:\Users\User\Downloads` داخل اختبارات الوحدة (`#[cfg(test)]`) للتأكد من سلامة دالة فحص وتطهير مجلد التنزيل `validate_download_dir`.
    - `apps/desktop/src/lib/tauri.js:127`: قيمة افتراضية مصطنعة في وضع المحاكاة للمطورين (`mock fallback`) لتجربة واجهة المتصفح المستقلة دون وقت تشغيل Tauri.
-   - `KIT-VALIDATION.json:58`: مسار بيئي في تقرير فحص البوت السابق.
    - **الخلاصة:** لا توجد أي مسارات خاصة بمطوري المشروع أو أسماء مستخدمين حقيقية مسربة داخل الكود البرمجي للمنتج.
 
 2. **روابط التوثيق ومستودع الكود (Documentation & Repository URLs):**
-   - `crates/http/src/client.rs:160`: رابط مستودع المشروع `https://github.com/` المضمن داخل ترويسة `User-Agent` المعيارية (`SAYL/<version> (+https://github.com/)`) لتعريف هوية العميل البرمجي مفتوح المصدر.
+   - `crates/http/src/client.rs:160`: رابط مستودع المشروع `https://github.com/` المضمن داخل ترويسة `User-Agent` المعيارية (`SAYL/<version> (+https://github.com/)`) لتعريف هوية العميل البرمجي متاح المصدر (source-available).
    - `apps/website/index.html:61, 301, 302`: روابط توثيقية ظاهرة للمستخدم في موقع الويب تنقله إلى مستودع الكود وصفحة الإبلاغ عن المشاكل `issues`.
 
 3. **خوادم الاسترجاع والـ IPC المحلي (Loopback & IPC Fixtures):**

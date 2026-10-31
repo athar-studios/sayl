@@ -3,10 +3,9 @@
 use std::time::Duration;
 
 use sayl_http::{
-    build_client, ClientConfig, ProxyConfig, ProxyMode, RedirectPolicy,
-    validate_header_value, build_request_headers,
-    validate_no_header_injection, OriginBudget, ManualTimeSource, origin_from_url,
-    HttpError,
+    build_client, build_request_headers, origin_from_url, validate_header_value,
+    validate_no_header_injection, ClientConfig, HttpError, ManualTimeSource, OriginBudget,
+    ProxyConfig, ProxyMode, RedirectPolicy,
 };
 use sayl_test_http::{HttpFixtureServer, Scenario};
 use url::Url;
@@ -20,9 +19,11 @@ async fn test_build_client_with_defaults_succeeds() {
 
 #[tokio::test]
 async fn test_build_client_connect_and_read_timeouts_accepted() {
-    let mut config = ClientConfig::default();
-    config.connect_timeout = Duration::from_millis(100);
-    config.read_timeout = Duration::from_millis(50);
+    let config = ClientConfig {
+        connect_timeout: Duration::from_millis(100),
+        read_timeout: Duration::from_millis(50),
+        ..Default::default()
+    };
 
     let client = build_client(&config).expect("client build failed");
 
@@ -47,32 +48,44 @@ async fn test_build_client_connect_and_read_timeouts_accepted() {
 
 #[tokio::test]
 async fn test_proxy_url_with_credentials_error_redacts_password() {
-    let mut config = ClientConfig::default();
-    config.proxy = Some(ProxyConfig {
-        url: "http://user:secretpassword@invalid-proxy.example.com:8080".to_string(),
-        mode: ProxyMode::Http,
-        username: None,
-        password: None,
-    });
+    let config = ClientConfig {
+        proxy: Some(ProxyConfig {
+            url: "http://user:secretpassword@invalid-proxy.example.com:8080".to_string(),
+            mode: ProxyMode::Http,
+            username: None,
+            password: None,
+        }),
+        ..Default::default()
+    };
 
     let result = build_client(&config);
     // The error should not contain the password
     if let Err(e) = result {
         let err_str = e.to_string();
-        assert!(!err_str.contains("secretpassword"), "password leaked in error: {}", err_str);
-        assert!(err_str.contains("***"), "credentials not redacted: {}", err_str);
+        assert!(
+            !err_str.contains("secretpassword"),
+            "password leaked in error: {}",
+            err_str
+        );
+        assert!(
+            err_str.contains("***"),
+            "credentials not redacted: {}",
+            err_str
+        );
     }
 }
 
 #[tokio::test]
 async fn test_invalid_proxy_scheme_socks5_rejected() {
-    let mut config = ClientConfig::default();
-    config.proxy = Some(ProxyConfig {
-        url: "socks5://proxy.example.com:1080".to_string(),
-        mode: ProxyMode::Http,
-        username: None,
-        password: None,
-    });
+    let config = ClientConfig {
+        proxy: Some(ProxyConfig {
+            url: "socks5://proxy.example.com:1080".to_string(),
+            mode: ProxyMode::Http,
+            username: None,
+            password: None,
+        }),
+        ..Default::default()
+    };
 
     let err = build_client(&config).unwrap_err();
     match err {
@@ -87,13 +100,15 @@ async fn test_invalid_proxy_scheme_socks5_rejected() {
 
 #[tokio::test]
 async fn test_invalid_proxy_scheme_ftp_rejected() {
-    let mut config = ClientConfig::default();
-    config.proxy = Some(ProxyConfig {
-        url: "ftp://proxy.example.com:21".to_string(),
-        mode: ProxyMode::Http,
-        username: None,
-        password: None,
-    });
+    let config = ClientConfig {
+        proxy: Some(ProxyConfig {
+            url: "ftp://proxy.example.com:21".to_string(),
+            mode: ProxyMode::Http,
+            username: None,
+            password: None,
+        }),
+        ..Default::default()
+    };
 
     let err = build_client(&config).unwrap_err();
     match err {
@@ -148,7 +163,11 @@ async fn test_build_request_headers_rejects_reserved_headers() {
     for (name, value) in reserved {
         let headers = vec![(name.to_string(), value.to_string())];
         let err = build_request_headers(&headers).unwrap_err();
-        assert!(matches!(err, HttpError::Validation { .. }), "header '{}' should be rejected", name);
+        assert!(
+            matches!(err, HttpError::Validation { .. }),
+            "header '{}' should be rejected",
+            name
+        );
         assert!(err.to_string().contains("reserved"));
     }
 }
@@ -173,11 +192,24 @@ async fn test_pool_reuse_with_pooling_scenario() {
     let url = Url::parse(&format!("{}test.bin", base_url)).unwrap();
 
     // Make two sequential requests
-    let _ = client.get(url.clone()).send().await.expect("first request failed");
-    let _ = client.get(url.clone()).send().await.expect("second request failed");
+    let _ = client
+        .get(url.clone())
+        .send()
+        .await
+        .expect("first request failed");
+    let _ = client
+        .get(url.clone())
+        .send()
+        .await
+        .expect("second request failed");
 
     let recorded = server.recorded_requests().await;
-    assert_eq!(recorded.len(), 2, "expected 2 requests recorded, got {}", recorded.len());
+    assert_eq!(
+        recorded.len(),
+        2,
+        "expected 2 requests recorded, got {}",
+        recorded.len()
+    );
 
     // Verify both requests went to the same connection by checking
     // that the server handled them on the same TCP connection.
@@ -226,7 +258,11 @@ async fn test_origin_budget_releases_correctly() {
 #[tokio::test]
 async fn test_origin_budget_enforces_rate_limit() {
     let time_source = std::sync::Arc::new(ManualTimeSource::default());
-    let budget = OriginBudget::with_time_source(10, 3, time_source.clone() as std::sync::Arc<dyn sayl_http::budget::TimeSource>);
+    let budget = OriginBudget::with_time_source(
+        10,
+        3,
+        time_source.clone() as std::sync::Arc<dyn sayl_http::budget::TimeSource>,
+    );
     let origin = "https://example.com:443";
 
     // First 3 requests should succeed
@@ -250,8 +286,10 @@ async fn test_origin_budget_enforces_rate_limit() {
 
 #[tokio::test]
 async fn test_allow_private_hosts_false_blocks_localhost() {
-    let mut config = ClientConfig::default();
-    config.allow_private_hosts = false;
+    let config = ClientConfig {
+        allow_private_hosts: false,
+        ..Default::default()
+    };
     // Note: The actual blocking of private hosts is enforced at the redirect layer
     // and by the caller before making requests. The ClientConfig stores the setting
     // for reference. This test verifies the config is stored correctly.
@@ -260,8 +298,10 @@ async fn test_allow_private_hosts_false_blocks_localhost() {
 
 #[tokio::test]
 async fn test_allow_private_hosts_true_allows_localhost() {
-    let mut config = ClientConfig::default();
-    config.allow_private_hosts = true;
+    let config = ClientConfig {
+        allow_private_hosts: true,
+        ..Default::default()
+    };
     assert!(config.allow_private_hosts);
 }
 
@@ -316,8 +356,10 @@ async fn test_origin_from_url() {
 
 #[tokio::test]
 async fn test_redirect_policy_integration() {
-    let mut config = ClientConfig::default();
-    config.redirect_policy = RedirectPolicy::new(3); // max 3 hops
+    let config = ClientConfig {
+        redirect_policy: RedirectPolicy::new(3), // max 3 hops
+        ..Default::default()
+    };
     let _client = build_client(&config).expect("client build failed");
 
     // The redirect policy is applied to the client; we can't easily test
@@ -328,8 +370,14 @@ async fn test_redirect_policy_integration() {
 
 #[tokio::test]
 async fn test_no_proxy_config() {
-    let mut config = ClientConfig::default();
-    config.no_proxy = vec!["localhost".to_string(), "127.0.0.1".to_string(), ".local".to_string()];
+    let config = ClientConfig {
+        no_proxy: vec![
+            "localhost".to_string(),
+            "127.0.0.1".to_string(),
+            ".local".to_string(),
+        ],
+        ..Default::default()
+    };
     let client = build_client(&config).expect("client build failed");
 
     // Client builds successfully with no_proxy list

@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>التوثيق والدليل الشامل لبرنامج سيل · SAYL Docs</title>
+  <meta name="description" content="دليل استخدام سيل: التثبيت، تجاوز SmartScreen، إضافة المتصفح، الاستئناف، أوامر CLI، والإعدادات بالتفصيل.">
+  <meta name="theme-color" content="#070F2E">
+  <link rel="canonical" href="https://sayl.site/docs">
+  <link rel="alternate" hreflang="ar" href="https://sayl.site/docs">
+  <link rel="alternate" hreflang="en" href="https://sayl.site/en/docs">
+  <link rel="alternate" hreflang="x-default" href="https://sayl.site/docs">
+
+  <!-- Favicons & App Icons (?v=2) -->
+  <link rel="icon" href="/favicon.ico?v=2" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
+  <link rel="manifest" href="/site.webmanifest">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:site_name" content="سيل · SAYL">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sayl.site/docs">
+  <meta property="og:title" content="التوثيق والدليل الشامل لبرنامج سيل · SAYL Docs">
+  <meta property="og:description" content="دليل استخدام سيل: التثبيت، تجاوز SmartScreen، إضافة المتصفح، الاستئناف، أوامر CLI، والإعدادات بالتفصيل.">
+  <meta property="og:image" content="https://sayl.site/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="التوثيق والدليل الشامل لبرنامج سيل · SAYL Docs">
+  <meta name="twitter:description" content="دليل استخدام سيل: التثبيت، تجاوز SmartScreen، إضافة المتصفح، الاستئناف، أوامر CLI، والإعدادات بالتفصيل.">
+  <meta name="twitter:image" content="https://sayl.site/og-image.png">
+
+  <!-- Preload Fonts & Stylesheet -->
+  <link rel="preload" href="/fonts/IBMPlexSansArabic-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/IBMPlexSansArabic-Bold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Athar Studio",
+    "url": "https://sayl.site",
+    "logo": "https://sayl.site/icon-512.png",
+    "sameAs": [
+      "https://github.com/athar-studios",
+      "https://ko-fi.com/athar_studio"
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {"@type": "ListItem", "position": 1, "name": "الرئيسية", "item": "https://sayl.site/"},
+      {"@type": "ListItem", "position": 2, "name": "التوثيق", "item": "https://sayl.site/docs.html"}
+    ]
+  }
+  </script>
+</head>
+<body class="page-inner">
+  <canvas id="flow" aria-hidden="true"></canvas>
+  <div class="lang-modal-overlay" id="lang-modal" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
+    <div class="lang-modal-card">
+      <img src="/favicon.svg?v=2" alt="شعار سيل" width="56" height="38" style="margin-bottom:12px">
+      <h2 id="lang-modal-title">اختر لغة الموقع · Choose Language</h2>
+      <p>يمكنك تغيير اللغة في أي وقت من زر التبديل بأعلى الصفحة.</p>
+      <div class="lang-choices">
+        <button type="button" class="lang-choice-btn primary" data-choose-lang="ar">
+          <strong>العربية</strong>
+          <small>اللغة الأساسية والواجهة الافتراضية</small>
+        </button>
+        <button type="button" class="lang-choice-btn" data-choose-lang="en">
+          <strong>English</strong>
+          <small>English LTR Interface</small>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <header>
+      <a href="/" class="brand" aria-label="سيل - الصفحة الرئيسية">
+        <img class="brand-logo" src="/icon.svg" alt="سيل" width="57" height="40">
+      </a>
+      <nav aria-label="التنقل الرئيسي">
+        <a href="/docs" class="active">التوثيق</a>
+        <a href="/#features" class="hide-mobile">المميزات</a>
+        <a href="/faq">الأسئلة الشائعة</a>
+        <a href="/compare">مقارنة</a>
+        <a href="/plugins">الإضافات</a>
+        <a href="/support">ادعمنا</a>
+      </nav>
+      <div class="header-actions">
+        <a href="/en/docs" class="lang-btn" aria-label="Switch to English">English</a>
+      </div>
+    </header>
+<div class="docs">
+      <!-- Sticky Sidebar -->
+      <aside aria-label="فهرس الدليل">
+        <input type="text" class="docs-search" placeholder="ابحث في أقسام الدليل..." data-ar-placeholder="ابحث في أقسام الدليل..." data-en-placeholder="Search sections..." aria-label="بحث في الدليل">
+
+        <button type="button" class="docs-mobile-toggle" aria-expanded="false">
+          <span data-ar="فهرس الأقسام" data-en="Table of Contents">فهرس الأقسام</span>
+          <span>☰</span>
+        </button>
+
+        <div class="docs-nav-links">
+          <div class="docs-nav-group-title" data-ar="الاستخدام اليومي" data-en="Everyday Use">الاستخدام اليومي</div>
+          <a class="on" href="#install" data-ar="البداية والتثبيت" data-en="Getting Started & Install">البداية والتثبيت</a>
+          <a href="#add" data-ar="إضافة تنزيل" data-en="Adding a Download">إضافة تنزيل</a>
+          <a href="#categories" data-ar="التصنيفات والبحث" data-en="Categories & Search">التصنيفات والبحث</a>
+          <a href="#progress-window" data-ar="نافذة التقدّم" data-en="Progress Window">نافذة التقدّم</a>
+          <a href="#tray" data-ar="التشغيل في الخلفية والشريط" data-en="Background & System Tray">التشغيل في الخلفية والشريط</a>
+          <a href="#startup" data-ar="التشغيل مع ويندوز" data-en="Start with Windows">التشغيل مع ويندوز</a>
+          <a href="#shutdown" data-ar="إطفاء الجهاز بعد الانتهاء" data-en="Auto Shutdown">إطفاء الجهاز بعد الانتهاء</a>
+          <a href="#sleep" data-ar="منع سكون الجهاز" data-en="Prevent Sleep">منع سكون الجهاز</a>
+          <a href="#resume" data-ar="الاستئناف وأخطاء السيرفر" data-en="Resume & Server Errors">الاستئناف وأخطاء السيرفر</a>
+
+          <div class="docs-nav-group-title" data-ar="التكامل والتحكم" data-en="Integration & Power">التكامل والتحكم</div>
+          <a href="#ext" data-ar="إضافة المتصفح وتفعيلها" data-en="Browser Extension">إضافة المتصفح وتفعيلها</a>
+          <a href="#cli" data-ar="سطر الأوامر (CLI)" data-en="Command-Line (CLI)">سطر الأوامر (CLI)</a>
+          <a href="#settings" data-ar="الإعدادات خيار خيار" data-en="Settings Breakdown">الإعدادات خيار خيار</a>
+          <a href="#data-locations" data-ar="مكان البيانات على جهازك" data-en="Data Storage Locations">مكان البيانات على جهازك</a>
+
+          <div class="docs-nav-group-title" data-ar="التطوير والمستقبل" data-en="Development & Roadmap">التطوير والمستقبل</div>
+          <a href="#build" data-ar="بناء سيل من المصدر" data-en="Building from Source">بناء سيل من المصدر</a>
+          <a href="#contribute" data-ar="المساهمة في الكود" data-en="Contributing Code">المساهمة في الكود</a>
+          <a href="#issues" data-ar="الإبلاغ عن مشكلة" data-en="Reporting Issues">الإبلاغ عن مشكلة</a>
+          <a href="#plugins" data-ar="الإضافات (Plugins)" data-en="Plugins (Roadmap)">الإضافات (Plugins)</a>
+          <a href="#themes" data-ar="السمات (Themes)" data-en="Themes (Roadmap)">السمات (Themes)</a>
+          <a href="#faq" data-ar="الأسئلة الشائعة" data-en="FAQ">الأسئلة الشائعة</a>
+        </div>
+      </aside>
+
+      <!-- Documentation Article -->
+      <article>
+        <h1 data-ar="دليل استخدام سيل الكامل" data-en="Complete Sayl Documentation">دليل استخدام سيل الكامل</h1>
+        <p data-ar="هذا الدليل يغطي كل ما تحتاجه لتشغيل سيل والاستفادة منه، من أول تثبيت حتى أوامر سطر الأوامر الدقيقة، ويخص الإصدار 0.1.0 لنظام Windows." data-en="This guide covers everything you need to run and configure Sayl, from initial installation to low-level CLI commands, targeting v0.1.0 on Windows.">هذا الدليل يغطي كل ما تحتاجه لتشغيل سيل والاستفادة منه، من أول تثبيت حتى أوامر سطر الأوامر الدقيقة، ويخص الإصدار 0.1.0 لنظام Windows.</p>
+
+        <!-- 1. Installation & SmartScreen -->
+        <h2 id="install" data-ar="1. البداية والتثبيت" data-en="1. Getting Started & Installation">1. البداية والتثبيت</h2>
+        <p data-ar="سيل متاح حاليًا لأنظمة Windows 10 وWindows 11 بمعمارية 64-bit." data-en="Sayl currently supports 64-bit Windows 10 and Windows 11.">سيل متاح حاليًا لأنظمة Windows 10 وWindows 11 بمعمارية 64-bit.</p>
+        <ol class="steps">
+          <li data-ar="افتح صفحة <a href='https://github.com/athar-studios/sayl/releases/latest' target='_blank'>آخر إصدار على GitHub</a> ونزِّل ملف التثبيت <code>SAYL-Setup-x64-0.1.0.exe</code>." data-en="Open the <a href='https://github.com/athar-studios/sayl/releases/latest' target='_blank'>latest GitHub Release</a> and download <code>SAYL-Setup-x64-0.1.0.exe</code>.">افتح صفحة <a href="https://github.com/athar-studios/sayl/releases/latest" target="_blank">آخر إصدار على GitHub</a> ونزِّل ملف التثبيت <code>SAYL-Setup-x64-0.1.0.exe</code>.</li>
+          <li data-ar="شغّل الملف، وسيقوم بالتثبيت في حساب المستخدم دون الحاجة إلى صلاحيات مسؤول النظام (Administrator)." data-en="Launch the installer; it installs inside user scope without requiring administrator elevation.">شغّل الملف، وسيقوم بالتثبيت في حساب المستخدم دون الحاجة إلى صلاحيات مسؤول النظام (Administrator).</li>
+          <li data-ar="ستجد اختصار سيل في قائمة ابدأ وسطح المكتب." data-en="Sayl will be ready in your Start Menu and Desktop shortcuts.">ستجد اختصار سيل في قائمة ابدأ وسطح المكتب.</li>
+        </ol>
+
+        <div class="note">
+          <strong data-ar="تنبيه Windows SmartScreen وكيف تتجاوزه:" data-en="Windows SmartScreen Notice & How to Proceed:">تنبيه Windows SmartScreen وكيف تتجاوزه:</strong><br>
+          <span data-ar="لأن سيل مشروع مجاني جديد ولم نقم بعد بشراء شهادة توقيع رقمي تجارية باهظة التكلفة (EV Code Signing)، قد يظهر لك نظام ويندوز نافذة زرقاء تحمل عبارة: «Windows protected your PC / ناشر غير معروف»." data-en="Because Sayl is a new independent project without a costly commercial EV code-signing certificate, Windows may display a blue warning screen saying 'Windows protected your PC / Unknown Publisher'.">لأن سيل مشروع مجاني جديد ولم نقم بعد بشراء شهادة توقيع رقمي تجارية باهظة التكلفة (EV Code Signing)، قد يظهر لك نظام ويندوز نافذة زرقاء تحمل عبارة: «Windows protected your PC / ناشر غير معروف».</span><br><br>
+          <strong data-ar="خطوات المتابعة:" data-en="How to continue:">خطوات المتابعة:</strong><br>
+          <span data-ar="1. اضغط على رابط <strong>«مزيد من المعلومات» (More info)</strong> الظاهر داخل الرسالة.<br>2. اضغط على زر <strong>«التشغيل على أي حال» (Run anyway)</strong> الذي سيظهر في الأسفل.<br>كود مصدر سيل متاح للجميع على GitHub، ويمكنك مراجعته بنفسك للتأكد من خلوه التام من أي برمجيات ضارة." data-en="1. Click <strong>'More info'</strong> inside the prompt.<br>2. Click <strong>'Run anyway'</strong> that appears at the bottom.<br>Sayl's full source code is available and auditable on GitHub for full verification.">1. اضغط على رابط <strong>«مزيد من المعلومات» (More info)</strong> الظاهر داخل الرسالة.<br>2. اضغط على زر <strong>«التشغيل على أي حال» (Run anyway)</strong> الذي سيظهر في الأسفل.<br>كود مصدر سيل متاح للجميع على GitHub، ويمكنك مراجعته بنفسك للتأكد من خلوه التام من أي برمجيات ضارة.</span>
+        </div>
+
+        <!-- 2. Adding a Download -->
+        <h2 id="add" data-ar="2. إضافة تنزيل جديد" data-en="2. Adding a Download">2. إضافة تنزيل جديد</h2>
+        <p data-ar="يوفر سيل عدة طرق بسيطة لبدء التنزيل فورًا:" data-en="Sayl provides multiple quick ways to start a download:">يوفر سيل عدة طرق بسيطة لبدء التنزيل فورًا:</p>
+        <ul>
+          <li data-ar="<strong>عبر زر الواجهة أو الاختصار:</strong> اضغط على زر «إضافة تنزيل» في الشريط العلوي، أو اضغط <kbd>Ctrl + N</kbd>. إذا كان في حافظتك رابط منسوخ، سيُلصقه البرنامج تلقائيًا." data-en="<strong>Toolbar or shortcut:</strong> Click 'Add Download' or press <kbd>Ctrl + N</kbd>. If you have a URL in your clipboard, it is pasted automatically."><strong>عبر زر الواجهة أو الاختصار:</strong> اضغط على زر «إضافة تنزيل» في الشريط العلوي، أو اضغط <kbd>Ctrl + N</kbd>. إذا كان في حافظتك رابط منسوخ، سيُلصقه البرنامج تلقائيًا.</li>
+          <li data-ar="<strong>السحب والإفلات:</strong> اسحب أي رابط مباشرة من المتصفح وأفلته في أي مساحة داخل نافذة سيل." data-en="<strong>Drag and drop:</strong> Drag any download link directly from your browser into the Sayl window."><strong>السحب والإفلات:</strong> اسحب أي رابط مباشرة من المتصفح وأفلته في أي مساحة داخل نافذة سيل.</li>
+          <li data-ar="<strong>تنبيه الروابط المكررة:</strong> إذا كان الرابط موجودًا بالفعل في قائمتك، سيعرض سيل نافذة تسألك: هل تود فتح الملف الموجود مسبقًا أم تنزيله مرة ثانية؟ حتى لا تستهلك باقتك دون قصد." data-en="<strong>Duplicate detection:</strong> If the link already exists in your tasks, Sayl asks whether you want to reveal the existing task or download it anew, preventing accidental duplicates."><strong>تنبيه الروابط المكررة:</strong> إذا كان الرابط موجودًا بالفعل في قائمتك، سيعرض سيل نافذة تسألك: هل تود فتح الملف الموجود مسبقًا أم تنزيله مرة ثانية؟ حتى لا تستهلك باقتك دون قصد.</li>
+        </ul>
+
+        <!-- 3. Categories & Search -->
+        <h2 id="categories" data-ar="3. التصنيفات والبحث" data-en="3. Categories & Search">3. التصنيفات والبحث</h2>
+        <p data-ar="مع كثرة التنزيلات، ينظم سيل ملفاتك تلقائيًا استنادًا إلى امتداد الملف ونوع المحتوى (MIME Type):" data-en="As your downloads grow, Sayl automatically groups them based on file extensions and MIME types:">مع كثرة التنزيلات، ينظم سيل ملفاتك تلقائيًا استنادًا إلى امتداد الملف ونوع المحتوى (MIME Type):</p>
+        <ul>
+          <li data-ar="<strong>التصنيفات الستة:</strong> فيديو (mp4, mkv, avi...)، صوت (mp3, wav, flac...)، مستندات (pdf, docx, epub...)، برامج (exe, msi, iso...)، ملفات مضغوطة (zip, rar, 7z...)، وقسم «أخرى» للملفات المتنوعة." data-en="<strong>6 Functional Categories:</strong> Video, Audio, Documents, Programs, Compressed, and Other for miscellaneous files."><strong>التصنيفات الستة:</strong> فيديو (mp4, mkv, avi...)، صوت (mp3, wav, flac...)، مستندات (pdf, docx, epub...)، برامج (exe, msi, iso...)، ملفات مضغوطة (zip, rar, 7z...)، وقسم «أخرى» للملفات المتنوعة.</li>
+          <li data-ar="<strong>فلترة الحالة:</strong> يمكنك التبديل بين عرض (الكل)، (يعمل حاليًا)، (متوقف مؤقتًا)، (مكتمل)، أو (فشل)." data-en="<strong>Status Filters:</strong> Switch between All, Active, Paused, Completed, or Failed tasks."><strong>فلترة الحالة:</strong> يمكنك التبديل بين عرض (الكل)، (يعمل حاليًا)، (متوقف مؤقتًا)، (مكتمل)، أو (فشل).</li>
+          <li data-ar="<strong>البحث الفوري:</strong> اكتب أي كلمة في شريط البحث ليقوم بتصفية المهام حسب اسم الملف أو الرابط أثناء الكتابة دون أي تأخير." data-en="<strong>Live Instant Search:</strong> Type in the search box to filter files and URLs in real-time."><strong>البحث الفوري:</strong> اكتب أي كلمة في شريط البحث ليقوم بتصفية المهام حسب اسم الملف أو الرابط أثناء الكتابة دون أي تأخير.</li>
+          <li data-ar="<strong>طريقة العرض:</strong> اختر بين عرض «البطاقات» الواسع أو عرض «الجدول» المضغوط حسب تفضيلك." data-en="<strong>View Modes:</strong> Choose between Cards view for rich detail or Table view for dense listing."><strong>طريقة العرض:</strong> اختر بين عرض «البطاقات» الواسع أو عرض «الجدول» المضغوط حسب تفضيلك.</li>
+        </ul>
+
+        <!-- 4. Progress Window -->
+        <h2 id="progress-window" data-ar="4. نافذة التقدّم" data-en="4. Progress Window">4. نافذة التقدّم</h2>
+        <p data-ar="عند بدء التنزيل، يمكن لسيل إظهار نافذة مخصصة مستقلة تمنحك تفاصيل دقيقة عن حالة النقل:" data-en="When downloading, Sayl can show a dedicated progress window providing deep insights into transfer health:">عند بدء التنزيل، يمكن لسيل إظهار نافذة مخصصة مستقلة تمنحك تفاصيل دقيقة عن حالة النقل:</p>
+        <ul>
+          <li data-ar="<strong>أشرطة الأجزاء المتوازية:</strong> يعرض شريطًا مقسمًا لكل اتصال نشط، بحيث ترى بصريًا حجم وسرعة ملء كل قطعة من الملف." data-en="<strong>Parallel Segment Bars:</strong> Visual segmented progress bars showing the buffer fill rate of each individual connection."><strong>أشرطة الأجزاء المتوازية:</strong> يعرض شريطًا مقسمًا لكل اتصال نشط، بحيث ترى بصريًا حجم وسرعة ملء كل قطعة من الملف.</li>
+          <li data-ar="<strong>إحصاءات حية:</strong> السرعة اللحظية، الحجم المنقول من الإجمالي، والوقت المتبقي (ETA)." data-en="<strong>Live Metrics:</strong> Real-time transfer speed, downloaded vs total size, and estimated time remaining (ETA)."><strong>إحصاءات حية:</strong> السرعة اللحظية، الحجم المنقول من الإجمالي، والوقت المتبقي (ETA).</li>
+          <li data-ar="<strong>إجراءات سريعة:</strong> زر لفتح الملف مباشرة، وزر لعرضه في مجلد التنزيل في مستكشف Windows." data-en="<strong>Direct Actions:</strong> Quick buttons to open the finished file or reveal it in Windows Explorer."><strong>إجراءات سريعة:</strong> زر لفتح الملف مباشرة، وزر لعرضه في مجلد التنزيل في مستكشف Windows.</li>
+          <li data-ar="يمكنك من الإعدادات تفعيل أو تعطيل ظهور هذه النافذة، أو جعلها تغلق تلقائيًا بمجرد اكتمال التنزيل." data-en="In Settings, you can enable/disable this popup or configure it to close automatically once done.">يمكنك من الإعدادات تفعيل أو تعطيل ظهور هذه النافذة، أو جعلها تغلق تلقائيًا بمجرد اكتمال التنزيل.</li>
+        </ul>
+
+        <!-- 5. Background Operation & Tray Icon -->
+        <h2 id="tray" data-ar="5. التشغيل في الخلفية وأيقونة شريط المهام" data-en="5. Background Operation & System Tray">5. التشغيل في الخلفية وأيقونة شريط المهام</h2>
+        <p data-ar="يبقى سيل يعمل في الخلفية بهدوء دون أن يعيق عملك:" data-en="Sayl operates quietly in the background without getting in your way:">يبقى سيل يعمل في الخلفية بهدوء دون أن يعيق عملك:</p>
+        <ul>
+          <li data-ar="عند إغلاق أو تصغير النافذة، يستمر التنزيل في الخلفية وتستقر أيقونة سيل في صينية النظام (System Tray بجوار الساعة)." data-en="Closing or minimizing the window keeps tasks running in the background with an icon in the Windows notification tray.">عند إغلاق أو تصغير النافذة، يستمر التنزيل في الخلفية وتستقر أيقونة سيل في صينية النظام (System Tray بجوار الساعة).</li>
+          <li data-ar="بالنقر المزدوج على أيقونة شريط المهام تُفتح النافذة الرئيسية مجددًا." data-en="Double-clicking the tray icon restores the main application window immediately.">بالنقر المزدوج على أيقونة شريط المهام تُفتح النافذة الرئيسية مجددًا.</li>
+          <li data-ar="بالنقر بزر الفأرة الأيمن على الأيقونة، تظهر لك قائمة سريعة لإيقاف كل التنزيلات مؤقتًا، أو استئناف الكل، أو إغلاق البرنامج بالكامل." data-en="Right-clicking the tray icon provides quick options to Pause All, Resume All, or Exit completely.">بالنقر بزر الفأرة الأيمن على الأيقونة، تظهر لك قائمة سريعة لإيقاف كل التنزيلات مؤقتًا، أو استئناف الكل، أو إغلاق البرنامج بالكامل.</li>
+        </ul>
+
+        <!-- 6. Start with Windows -->
+        <h2 id="startup" data-ar="6. التشغيل مع ويندوز" data-en="6. Start with Windows">6. التشغيل مع ويندوز</h2>
+        <p data-ar="يمكنك ضبط سيل ليبدأ تلقائيًا مع إقلاع نظام Windows. يتيح ذلك للبرنامج استكمال التنزيلات المعلقة فور فتح الحاسوب دون أن تضطر لتشغيله يدويًا في كل مرة، ويبقى خفيفًا جدًا على استهلاك الذاكرة والمعالج." data-en="You can configure Sayl to launch automatically on Windows startup. This allows pending downloads to continue automatically whenever you boot up your PC, with negligible memory footprint.">يمكنك ضبط سيل ليبدأ تلقائيًا مع إقلاع نظام Windows. يتيح ذلك للبرنامج استكمال التنزيلات المعلقة فور فتح الحاسوب دون أن تضطر لتشغيله يدويًا في كل مرة، ويبقى خفيفًا جدًا على استهلاك الذاكرة والمعالج.</p>
+
+        <!-- 7. Shutdown Computer on Complete -->
+        <h2 id="shutdown" data-ar="7. إطفاء الجهاز بعد الانتهاء" data-en="7. Auto-Shutdown on Completion">7. إطفاء الجهاز بعد الانتهاء</h2>
+        <p data-ar="إذا كنت تنزّل ملفات كبيرة ليلًا أو قبل الخروج من المنزل، يمكنك تفعيل خيار «إيقاف تشغيل الجهاز عند انتهاء كل التحميلات»:" data-en="When downloading large files overnight or before leaving your desk, enable 'Shutdown PC when all downloads complete':">إذا كنت تنزّل ملفات كبيرة ليلًا أو قبل الخروج من المنزل، يمكنك تفعيل خيار «إيقاف تشغيل الجهاز عند انتهاء كل التحميلات»:</p>
+        <ul>
+          <li data-ar="<strong>عداد الأمان (٣٠ ثانية):</strong> عند اكتمال آخر تنزيل، لا يطفئ سيل الجهاز فجأة؛ بل تظهر شاشة تنبيه واضحة مع عداد تنازلي مدته 30 ثانية وزر بارز لإلغاء الإطفاء بنقرة واحدة إذا كنت لا تزال تستخدم الحاسوب." data-en="<strong>30-Second Safety Countdown:</strong> Upon completion, Sayl displays a clear 30-second warning dialog with an instant cancel button."><strong>عداد الأمان (٣٠ ثانية):</strong> عند اكتمال آخر تنزيل، لا يطفئ سيل الجهاز فجأة؛ بل تظهر شاشة تنبيه واضحة مع عداد تنازلي مدته 30 ثانية وزر بارز لإلغاء الإطفاء بنقرة واحدة إذا كنت لا تزال تستخدم الحاسوب.</li>
+          <li data-ar="<strong>شروط الأمان الصارمة:</strong> لن يتم إطفاء الجهاز إذا وُجدت تنزيلات فاشلة أو متوقفة مؤقتًا لم تكتمل بعد، لحماية مهامك من الضياع." data-en="<strong>Strict Safety Guardrails:</strong> Shutdown will not trigger if any tasks are paused, failed, or incomplete."><strong>شروط الأمان الصارمة:</strong> لن يتم إطفاء الجهاز إذا وُجدت تنزيلات فاشلة أو متوقفة مؤقتًا لم تكتمل بعد، لحماية مهامك من الضياع.</li>
+        </ul>
+
+        <!-- 8. Prevent Sleep -->
+        <h2 id="sleep" data-ar="8. منع سكون الجهاز (Prevent Sleep)" data-en="8. Prevent Sleep">8. منع سكون الجهاز (Prevent Sleep)</h2>
+        <p data-ar="كثيرًا ما تتوقف التنزيلات في البرامج الأخرى لأن Windows يدخل في وضع السكون (Sleep / Standby) بعد دقائق من عدم لمس الفأرة. يتصل سيل بواجهات الطاقة في Windows (عبر <code>SetThreadExecutionState</code>) لمنع الحاسوب من النوم طالما توجد مهام تنزيل نشطة، وفور اكتمالها يُرفع هذا الحظر تلقائيًا ليعود جهازك لتوفير الطاقة المعتاد." data-en="Downloads often fail when Windows enters sleep mode after inactivity. Sayl utilizes Windows power APIs to inhibit system sleep while downloads are actively in flight, releasing the lock automatically once tasks finish.">كثيرًا ما تتوقف التنزيلات في البرامج الأخرى لأن Windows يدخل في وضع السكون (Sleep / Standby) بعد دقائق من عدم لمس الفأرة. يتصل سيل بواجهات الطاقة في Windows (عبر <code>SetThreadExecutionState</code>) لمنع الحاسوب من النوم طالما توجد مهام تنزيل نشطة، وفور اكتمالها يُرفع هذا الحظر تلقائيًا ليعود جهازك لتوفير الطاقة المعتاد.</p>
+
+        <!-- 9. Resuming & Server Errors -->
+        <h2 id="resume" data-ar="9. الاستئناف وأخطاء السيرفر" data-en="9. Resumption & Server Errors">9. الاستئناف وأخطاء السيرفر</h2>
+        <p data-ar="بُني سيل على أساس هندسي يضمن سلامة البيانات بنسبة 100%:" data-en="Sayl is built with strict integrity guarantees for your downloaded files:">بُني سيل على أساس هندسي يضمن سلامة البيانات بنسبة 100%:</p>
+        <ul>
+          <li data-ar="<strong>كيف يعمل الاستئناف؟</strong> يطلب سيل أجزاء الملف باستخدام ترويسة <code>Range: bytes=X-Y</code> واستجابة <code>206 Partial Content</code>. قبل إكمال أي بايت قديم، يتأكد سيل من تطابق وسم <code>ETag</code> القوي وتاريخ <code>Last-Modified</code> من السيرفر. فإذا كان الملف قد تغيّر على الخادم، يبدأ التنزيل من الصفر تلقائيًا لمنع دمج أجزاء غير متطابقة تُتلف الملف." data-en="<strong>How Resumption Works:</strong> Requests byte chunks using HTTP Range requests and validates strong ETag and Last-Modified headers before stitching data."><strong>كيف يعمل الاستئناف؟</strong> يطلب سيل أجزاء الملف باستخدام ترويسة <code>Range: bytes=X-Y</code> واستجابة <code>206 Partial Content</code>. قبل إكمال أي بايت قديم، يتأكد سيل من تطابق وسم <code>ETag</code> القوي وتاريخ <code>Last-Modified</code> من السيرفر. فإذا كان الملف قد تغيّر على الخادم، يبدأ التنزيل من الصفر تلقائيًا لمنع دمج أجزاء غير متطابقة تُتلف الملف.</li>
+          <li data-ar="<strong>ملفات <code>.part</code> الذرية:</strong> يكتب سيل البيانات في ملف مؤقت يحمل اللاحقة <code>.part</code>، مع تنفيذ أمر <code>fsync</code> للتأكد من كتابة البيانات في القرص الفعلي. وفقط بعد اكتمال التنزيل 100% والتحقق من حجمه، يقوم سيل بإعادة تسميته ذريًا (Atomic Rename) إلى الاسم النهائي. هكذا تضمن ألا تجد في مجلدك ملفات معطوبة أو ناقصة." data-en="<strong>Atomic <code>.part</code> Files:</strong> Data writes exclusively to a <code>.part</code> file, synced via <code>fsync</code>, and only renamed to the final filename upon 100% verified completion."><strong>ملفات <code>.part</code> الذرية:</strong> يكتب سيل البيانات في ملف مؤقت يحمل اللاحقة <code>.part</code>، مع تنفيذ أمر <code>fsync</code> للتأكد من كتابة البيانات في القرص الفعلي. وفقط بعد اكتمال التنزيل 100% والتحقق من حجمه، يقوم سيل بإعادة تسميته ذريًا (Atomic Rename) إلى الاسم النهائي. هكذا تضمن ألا تجد في مجلدك ملفات معطوبة أو ناقصة.</li>
+          <li data-ar="<strong>أخطاء الخادم (403, 503, Timeouts):</strong> إذا انتهت صلاحية الرابط أو واجه الخادم ضغطًا مؤقتًا، ينبهك سيل بالخطأ المحدد بوضوح ويحتفظ بنقاط التنزيل، لتستأنفه لاحقًا أو تحدث الرابط دون فقدان ما نزل." data-en="<strong>Server Failures:</strong> Clear error reporting for expired tokens (403) or server overload (503), retaining downloaded chunks safely."><strong>أخطاء الخادم (403, 503, Timeouts):</strong> إذا انتهت صلاحية الرابط أو واجه الخادم ضغطًا مؤقتًا، ينبهك سيل بالخطأ المحدد بوضوح ويحتفظ بنقاط التنزيل، لتستأنفه لاحقًا أو تحدث الرابط دون فقدان ما نزل.</li>
+          <li data-ar="<strong>الاسترداد بعد الانهيار (Crash Recovery):</strong> إذا انقطعت الكهرباء أو أُجبر البرنامج على الإغلاق، يقوم سيل عند فتحه تلقائيًا بفحص سجل الـ WAL وإعادة كل المهام غير المكتملة إلى حالة <code>Paused</code> الآمنة، لتبدأ استئنافها بنقرة واحدة." data-en="<strong>Crash Recovery:</strong> WAL replay automatically safely sets incomplete tasks to Paused after an unexpected system shutdown."><strong>الاسترداد بعد الانهيار (Crash Recovery):</strong> إذا انقطعت الكهرباء أو أُجبر البرنامج على الإغلاق، يقوم سيل عند فتحه تلقائيًا بفحص سجل الـ WAL وإعادة كل المهام غير المكتملة إلى حالة <code>Paused</code> الآمنة، لتبدأ استئنافها بنقرة واحدة.</li>
+        </ul>
+
+        <!-- 10. Browser Extension & Activation -->
+        <h2 id="ext" data-ar="10. إضافة المتصفح وتفعيلها" data-en="10. Browser Extension & Setup">10. إضافة المتصفح وتفعيلها</h2>
+        <p data-ar="تتيح إضافة المتصفح لبرنامج سيل التقاط روابط التنزيل مباشرة من Google Chrome وMicrosoft Edge وBrave والمتصفحات المتوافقة:" data-en="The browser extension allows Sayl to capture download links directly from Google Chrome, Microsoft Edge, Brave, and compatible Chromium browsers:">تتيح إضافة المتصفح لبرنامج سيل التقاط روابط التنزيل مباشرة من Google Chrome وMicrosoft Edge وBrave والمتصفحات المتوافقة:</p>
+        <ol class="steps">
+          <li data-ar="افتح برنامج سيل، ثم انتقل إلى <strong>الإعدادات</strong> (رمز الترس أو <kbd>Ctrl+,</kbd>)." data-en="Open Sayl, then go to <strong>Settings</strong> (gear icon or <kbd>Ctrl+,</kbd>).">افتح برنامج سيل، ثم انتقل إلى <strong>الإعدادات</strong> (رمز الترس أو <kbd>Ctrl+,</kbd>).</li>
+          <li data-ar="انتقل إلى قسم <strong>إضافة المتصفح</strong> واضغط زر <strong>تفعيل</strong>." data-en="Navigate to the <strong>Browser Extension</strong> section and click <strong>Activate</strong>.">انتقل إلى قسم <strong>إضافة المتصفح</strong> واضغط زر <strong>تفعيل</strong>.</li>
+          <li data-ar="الإضافة غير منشورة في متاجر المتصفحات حتى الآن؛ سيل يثبتها محلياً (يسجّل مضيف الرسائل الأصلي تلقائياً). افتح سيل > الإعدادات > إضافة المتصفح > تفعيل، ثم اتبع الخطوات التي يعرضها:" data-en="The extension is not yet listed in browser stores; Sayl installs it locally (it registers the native messaging host automatically). Open Sayl > Settings > Browser Extension > Activate, then follow the steps it shows:">الإضافة غير منشورة في متاجر المتصفحات حتى الآن؛ سيل يثبتها محلياً (يسجّل مضيف الرسائل الأصلي تلقائياً). افتح سيل > الإعدادات > إضافة المتصفح > تفعيل، ثم اتبع الخطوات التي يعرضها:</li>
+          <li data-ar="في المتصفح: افتح صفحة الإضافات (<code>chrome://extensions</code> أو <code>edge://extensions</code>) وفعّل «وضع مطوّر البرامج»." data-en="In your browser: open the extensions page (<code>chrome://extensions</code> or <code>edge://extensions</code>) and enable 'Developer mode'.">في المتصفح: افتح صفحة الإضافات (<code>chrome://extensions</code> أو <code>edge://extensions</code>) وفعّل «وضع مطوّر البرامج».</li>
+          <li data-ar="اضغط «تحميل حزمة غير مضغوطة» (Load unpacked) واختر مجلد الإضافة الذي يعرضه سيل (زر نسخ المسار / فتح المجلد)." data-en="Click 'Load unpacked' and select the extension folder shown by Sayl (use the copy-path / open-folder buttons).">اضغط «تحميل حزمة غير مضغوطة» (Load unpacked) واختر مجلد الإضافة الذي يعرضه سيل (زر نسخ المسار / فتح المجلد).</li>
+          <li data-ar="لـ Firefox: افتح <code>about:debugging#/runtime/this-firefox</code> → «تحميل إضافة مؤقتة» → اختر <code>manifest.json</code>." data-en="For Firefox: open <code>about:debugging#/runtime/this-firefox</code> → 'Load Temporary Add-on' → select <code>manifest.json</code>.">لـ Firefox: افتح <code>about:debugging#/runtime/this-firefox</code> → «تحميل إضافة مؤقتة» → اختر <code>manifest.json</code>.</li>
+          <li data-ar="بعد التثبيت، تحقق من حالة «متصل» في إعدادات سيل؛ بعدها تُلتقط الروابط تلقائياً." data-en="After install, check the 'Connected' status in Sayl Settings; captures then happen automatically.">بعد التثبيت، تحقق من حالة «متصل» في إعدادات سيل؛ بعدها تُلتقط الروابط تلقائياً.</li>
+        </ol>
+        <p data-ar="بعد التثبيت بنجاح، يلتقط سيل التنزيلات تلقائيًا بمجرد النقر على أي رابط تحميل، كما يمكنك النقر بزر الفأرة الأيمن على أي رابط واختيار <strong>«التحميل بواسطة سيل»</strong>." data-en="Once installed, Sayl captures downloads seamlessly, and you can right-click any link to choose <strong>'Download with Sayl'</strong>.">بعد التثبيت بنجاح، يلتقط سيل التنزيلات تلقائيًا بمجرد النقر على أي رابط تحميل، كما يمكنك النقر بزر الفأرة الأيمن على أي رابط واختيار <strong>«التحميل بواسطة سيل»</strong>.</p>
+
+        <details class="note">
+          <summary data-ar="طريقة التثبيت اليدوي للمطورين (Load unpacked)" data-en="Advanced: Manual Developer Installation (Load unpacked)">طريقة التثبيت اليدوي للمطورين (Load unpacked)</summary>
+          <div style="margin-top:14px">
+            <p data-ar="إذا كنت تبني سيل من المصدر أو تطوّر على كود الإضافة محليًا، يمكنك تثبيتها يدويًا عبر الخطوات التالية:" data-en="If you are building from source or developing the extension locally, you can load it unpacked:">إذا كنت تبني سيل من المصدر أو تطوّر على كود الإضافة محليًا، يمكنك تثبيتها يدويًا عبر الخطوات التالية:</p>
+            <ol class="steps">
+              <li data-ar="افتح صفحة الإضافات في متصفحك: <code>chrome://extensions</code> أو <code>edge://extensions</code>." data-en="Open extension settings in your browser: <code>chrome://extensions</code> or <code>edge://extensions</code>.">افتح صفحة الإضافات في متصفحك: <code>chrome://extensions</code> أو <code>edge://extensions</code>.</li>
+              <li data-ar="فعّل «وضع مطوّر البرامج» (Developer mode) في أعلى الصفحة." data-en="Enable 'Developer mode' in the top toolbar.">فعّل «وضع مطوّر البرامج» (Developer mode) في أعلى الصفحة.</li>
+              <li data-ar="اضغط «تحميل حزمة غير مضغوطة» (Load unpacked) واختر مجلد <code>extensions/browser/chromium</code> الموجود في ملفات سيل." data-en="Click 'Load unpacked' and select <code>extensions/browser/chromium</code>.">اضغط «تحميل حزمة غير مضغوطة» (Load unpacked) واختر مجلد <code>extensions/browser/chromium</code> الموجود في ملفات سيل.</li>
+              <li data-ar="انسخ معرّف الإضافة (Extension ID) المخصص لها." data-en="Copy the assigned Extension ID.">انسخ معرّف الإضافة (Extension ID) المخصص لها.</li>
+              <li data-ar="شغّل سكربت التسجيل في PowerShell ليرتبط مضيف الرسائل الأصلي (Native Messaging Host) بالمتصفح:<br><code>powershell -ExecutionPolicy Bypass -File tools/register-native-host.ps1 -ExtensionId &lt;معرف_الإضافة&gt;</code>" data-en="Run the registration script in PowerShell:<br><code>powershell -ExecutionPolicy Bypass -File tools/register-native-host.ps1 -ExtensionId &lt;EXTENSION_ID&gt;</code>">شغّل سكربت التسجيل في PowerShell ليرتبط مضيف الرسائل الأصلي (Native Messaging Host) بالمتصفح:<br><code>powershell -ExecutionPolicy Bypass -File tools/register-native-host.ps1 -ExtensionId &lt;معرف_الإضافة&gt;</code></li>
+            </ol>
+          </div>
+        </details>
+
+        <!-- 11. Full CLI Reference -->
+        <h2 id="cli" data-ar="11. سطر الأوامر (sayl CLI)" data-en="11. Command-Line Interface (sayl CLI)">11. سطر الأوامر (sayl CLI)</h2>
+        <p data-ar="يأتي سيل مع أداة سطر أوامر مستقلة (<code>sayl.exe</code>) مبنية بلغة Rust، توفر تحكمًا كاملًا في محرك التنزيل. هذه قائمة الأوامر الفعلية كما هي معرّفة في كود البرنامج:" data-en="Sayl includes a high-performance standalone CLI (<code>sayl.exe</code>) providing full programmatic control:">يأتي سيل مع أداة سطر أوامر مستقلة (<code>sayl.exe</code>) مبنية بلغة Rust، توفر تحكمًا كاملًا في محرك التنزيل. هذه قائمة الأوامر الفعلية كما هي معرّفة في كود البرنامج:</p>
+
+        <h3 data-ar="الأوامر الأساسية:" data-en="Core Commands:">الأوامر الأساسية:</h3>
+        <div class="table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th data-ar="الأمر والصيغة" data-en="Command & Syntax">الأمر والصيغة</th>
+                <th data-ar="الوصف" data-en="Description">الوصف</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>sayl add &lt;urls...&gt;</code></td>
+                <td data-ar="إضافة رابط أو عدة روابط دفعة واحدة إلى طابور التنزيل." data-en="Add one or more URLs to the download queue.">إضافة رابط أو عدة روابط دفعة واحدة إلى طابور التنزيل.</td>
+              </tr>
+              <tr>
+                <td><code>sayl start &lt;id&gt; | --all</code></td>
+                <td data-ar="بدء تنزيل مهمة محددة بمعرفها (أو بدايته)، أو بدء كل المهام المنتظرة." data-en="Start a specific queued task by ID, or start every queued task.">بدء تنزيل مهمة محددة بمعرفها (أو بدايته)، أو بدء كل المهام المنتظرة.</td>
+              </tr>
+              <tr>
+                <td><code>sayl list [--json]</code></td>
+                <td data-ar="عرض جدول بكل المهام المسجلة وحالاتها، أو بصيغة JSON للأتمتة." data-en="List all download tasks in tabular format or structured JSON.">عرض جدول بكل المهام المسجلة وحالاتها، أو بصيغة JSON للأتمتة.</td>
+              </tr>
+              <tr>
+                <td><code>sayl info &lt;id&gt;</code></td>
+                <td data-ar="عرض تفاصيل دقيقة وشاملة عن المهمة (الحجم، النطاقات، المسار، الأخطاء)." data-en="Display detailed telemetry and state information about a task.">عرض تفاصيل دقيقة وشاملة عن المهمة (الحجم، النطاقات، المسار، الأخطاء).</td>
+              </tr>
+              <tr>
+                <td><code>sayl pause &lt;id&gt;</code></td>
+                <td data-ar="إيقاف مهمة جارية مؤقتًا وحفظ إحداثيات البايتات على القرص." data-en="Pause an active or queued download task safely.">إيقاف مهمة جارية مؤقتًا وحفظ إحداثيات البايتات على القرص.</td>
+              </tr>
+              <tr>
+                <td><code>sayl cancel &lt;id&gt;</code></td>
+                <td data-ar="إلغاء مهمة جارية أو منتظرة نهائيًا وتحرير الموارد." data-en="Cancel an active or queued download task.">إلغاء مهمة جارية أو منتظرة نهائيًا وتحرير الموارد.</td>
+              </tr>
+              <tr>
+                <td><code>sayl remove &lt;id&gt; [--delete-file]</code></td>
+                <td data-ar="حذف المهمة من السجل، مع إمكانية حذف الملف المنزّل وملف <code>.part</code> من القرص." data-en="Remove a task record, optionally deleting downloaded and partial files.">حذف المهمة من السجل، مع إمكانية حذف الملف المنزّل وملف <code>.part</code> من القرص.</td>
+              </tr>
+              <tr>
+                <td><code>sayl recover</code></td>
+                <td data-ar="فحص السجل واسترداد كل المهام التي قُطعت بفعل إغلاق مفاجئ وإعادتها إلى <code>Paused</code> للاستئناف." data-en="Recover non-terminal tasks interrupted by crash or restart.">فحص السجل واسترداد كل المهام التي قُطعت بفعل إغلاق مفاجئ وإعادتها إلى <code>Paused</code> للاستئناف.</td>
+              </tr>
+              <tr>
+                <td><code>sayl events [--idle-exit &lt;ms&gt;]</code></td>
+                <td data-ar="بث مباشر لكل أحداث المحرك الداخلية بصيغة JSON حتى يتم إيقافه." data-en="Stream live engine events as JSON lines until interrupted.">بث مباشر لكل أحداث المحرك الداخلية بصيغة JSON حتى يتم إيقافه.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 data-ar="المعاملات والخيارات العامة (Global Options):" data-en="Global Options:">المعاملات والخيارات العامة (Global Options):</h3>
+        <div class="table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th data-ar="الخيار" data-en="Option">الخيار</th>
+                <th data-ar="القيمة الافتراضية" data-en="Default">القيمة الافتراضية</th>
+                <th data-ar="الشرح" data-en="Description">الشرح</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>--download-dir &lt;PATH&gt;</code></td>
+                <td><code>%USERPROFILE%\Downloads\SAYL</code></td>
+                <td data-ar="تحديد مجلد حفظ الملفات المكتملة." data-en="Target destination directory for downloads.">تحديد مجلد حفظ الملفات المكتملة.</td>
+              </tr>
+              <tr>
+                <td><code>--data-dir &lt;PATH&gt;</code></td>
+                <td><code>&lt;download-dir&gt;\.data</code></td>
+                <td data-ar="تحديد مجلد تخزين السجلات وقاعدة البيانات." data-en="Storage directory for task records and journals.">تحديد مجلد تخزين السجلات وقاعدة البيانات.</td>
+              </tr>
+              <tr>
+                <td><code>--connections &lt;N&gt;</code></td>
+                <td><code>4</code></td>
+                <td data-ar="أقصى عدد اتصالات متوازية للمهمة الواحدة (تجزئة الملف)." data-en="Max concurrent connections per task.">أقصى عدد اتصالات متوازية للمهمة الواحدة (تجزئة الملف).</td>
+              </tr>
+              <tr>
+                <td><code>--concurrent &lt;N&gt;</code></td>
+                <td><code>3</code></td>
+                <td data-ar="أقصى عدد مهام نشطة تنزل في وقت واحد في الطابور." data-en="Max concurrent active download tasks.">أقصى عدد مهام نشطة تنزل في وقت واحد في الطابور.</td>
+              </tr>
+              <tr>
+                <td><code>--lang &lt;ar|en&gt;</code></td>
+                <td><code>ar</code></td>
+                <td data-ar="لغة الرسائل والمخرجات النصية في الطرفية." data-en="CLI output language (Arabic or English).">لغة الرسائل والمخرجات النصية في الطرفية.</td>
+              </tr>
+              <tr>
+                <td><code>--json</code></td>
+                <td>—</td>
+                <td data-ar="إخراج النتائج بصيغة JSON مهيكلة للتكامل مع البرامج الأخرى." data-en="Output command results in JSON format.">إخراج النتائج بصيغة JSON مهيكلة للتكامل مع البرامج الأخرى.</td>
+              </tr>
+              <tr>
+                <td><code>-q, --quiet</code></td>
+                <td>—</td>
+                <td data-ar="كتم أشرطة التقدم والرسائل لتشغيل صامت تمامًا." data-en="Suppress progress bars and informational messages.">كتم أشرطة التقدم والرسائل لتشغيل صامت تمامًا.</td>
+              </tr>
+              <tr>
+                <td><code>-v, --verbose</code></td>
+                <td>—</td>
+                <td data-ar="تفعيل السجلات التشخيصية التفصيلية للشبكة والقرص." data-en="Enable verbose diagnostic logs.">تفعيل السجلات التشخيصية التفصيلية للشبكة والقرص.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 data-ar="رموز الخروج البرمجية (Exit Codes):" data-en="Exit Codes:">رموز الخروج البرمجية (Exit Codes):</h3>
+        <p data-ar="<code>0</code>: نجاح · <code>2</code>: خطأ في استخدام الأمر · <code>3</code>: فشل المهمة · <code>4</code>: ألغيت المهمة · <code>5</code>: خطأ في المخزن أو القرص (I/O)." data-en="<code>0</code>: Success · <code>2</code>: Usage error · <code>3</code>: Task failed · <code>4</code>: Cancelled · <code>5</code>: Store or I/O error."><code>0</code>: نجاح · <code>2</code>: خطأ في استخدام الأمر · <code>3</code>: فشل المهمة · <code>4</code>: ألغيت المهمة · <code>5</code>: خطأ في المخزن أو القرص (I/O).</p>
+
+        <!-- 12. Settings Breakdown -->
+        <h2 id="settings" data-ar="12. الإعدادات خيار خيار" data-en="12. Settings Option by Option">12. الإعدادات خيار خيار</h2>
+        <p data-ar="يمكنك فتح شاشة الإعدادات في الواجهة في أي وقت بالضغط على أيقونة الترس أو عبر الاختصار <kbd>Ctrl + ,</kbd>. فيما يلي شرح لكل خيار متاح:" data-en="Open settings anytime by clicking the gear icon or pressing <kbd>Ctrl + ,</kbd>. Here is what each option controls:">يمكنك فتح شاشة الإعدادات في الواجهة في أي وقت بالضغط على أيقونة الترس أو عبر الاختصار <kbd>Ctrl + ,</kbd>. فيما يلي شرح لكل خيار متاح:</p>
+        <div class="table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th data-ar="الإعداد" data-en="Setting">الإعداد</th>
+                <th data-ar="المدى المسموح" data-en="Range">المدى المسموح</th>
+                <th data-ar="الافتراضي" data-en="Default">الافتراضي</th>
+                <th data-ar="الشرح والتأثير" data-en="Details">الشرح والتأثير</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>مجلد حفظ التنزيلات</strong><br><small>download_dir</small></td>
+                <td>مسار مجلد صالح</td>
+                <td><code>%USERPROFILE%\Downloads</code></td>
+                <td data-ar="المكان الذي تستقر فيه الملفات بعد انتهاء تنزيلها بالكامل." data-en="Default destination directory for finished downloads.">المكان الذي تستقر فيه الملفات بعد انتهاء تنزيلها بالكامل.</td>
+              </tr>
+              <tr>
+                <td><strong>أقصى تنزيلات نشطة</strong><br><small>max_concurrent_tasks</small></td>
+                <td>من 1 إلى 32</td>
+                <td><code>3</code></td>
+                <td data-ar="عدد الملفات التي يُسمح بتنزيلها معًا في وقت واحد. الباقي ينتظر في الطابور تلقائيًا." data-en="Number of active download tasks allowed concurrently.">عدد الملفات التي يُسمح بتنزيلها معًا في وقت واحد. الباقي ينتظر في الطابور تلقائيًا.</td>
+              </tr>
+              <tr>
+                <td><strong>أقصى اتصالات للمهمة</strong><br><small>max_connections_per_task</small></td>
+                <td>من 1 إلى 64</td>
+                <td><code>4</code></td>
+                <td data-ar="عدد الوصلات المتوازية لتجزئة الملف الواحد إذا كان الخادم يدعم النطاقات." data-en="Number of chunked connections opened per task for parallel acceleration.">عدد الوصلات المتوازية لتجزئة الملف الواحد إذا كان الخادم يدعم النطاقات.</td>
+              </tr>
+              <tr>
+                <td><strong>سمة المظهر</strong><br><small>theme</small></td>
+                <td>تلقائي / داكن / فاتح</td>
+                <td><code>system</code></td>
+                <td data-ar="مظهر الواجهة؛ إما يتبع إعدادات ويندوز أو يُثبّت على الداكن أو الفاتح." data-en="Theme appearance: follow system preference, dark, or light.">مظهر الواجهة؛ إما يتبع إعدادات ويندوز أو يُثبّت على الداكن أو الفاتح.</td>
+              </tr>
+              <tr>
+                <td><strong>لغة الواجهة</strong><br><small>language</small></td>
+                <td>العربية / English</td>
+                <td><code>ar</code></td>
+                <td data-ar="لغة واجهة التطبيق والاتجاه (RTL للعربية وLTR للإنجليزية)." data-en="Application language and layout direction.">لغة واجهة التطبيق والاتجاه (RTL للعربية وLTR للإنجليزية).</td>
+              </tr>
+              <tr>
+                <td><strong>طريقة العرض</strong><br><small>view_mode</small></td>
+                <td>بطاقات / جدول</td>
+                <td><code>cards</code></td>
+                <td data-ar="طريقة عرض قائمة المهام؛ إما بطاقات غنية بالتفاصيل أو جدول مدمج." data-en="Default layout: rich visual Cards or compact Table.">طريقة عرض قائمة المهام؛ إما بطاقات غنية بالتفاصيل أو جدول مدمج.</td>
+              </tr>
+              <tr>
+                <td><strong>منع نوم الجهاز</strong><br><small>prevent_sleep</small></td>
+                <td>مفعّل / معطّل</td>
+                <td><code>true</code></td>
+                <td data-ar="منع دخول ويندوز في وضع السكون طالما توجد ملفات قيد التنزيل." data-en="Prevents Windows from entering sleep mode while downloads are in flight.">منع دخول ويندوز في وضع السكون طالما توجد ملفات قيد التنزيل.</td>
+              </tr>
+              <tr>
+                <td><strong>إظهار نافذة التحميل</strong><br><small>show_download_window</small></td>
+                <td>مفعّل / معطّل</td>
+                <td><code>true</code></td>
+                <td data-ar="فتح نافذة منبثقة مستقلة لمتابعة الأجزاء وسرعة النقل عند بدء كل تنزيل." data-en="Automatically shows dedicated progress window when a download starts.">فتح نافذة منبثقة مستقلة لمتابعة الأجزاء وسرعة النقل عند بدء كل تنزيل.</td>
+              </tr>
+              <tr>
+                <td><strong>إغلاق نافذة التحميل تلقائيًا</strong><br><small>close_download_window_on_finish</small></td>
+                <td>مفعّل / معطّل</td>
+                <td><code>false</code></td>
+                <td data-ar="إغلاق نافذة التقدّم تلقائيًا بمجرد اكتمال تنزيل الملف بنجاح." data-en="Automatically closes the progress window when task finishes.">إغلاق نافذة التقدّم تلقائيًا بمجرد اكتمال تنزيل الملف بنجاح.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 data-ar="اختصارات لوحة المفاتيح:" data-en="Keyboard Shortcuts:">اختصارات لوحة المفاتيح:</h3>
+        <ul>
+          <li><kbd>Ctrl + N</kbd>: <span data-ar="إضافة تنزيل جديد ولصق الرابط." data-en="Add a new download and auto-paste URL.">إضافة تنزيل جديد ولصق الرابط.</span></li>
+          <li><kbd>Space</kbd>: <span data-ar="إيقاف مؤقت أو استئناف المهمة المحددة." data-en="Pause or resume selected task.">إيقاف مؤقت أو استئناف المهمة المحددة.</span></li>
+          <li><kbd>Delete</kbd>: <span data-ar="إلغاء التنزيل أو حذف المهمة." data-en="Cancel or remove selected task.">إلغاء التنزيل أو حذف المهمة.</span></li>
+          <li><kbd>Ctrl + O</kbd>: <span data-ar="فتح مجلد التنزيلات في مستكشف Windows." data-en="Open Downloads directory in Windows Explorer.">فتح مجلد التنزيلات في مستكشف Windows.</span></li>
+          <li><kbd>Ctrl + ,</kbd>: <span data-ar="فتح شاشة الإعدادات." data-en="Open settings dialog.">فتح شاشة الإعدادات.</span></li>
+          <li><kbd>Esc</kbd>: <span data-ar="إغلاق أي نافذة منبثقة." data-en="Close dialog or cancel input.">إغلاق أي نافذة منبثقة.</span></li>
+        </ul>
+
+        <!-- 13. Data Locations -->
+        <h2 id="data-locations" data-ar="13. مكان البيانات على جهازك" data-en="13. Data Storage Locations">13. مكان البيانات على جهازك</h2>
+        <p data-ar="يحترم سيل خصوصيتك تمامًا ولا يبعثر ملفاته في أماكن خفية:" data-en="Sayl keeps its data transparent and self-contained on your PC:">يحترم سيل خصوصيتك تمامًا ولا يبعثر ملفاته في أماكن خفية:</p>
+        <ul>
+          <li data-ar="<strong>الإعدادات وقاعدة البيانات:</strong> تُحفظ في المسار القياسي لويندوز:<br><code>%APPDATA%\SAYL\</code><br>ويحتوي على ملف <code>settings.json</code> ومجلد السجلات وقاعدة البيانات <code>store\</code>." data-en="<strong>Settings & Store:</strong> Saved in standard Windows app data:<br><code>%APPDATA%\SAYL\</code><br>containing <code>settings.json</code> and the <code>store\</code> directory."><strong>الإعدادات وقاعدة البيانات:</strong> تُحفظ في المسار القياسي لويندوز:<br><code>%APPDATA%\SAYL\</code><br>ويحتوي على ملف <code>settings.json</code> ومجلد السجلات وقاعدة البيانات <code>store\</code>.</li>
+          <li data-ar="<strong>الملفات المكتملة:</strong> تستقر في مجلدك المعتاد <code>%USERPROFILE%\Downloads\</code> (أو المسار الذي حددته في الإعدادات)." data-en="<strong>Completed Files:</strong> Located in <code>%USERPROFILE%\Downloads\</code> or your custom directory."><strong>الملفات المكتملة:</strong> تستقر في مجلدك المعتاد <code>%USERPROFILE%\Downloads\</code> (أو المسار الذي حددته في الإعدادات).</li>
+          <li data-ar="<strong>الملفات المؤقتة (.part):</strong> توجد بجانب الملف المنزّل أثناء التحميل وتُزال تلقائيًا بعد اكتماله." data-en="<strong>Partial Files (.part):</strong> Kept next to download destination until 100% complete."><strong>الملفات المؤقتة (.part):</strong> توجد بجانب الملف المنزّل أثناء التحميل وتُزال تلقائيًا بعد اكتماله.</li>
+          <li data-ar="<strong>حذف البيانات تمامًا:</strong> إذا رغبت في محو كل أثر للبرنامج، أغلق سيل ثم احذف مجلد <code>%APPDATA%\SAYL\</code> فقط." data-en="<strong>Complete Cleanup:</strong> To erase all data, simply delete <code>%APPDATA%\SAYL\</code>."><strong>حذف البيانات تمامًا:</strong> إذا رغبت في محو كل أثر للبرنامج، أغلق سيل ثم احذف مجلد <code>%APPDATA%\SAYL\</code> فقط.</li>
+        </ul>
+
+        <!-- 14. Building from Source -->
+        <h2 id="build" data-ar="14. بناء سيل من المصدر" data-en="14. Building Sayl from Source">14. بناء سيل من المصدر</h2>
+        <p data-ar="كود سيل متاح للجميع، ويمكنك بناؤه وفحص كوده بنفسك:" data-en="Sayl's source code is fully available; you can compile and audit it locally:">كود سيل متاح للجميع، ويمكنك بناؤه وفحص كوده بنفسك:</p>
+        <ol class="steps">
+          <li data-ar="<strong>المتطلبات الأساسية:</strong><br>• نظام Windows 10 أو 11 (x64)<br>• Rust (سلسلة أدوات GNU: <code>stable-x86_64-pc-windows-gnu</code>)<br>• Node.js 18 أو أحدث مع npm" data-en="<strong>Prerequisites:</strong><br>• Windows 10/11 x64<br>• Rust GNU toolchain: <code>stable-x86_64-pc-windows-gnu</code><br>• Node.js 18+ with npm"><strong>المتطلبات الأساسية:</strong><br>• نظام Windows 10 أو 11 (x64)<br>• Rust (سلسلة أدوات GNU: <code>stable-x86_64-pc-windows-gnu</code>)<br>• Node.js 18 أو أحدث مع npm</li>
+          <li data-ar="<strong>إعداد البيئة في PowerShell:</strong><br><code>$env:RUSTFLAGS = &quot;-C linker=rust-lld&quot;</code>" data-en="<strong>Setup Environment in PowerShell:</strong><br><code>$env:RUSTFLAGS = &quot;-C linker=rust-lld&quot;</code>"><strong>إعداد البيئة في PowerShell:</strong><br><code>$env:RUSTFLAGS = "-C linker=rust-lld"</code></li>
+          <li data-ar="<strong>فحص الشفرة وتشغيل الاختبارات:</strong><br><code>cargo check --workspace</code><br><code>cargo test --workspace</code>" data-en="<strong>Run Checks and Test Suite:</strong><br><code>cargo check --workspace</code><br><code>cargo test --workspace</code>"><strong>فحص الشفرة وتشغيل الاختبارات:</strong><br><code>cargo check --workspace</code><br><code>cargo test --workspace</code></li>
+          <li data-ar="<strong>بناء واجهة سطح المكتب (Tauri):</strong><br><code>cd apps/desktop</code><br><code>npm install</code><br><code>npm run tauri build</code>" data-en="<strong>Build Desktop UI (Tauri):</strong><br><code>cd apps/desktop</code><br><code>npm install</code><br><code>npm run tauri build</code>"><strong>بناء واجهة سطح المكتب (Tauri):</strong><br><code>cd apps/desktop</code><br><code>npm install</code><br><code>npm run tauri build</code></li>
+        </ol>
+
+        <!-- 15. Contributing Code -->
+        <h2 id="contribute" data-ar="15. المساهمة في الكود" data-en="15. Contributing Code">15. المساهمة في الكود</h2>
+        <p data-ar="نرحب بمساهمات المطورين لتحسين سيل. قبل إرسال طلب سحب (Pull Request)، يرجى مراعاة التالي:" data-en="Contributions are welcome. Before submitting a Pull Request, please ensure:">نرحب بمساهمات المطورين لتحسين سيل. قبل إرسال طلب سحب (Pull Request)، يرجى مراعاة التالي:</p>
+        <ul>
+          <li data-ar="تأكد من نجاح كافة اختبارات مساحة العمل الحتمية عبر <code>cargo test --workspace</code>." data-en="All deterministic workspace tests pass cleanly via <code>cargo test --workspace</code>.">تأكد من نجاح كافة اختبارات مساحة العمل الحتمية عبر <code>cargo test --workspace</code>.</li>
+          <li data-ar="احرص على تنسيق الشفرة بالمعيار المعتمد عبر <code>cargo fmt --all</code>." data-en="Code is formatted according to standard formatting using <code>cargo fmt --all</code>.">احرص على تنسيق الشفرة بالمعيار المعتمد عبر <code>cargo fmt --all</code>.</li>
+          <li data-ar="التزم بصيغة رسائل الكوميت الإنجليزية القياسية (مثال: <code>fix(http): handle chunk timeout gracefully</code>)." data-en="Use standard imperative commit messages (e.g., <code>fix(http): handle chunk timeout gracefully</code>).">التزم بصيغة رسائل الكوميت الإنجليزية القياسية (مثال: <code>fix(http): handle chunk timeout gracefully</code>).</li>
+          <li data-ar="راجع ملف <code>CONTRIBUTING.md</code> في المستودع للمزيد من التفاصيل." data-en="Consult <code>CONTRIBUTING.md</code> in the repository for full guidelines.">راجع ملف <code>CONTRIBUTING.md</code> في المستودع للمزيد من التفاصيل.</li>
+        </ul>
+
+        <!-- 16. Reporting Issues -->
+        <h2 id="issues" data-ar="16. الإبلاغ عن مشكلة" data-en="16. Reporting Issues">16. الإبلاغ عن مشكلة</h2>
+        <p data-ar="إذا واجهتك مشكلة أثناء التنزيل أو خطأ غير متوقع:" data-en="If you encounter a bug or unexpected behavior:">إذا واجهتك مشكلة أثناء التنزيل أو خطأ غير متوقع:</p>
+        <ul>
+          <li data-ar="<strong>الأخطاء والمقترحات العامة:</strong> افتح تذكرة على <a href='https://github.com/athar-studios/sayl/issues' target='_blank'>GitHub Issues</a> مستخدمًا قوالب البلاغات المتوفرة، واذكر نوع الرابط والخطأ الذي ظهر لك." data-en="<strong>General Bugs & Features:</strong> Open an issue on <a href='https://github.com/athar-studios/sayl/issues' target='_blank'>GitHub Issues</a> using our issue templates."><strong>الأخطاء والمقترحات العامة:</strong> افتح تذكرة على <a href="https://github.com/athar-studios/sayl/issues" target="_blank">GitHub Issues</a> مستخدمًا قوالب البلاغات المتوفرة، واذكر نوع الرابط والخطأ الذي ظهر لك.</li>
+          <li data-ar="<strong>الثغرات الأمنية:</strong> إذا اكتشفت ثغرة أمنية تمس سلامة المستخدمين، يرجى عدم نشرها في العلن والرجوع إلى إرشادات ملف <code>SECURITY.md</code> للإبلاغ السري والمسؤول." data-en="<strong>Security Vulnerabilities:</strong> Please report security concerns privately per the instructions in <code>SECURITY.md</code>."><strong>الثغرات الأمنية:</strong> إذا اكتشفت ثغرة أمنية تمس سلامة المستخدمين، يرجى عدم نشرها في العلن والرجوع إلى إرشادات ملف <code>SECURITY.md</code> للإبلاغ السري والمسؤول.</li>
+        </ul>
+
+        <!-- 17. Plugins Section (Explicitly Roadmap) -->
+        <h2 id="plugins" data-ar="17. الإضافات (Plugins)" data-en="17. Plugins">17. الإضافات (Plugins)</h2>
+        <div class="note note-teal">
+          <strong data-ar="في خطة التطوير — غير متوفرة حاليًا:" data-en="Roadmap Feature — Not Yet Available in v0.1.0:">في خطة التطوير — غير متوفرة حاليًا:</strong><br>
+          <span data-ar="نظام الإضافات (Plugins) ميزة مدرجة في خطة الإصدارات المستقبلية للمشروع (المقررة للإصدار v0.5.0 عبر بيئة WebAssembly آمنة). في الإصدار الحالي (v0.1.0) لا يوجد أي نظام للإضافات أو واجهات برمجية (APIs) لتشغيل إضافات خارجية، ولن نضع واجهات وهمية غير منفذة. تابع تحديثات المستودع لمعرفة موعد إطلاقها." data-en="A sandboxed WebAssembly plugin runtime is planned for future milestones (targeted for v0.5.0). In the current release (v0.1.0), plugin APIs do not exist yet. Follow our GitHub releases for roadmap progress.">نظام الإضافات (Plugins) ميزة مدرجة في خطة الإصدارات المستقبلية للمشروع (المقررة للإصدار v0.5.0 عبر بيئة WebAssembly آمنة). في الإصدار الحالي (v0.1.0) لا يوجد أي نظام للإضافات أو واجهات برمجية (APIs) لتشغيل إضافات خارجية، ولن نضع واجهات وهمية غير منفذة. تابع تحديثات المستودع لمعرفة موعد إطلاقها.</span>
+        </div>
+
+        <!-- 18. Themes Section (Explicitly Roadmap) -->
+        <h2 id="themes" data-ar="18. السمات (Themes)" data-en="18. Themes">18. السمات (Themes)</h2>
+        <div class="note note-teal">
+          <strong data-ar="في خطة التطوير — غير متوفرة حاليًا:" data-en="Roadmap Feature — Not Yet Available in v0.1.0:">في خطة التطوير — غير متوفرة حاليًا:</strong><br>
+          <span data-ar="يتضمن سيل حاليًا وضعين رسميين متقنين: الوضع الفاتح والوضع الداكن، مع إمكانية التبديل التلقائي مع النظام. أما إمكانية استيراد سمات خارجية مخصصة أو تركيب حزم ألوان مخصصة (Custom Community Themes)، فهي ميزة مجدولة في خطة التطوير اللاحقة وغير متاحة بعد في v0.1.0." data-en="Sayl currently features two built-in official themes: Dark and Light, plus automatic system switching. Custom user-created theme packs and catalogs are planned for upcoming releases and are not part of v0.1.0.">يتضمن سيل حاليًا وضعين رسميين متقنين: الوضع الفاتح والوضع الداكن، مع إمكانية التبديل التلقائي مع النظام. أما إمكانية استيراد سمات خارجية مخصصة أو تركيب حزم ألوان مخصصة (Custom Community Themes)، فهي ميزة مجدولة في خطة التطوير اللاحقة وغير متاحة بعد في v0.1.0.</span>
+        </div>
+
+        <!-- 19. FAQ -->
+        <h2 id="faq" data-ar="19. الأسئلة الشائعة" data-en="19. Frequently Asked Questions">19. الأسئلة الشائعة</h2>
+        <details open>
+          <summary data-ar="هل ينزّل سيل مقاطع يوتيوب أو مواقع الفيديو حاليًا؟" data-en="Does Sayl download videos from YouTube right now?">هل ينزّل سيل مقاطع يوتيوب أو مواقع الفيديو حاليًا؟</summary>
+          <p data-ar="ليس في الإصدار الحالي 0.1.0. ميزة تنزيل الفيديو واختيار الدقة مدمجة في خطة الإصدار 0.2.0 القادم عبر أداتي yt-dlp وFFmpeg دون الحاجة لتثبيتهما يدويًا." data-en="Not in v0.1.0. Full video stream extraction and quality selection are scheduled for v0.2.0.">ليس في الإصدار الحالي 0.1.0. ميزة تنزيل الفيديو واختيار الدقة مدمجة في خطة الإصدار 0.2.0 القادم عبر أداتي yt-dlp وFFmpeg دون الحاجة لتثبيتهما يدويًا.</p>
+        </details>
+        <details>
+          <summary data-ar="هل يجمع سيل أي بيانات عن استخدامي أو روابطي؟" data-en="Does Sayl collect any analytics or link telemetry?">هل يجمع سيل أي بيانات عن استخدامي أو روابطي؟</summary>
+          <p data-ar="لا على الإطلاق. سيل لا يحتوي على أي كود تتبع (No Telemetry)، ولا يرسل إحصاءات، ولا يطلب حسابًا، ولا يتصل بأي خوادم وسيطة تخصنا. الاتصال يتم مباشرة بين حاسوبك والسيرفر الذي تنزل منه فقط." data-en="Zero telemetry. Sayl has no analytics, no account requirements, and no intermediate proxy servers. All traffic goes directly from your PC to the download host.">لا على الإطلاق. سيل لا يحتوي على أي كود تتبع (No Telemetry)، ولا يرسل إحصاءات، ولا يطلب حسابًا، ولا يتصل بأي خوادم وسيطة تخصنا. الاتصال يتم مباشرة بين حاسوبك والسيرفر الذي تنزل منه فقط.</p>
+        </details>
+        <details>
+          <summary data-ar="توقّف التنزيل عند نسبة معينة، فماذا أفعل؟" data-en="A download stalled at a certain percentage, what should I do?">توقّف التنزيل عند نسبة معينة، فماذا أفعل؟</summary>
+          <p data-ar="اضغط زر «إيقاف مؤقت» ثم «استئناف». إذا كان الخادم لا يدعم الاستئناف وأصدر رابطًا مؤقتًا انتهى وقته، يمكنك نسخ الرابط الجديد وإضافته مجددًا." data-en="Press Pause and then Resume. If the server issued a temporary token that expired, copy the fresh URL to restart.">اضغط زر «إيقاف مؤقت» ثم «استئناف». إذا كان الخادم لا يدعم الاستئناف وأصدر رابطًا مؤقتًا انتهى وقته، يمكنك نسخ الرابط الجديد وإضافته مجددًا.</p>
+        </details>
+        <details>
+          <summary data-ar="هل يدعم سيل التورنت والروابط المغناطيسية (Magnet)؟" data-en="Does Sayl support BitTorrent or Magnet links?">هل يدعم سيل التورنت والروابط المغناطيسية (Magnet)؟</summary>
+          <p data-ar="بروتوكول التورنت مجدول لإصدار مستقبلي (v0.4.0) باستخدام محرك librqbit المكتوب بلغة Rust. الإصدار الحالي مخصص لتنزيلات الويب المباشرة HTTP/HTTPS." data-en="BitTorrent protocol support is on the roadmap for v0.4.0 via librqbit. v0.1.0 focuses exclusively on direct HTTP/HTTPS downloads.">بروتوكول التورنت مجدول لإصدار مستقبلي (v0.4.0) باستخدام محرك librqbit المكتوب بلغة Rust. الإصدار الحالي مخصص لتنزيلات الويب المباشرة HTTP/HTTPS.</p>
+        </details>
+      </article>
+    </div>
+    <footer>
+      <div class="footer-wrap">
+        <div class="footer-brand">
+          <img class="footer-logo" src="/icon.svg" alt="سيل" width="54" height="38">
+          <span><strong>سيل · SAYL</strong></span>
+        </div>
+        <div class="footer-links">
+          <a href="/docs">التوثيق</a>
+          <a href="/faq">الأسئلة الشائعة</a>
+          <a href="/compare">مقارنة البرامج</a>
+          <a href="/idm-alternative">بديل IDM</a>
+          <a href="/free-download-manager-windows">تحميل لويندوز</a>
+          <a href="/plugins">الإضافات</a>
+          <a href="/themes">السمات</a>
+          <a href="/about">عن الاستوديو</a>
+          <a href="/support">ادعمنا</a>
+          <a href="/privacy">الخصوصية</a>
+          <a href="/terms">الشروط</a>
+          <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </div>
+      </div>
+      <div style="margin-top:20px;text-align:center;color:#6b80ad;font-size:0.85rem">
+        استوديو أثر · مرخّص بموجب رخصة PolyForm Noncommercial 1.0.0 · بدون إعلانات ولا تتبّع
+      </div>
+    </footer>
+  </div>
+
+  <script src="/flow.js" defer></script>
+  <script src="/site.js" defer></script>
+</body>
+</html>

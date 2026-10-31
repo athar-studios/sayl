@@ -80,13 +80,22 @@ fn test_reopen_after_writes_preserves_identical_records() {
         let store = Store::open(dir.path()).expect("reopen store");
         assert_eq!(store.stats().records, 2);
 
-        let recovered1 = store.get_task(id1).expect("get task 1").expect("task 1 exists");
-        let recovered2 = store.get_task(id2).expect("get task 2").expect("task 2 exists");
+        let recovered1 = store
+            .get_task(id1)
+            .expect("get task 1")
+            .expect("task 1 exists");
+        let recovered2 = store
+            .get_task(id2)
+            .expect("get task 2")
+            .expect("task 2 exists");
 
         assert_eq!(recovered1, task1);
         assert_eq!(recovered2, task2);
 
-        let recovered_cp = store.load_checkpoint(id1).expect("load cp").expect("cp exists");
+        let recovered_cp = store
+            .load_checkpoint(id1)
+            .expect("load cp")
+            .expect("cp exists");
         assert_eq!(recovered_cp, cp1);
 
         let all = store.list_tasks().expect("list tasks");
@@ -127,15 +136,23 @@ fn test_truncated_tail_recovery_ignores_corrupt_tail_and_recovers_intact_records
         let store = Store::open(dir.path()).expect("reopen store with truncated tail succeeds");
         assert_eq!(store.stats().records, 2);
 
-        let r1 = store.get_task(id1).expect("get task 1").expect("task 1 intact");
-        let r2 = store.get_task(id2).expect("get task 2").expect("task 2 intact");
+        let r1 = store
+            .get_task(id1)
+            .expect("get task 1")
+            .expect("task 1 intact");
+        let r2 = store
+            .get_task(id2)
+            .expect("get task 2")
+            .expect("task 2 intact");
         assert_eq!(r1, task1);
         assert_eq!(r2, task2);
 
         // Subsequent writes after recovery must work seamlessly
         let task3 = TaskRecord::new("https://example.com/c.iso", "C:\\dl", "c.iso");
         let id3 = task3.id;
-        store.upsert_task(&task3).expect("upsert task 3 after recovery");
+        store
+            .upsert_task(&task3)
+            .expect("upsert task 3 after recovery");
         assert_eq!(store.stats().records, 3);
         assert_eq!(store.get_task(id3).expect("get task 3").unwrap(), task3);
     }
@@ -239,7 +256,11 @@ fn test_multi_range_checkpoint_roundtrips_exactly() {
     let dir = test_temp_dir();
     let store = Store::open(dir.path()).expect("open store");
 
-    let task = TaskRecord::new("https://example.com/large.iso", PathBuf::from("C:\\dl"), "large.iso");
+    let task = TaskRecord::new(
+        "https://example.com/large.iso",
+        PathBuf::from("C:\\dl"),
+        "large.iso",
+    );
     let task_id = task.id;
     store.upsert_task(&task).expect("upsert task");
 
@@ -256,7 +277,10 @@ fn test_multi_range_checkpoint_roundtrips_exactly() {
     store.save_checkpoint(&checkpoint).expect("save checkpoint");
 
     // Load from active store
-    let loaded = store.load_checkpoint(task_id).expect("load cp").expect("cp exists");
+    let loaded = store
+        .load_checkpoint(task_id)
+        .expect("load cp")
+        .expect("cp exists");
     assert_eq!(loaded, checkpoint);
     assert_eq!(loaded.range_map, ranges);
 
@@ -265,7 +289,10 @@ fn test_multi_range_checkpoint_roundtrips_exactly() {
     drop(store);
 
     let reopened = Store::open(dir.path()).expect("reopen store");
-    let loaded_reopened = reopened.load_checkpoint(task_id).expect("load cp").expect("cp exists");
+    let loaded_reopened = reopened
+        .load_checkpoint(task_id)
+        .expect("load cp")
+        .expect("cp exists");
     assert_eq!(loaded_reopened, checkpoint);
     assert_eq!(loaded_reopened.range_map, ranges);
 }
@@ -296,7 +323,10 @@ fn test_ten_thousand_upserts_and_query_correctness_under_five_seconds() {
 
     // Verify sample correctness
     for sampled_id in sampled_ids {
-        let task = store.get_task(sampled_id).expect("get_task").expect("sampled task exists");
+        let task = store
+            .get_task(sampled_id)
+            .expect("get_task")
+            .expect("sampled task exists");
         assert_eq!(task.id, sampled_id);
     }
 

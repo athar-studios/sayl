@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.1.0] - (Windows-only, unreleased / in-progress)
+
+> **Status:** In active development (Windows-only). Not released. Packaging and installers are blocked pending Windows SDK availability.
+
+### Scope Summary
+- **Core Engine:** Pure Rust multi-part download engine featuring parallel ranged downloads, validator-safe resume (`ETag` / `If-Range`), crash recovery via append-only journaling (`journal.jsonl`) and atomic snapshot compaction, and concurrency scheduling.
+- **Command-Line Interface (`sayl-cli`):** Standalone `sayl` CLI supporting `add`, `start` (with resume capability), `list`, `info`, `pause`, `cancel`, `remove`, `recover`, and live JSON `events` streaming.
+- **Tauri Desktop UI (`apps/desktop`):** Tauri 2 + Svelte 5 application supporting link addition, lifecycle controls (pause / resume / cancel), live progress streaming, configuration settings, and native Arabic (RTL) alongside English.
+- **Browser Extension:** Chromium / Microsoft Edge Manifest V3 extension integrating with the local application via secure Native Messaging.
+- **Packaging & Distribution:** NSIS and WiX MSI installer configurations alongside `SHA256SUMS.txt` manifest generation (packaging currently blocked on the missing Windows SDK environment).
+- **Website & Documentation:** Zero-tracking static documentation and download portal at `sayl.site` with governance and usage guides.
+
 ### Added
 
 #### CORE-001: Core Domain Engine & State Machine
@@ -20,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### TEST-001: Deterministic HTTP Fixture Server
 - Implemented `sayl-test-http` in-memory test fixture server binding strictly to `127.0.0.1:0`.
-- Simulated all 27 failure modes and protocol edge cases specified in MASTER-PLAN §8 (including `Ok206`, `NoAcceptRanges`, `IgnoredRange200`, `BadContentRange`, `BodyTruncation`, `ConnectionReset`, `ETagChanged`, `WeakETagOnly`, `NoValidator`, `416RangeNotSatisfiable`, `HeadRejected`, `UnknownSize`, `EmptyFile`, `UnexpectedEncoding`, `429RetryAfter`, `RedirectWithSecrets`, `NoSpace`, `PermissionDenied`, `MaliciousFilename`, `PauseCancelDuringProbe`, `SlowWorker`, `OldLease`, `RecoveryAtFinalize`, `ProxyTLS`, `LimitsOrigin`, `FileTruncation`, `Pooling`).
+- Simulated all 27 failure modes and protocol edge cases (including `Ok206`, `NoAcceptRanges`, `IgnoredRange200`, `BadContentRange`, `BodyTruncation`, `ConnectionReset`, `ETagChanged`, `WeakETagOnly`, `NoValidator`, `416RangeNotSatisfiable`, `HeadRejected`, `UnknownSize`, `EmptyFile`, `UnexpectedEncoding`, `429RetryAfter`, `RedirectWithSecrets`, `NoSpace`, `PermissionDenied`, `MaliciousFilename`, `PauseCancelDuringProbe`, `SlowWorker`, `OldLease`, `RecoveryAtFinalize`, `ProxyTLS`, `LimitsOrigin`, `FileTruncation`, `Pooling`).
 - Implemented deterministic byte generator `BodyGenerator` with pattern verification and request audit log.
 - Verified with 25 passing unit and integration tests.
 

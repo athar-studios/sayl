@@ -1,0 +1,38 @@
+{
+  "extension_name": {
+    "message": "سيل",
+    "description": "اسم الإضافة كما يظهر في المتصفح"
+  },
+  "extension_description": {
+    "message": "أرسل التنزيلات إلى سيل. وعند إغلاق سيل، يواصل المتصفح التنزيل كما هو معتاد.",
+    "description": "وصف الإضافة كما يظهر في المتصفح"
+  },
+  "context_menu_download": {
+    "message": "التحميل باستخدام سيل",
+    "description": "خيار قائمة الكليك يمين على الروابط (واجهة عربية)"
+  },
+  "action_title": {
+    "message": "سيل",
+    "description": "تلميح زر شريط الأدوات"
+  },
+  "notify_accepted_title": {
+    "message": "تم قبول التنزيل",
+    "description": "عنوان الإشعار عند تحويل التنزيل إلى سيل"
+  },
+  "notify_error_title": {
+    "message": "تعذر الاتصال بسيل",
+    "description": "عنوان الإشعار عند حدوث خطأ في المضيف"
+  },
+  "status_connected": {
+    "message": "متصلة",
+    "description": "كلمة الحالة عندما يكون سيل متصلًا"
+  },
+  "status_not_installed": {
+    "message": "غير مثبتة",
+    "description": "كلمة الحالة عندما يتعذر الوصول إلى سيل"
+  },
+  "status_app_disconnected": {
+    "message": "غير متصلة",
+    "description": "كلمة الحالة عندما يكون سيل غير قيد التشغيل"
+  }
+}

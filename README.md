@@ -10,14 +10,14 @@
 
 [![CI](https://github.com/athar-studios/sayl/actions/workflows/ci.yml/badge.svg)](https://github.com/athar-studios/sayl/actions)
 [![Latest Release](https://img.shields.io/github/v/release/athar-studios/sayl?color=00B6BD&label=%D8%A7%D9%84%D8%A5%D8%B5%D8%AF%D8%A7%D8%B1)](https://github.com/athar-studios/sayl/releases/latest)
-[![License](https://img.shields.io/badge/%D8%A7%D9%84%D8%B1%D8%AE%D8%B5%D8%A9-Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/%D8%A7%D9%84%D8%B1%D8%AE%D8%B5%D8%A9-PolyForm%20Noncommercial%201.0.0-blue.svg)](LICENSE)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-%D8%A7%D8%AF%D8%B9%D9%85%D9%86%D8%A7-orange.svg)](https://ko-fi.com/athar_studio)
 
-**سيل مدير تنزيلات سريع وخفيف لنظام Windows، مبني بلغة Rust وواجهة سطح مكتب حديثة، مفتوح المصدر بالكامل، ويحترم خصوصيتك بلا إعلانات ولا تتبّع.**
+**سيل مدير تنزيلات سريع وخفيف لنظام Windows، مبني بلغة Rust وواجهة سطح مكتب حديثة، مصدره متاح للجميع، ومجاني للاستخدام الشخصي وغير التجاري، ويحترم خصوصيتك بلا إعلانات ولا تتبّع.**
 
 <br>
 
-<img src="docs/ui-mockups/01-main-light-ar.png" alt="واجهة برنامج سيل الرئيسية" width="880">
+<img src="docs/screenshots/main-window-ar.png" alt="واجهة برنامج سيل الرئيسية" width="880">
 
 </div>
 
@@ -45,7 +45,7 @@
 
 > **ملاحظة حول تنبيه Windows SmartScreen:**  
 > نظرًا لأن سيل مشروع مجاني حديث ولا نملك بعد شهادة توقيع رقمي تجارية باهظة (EV Certificate)، قد يعرض نظام ويندوز نافذة زرقاء تفيد بأن «التطبيق غير معروف».  
-> لتشغيل البرنامج: اضغط على **«مزيد من المعلومات» (More info)** ثم اختر **«التشغيل على أي حال» (Run anyway)**. كود سيل مفتوح بالكامل ويمكنك مراجعته بنفسك للتأكد من أمانه.
+> لتشغيل البرنامج: اضغط على **«مزيد من المعلومات» (More info)** ثم اختر **«التشغيل على أي حال» (Run anyway)**. كود سيل متاح بالكامل (source-available) ويمكنك مراجعته بنفسك للتأكد من أمانه.
 
 ---
 
@@ -125,7 +125,7 @@ npm run tauri build
 
 ## ادعم سيل
 
-سيل مجاني وسيبقى دائمًا مجانيًا ومفتوح المصدر. إذا وجدت البرنامج مفيدًا وترغب في دعم استمراره وتطوير ميزاته القادمة، يمكنك دعمنا بأي مبلغ عبر منصة كوفي:
+سيل مجاني للاستخدام الشخصي وسيبقى كذلك، وكوده متاح للجميع. إذا وجدت البرنامج مفيدًا وترغب في دعم استمراره وتطوير ميزاته القادمة، يمكنك دعمنا بأي مبلغ عبر منصة كوفي:
 
 ☕ **[ادعمنا على Ko-fi](https://ko-fi.com/athar_studio)**
 
@@ -133,4 +133,8 @@ npm run tauri build
 
 ## الرخصة
 
-سيل منشور ومتاح بموجب ترخيص **[Apache-2.0](LICENSE)**.
+سيل منشور بموجب رخصة **[PolyForm Noncommercial 1.0.0](LICENSE)**.
+
+- الكود متاح للجميع للاطلاع والتعديل.
+- الاستخدام مجاني للأفراد ولأي غرض غير تجاري.
+- الاستخدام التجاري يحتاج إذنًا مكتوبًا منا. للتواصل: contact@atharapp.download

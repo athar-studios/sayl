@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sayl vs IDM vs Flow: Honest Comparison</title>
+  <meta name="description" content="A factual, verifiable comparison between Sayl, IDM, and Flow: pricing, licensing, multi-threaded speed, and privacy.">
+  <meta name="theme-color" content="#070F2E">
+  <link rel="canonical" href="https://sayl.site/en/compare">
+  <link rel="alternate" hreflang="ar" href="https://sayl.site/compare">
+  <link rel="alternate" hreflang="en" href="https://sayl.site/en/compare">
+  <link rel="alternate" hreflang="x-default" href="https://sayl.site/compare">
+
+  <!-- Favicons & App Icons (?v=2) -->
+  <link rel="icon" href="/favicon.ico?v=2" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
+  <link rel="manifest" href="/site.webmanifest">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:site_name" content="سيل · SAYL">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sayl.site/en/compare">
+  <meta property="og:title" content="Sayl vs IDM vs Flow: Honest Comparison">
+  <meta property="og:description" content="A factual, verifiable comparison between Sayl, IDM, and Flow: pricing, licensing, multi-threaded speed, and privacy.">
+  <meta property="og:image" content="https://sayl.site/og-image-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Sayl vs IDM vs Flow: Honest Comparison">
+  <meta name="twitter:description" content="A factual, verifiable comparison between Sayl, IDM, and Flow: pricing, licensing, multi-threaded speed, and privacy.">
+  <meta name="twitter:image" content="https://sayl.site/og-image-en.png">
+
+  <!-- Preload Fonts & Stylesheet -->
+  <link rel="preload" href="/fonts/IBMPlexSansArabic-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/IBMPlexSansArabic-Bold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Athar Studio",
+    "url": "https://sayl.site",
+    "logo": "https://sayl.site/icon-512.png",
+    "sameAs": [
+      "https://github.com/athar-studios",
+      "https://ko-fi.com/athar_studio"
+    ]
+  }
+  </script>
+</head>
+<body class="page-inner">
+  <canvas id="flow" aria-hidden="true"></canvas>
+  <div class="lang-modal-overlay" id="lang-modal" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
+    <div class="lang-modal-card">
+      <img src="/favicon.svg?v=2" alt="Sayl logo" width="56" height="38" style="margin-bottom:12px">
+      <h2 id="lang-modal-title">Choose Language · اختر لغة الموقع</h2>
+      <p>You can toggle your preferred language anytime from the header button.</p>
+      <div class="lang-choices">
+        <button type="button" class="lang-choice-btn" data-choose-lang="ar">
+          <strong>العربية</strong>
+          <small>Arabic RTL Interface</small>
+        </button>
+        <button type="button" class="lang-choice-btn primary" data-choose-lang="en">
+          <strong>English</strong>
+          <small>Default English experience</small>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <header>
+      <a href="/en" class="brand" aria-label="Sayl - Home">
+        <img class="brand-logo" src="/icon.svg" alt="Sayl" width="57" height="40">
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="/en/docs">Docs</a>
+        <a href="/en#features" class="hide-mobile">Features</a>
+        <a href="/en/faq">FAQ</a>
+        <a href="/en/compare" class="active">Compare</a>
+        <a href="/en/plugins">Plugins</a>
+        <a href="/en/support">Support</a>
+      </nav>
+      <div class="header-actions">
+        <a href="/compare" class="lang-btn" aria-label="التبديل إلى العربية">العربية</a>
+      </div>
+    </header>
+    <main class="page-shell" style="max-width:980px">
+      <article class="page-card">
+        <h1>Sayl vs IDM vs Flow: Factual Comparison</h1>
+        <p class="lead" style="color:#b9c8e6;font-size:1.15rem;margin-bottom:28px">An honest, verified comparison between Sayl, Internet Download Manager (IDM), and Flow across pricing, architecture, and feature sets.</p>
+
+        <div class="table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th style="width:26%">Feature</th>
+                <th style="width:28%;color:var(--teal)">Sayl</th>
+                <th style="width:23%">IDM</th>
+                <th style="width:23%">Flow</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Pricing & Licensing Model</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">100% Free forever without limits</td>
+                <td>Commercial (30-day trial, then $24.95/yr or $38 lifetime)</td>
+                <td>Freemium / Proprietary</td>
+              </tr>              <tr>
+                <td><strong>Source Code & Auditability</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Source-available, free for non-commercial use (PolyForm Noncommercial 1.0.0)</td>
+                <td>Closed Source (Proprietary)</td>
+                <td>Closed Source (Proprietary)</td>
+              </tr>              <tr>
+                <td><strong>Arabic Support & RTL Layout</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Native Arabic-first RTL alongside English</td>
+                <td>Basic translation with legacy LTR dialogs</td>
+                <td>English-first (Limited/no Arabic)</td>
+              </tr>              <tr>
+                <td><strong>Supported Platforms</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Windows 10 & 11 (64-bit)</td>
+                <td>Windows (All versions)</td>
+                <td>Windows & macOS</td>
+              </tr>              <tr>
+                <td><strong>Parallel Segmented Acceleration</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Yes (Concurrent multi-stream chunks)</td>
+                <td>Yes (Dynamic segmentation up to 32)</td>
+                <td>Yes (Multi-part downloads)</td>
+              </tr>              <tr>
+                <td><strong>Atomic Resume & ETag Validation</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Yes (ETag check + atomic .part files)</td>
+                <td>Yes (Reliable resume for supported links)</td>
+                <td>Yes (Resume capability)</td>
+              </tr>              <tr>
+                <td><strong>Browser Integration</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Manifest V3 extension (Chrome, Edge, Brave)</td>
+                <td>Broad browser integration modules</td>
+                <td>Chrome and Firefox extensions</td>
+              </tr>              <tr>
+                <td><strong>Standalone CLI Tool</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Yes (Native standalone sayl.exe with JSON)</td>
+                <td>Command line launch parameters</td>
+                <td>Not available</td>
+              </tr>              <tr>
+                <td><strong>Video Stream Extraction</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Scheduled for v0.2.0 (yt-dlp integration)</td>
+                <td>Available (Floating video grabber)</td>
+                <td>Available for selected sites</td>
+              </tr>              <tr>
+                <td><strong>Plugin & Theme Architecture</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Planned for v0.2.0 (Open modular plugins)</td>
+                <td>Proprietary without public plugin API</td>
+                <td>Not available</td>
+              </tr>              <tr>
+                <td><strong>Privacy & Zero Telemetry</strong></td>
+                <td style="color:#7fe9ec;background:rgba(0,182,189,0.06)">Zero telemetry, zero ads, no remote tracking</td>
+                <td>No ads, but connects to verify licenses</td>
+                <td>May include ads or metrics in free tier</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 style="margin-top:40px">Summary: Which one is right for you?</h2>
+        <p>If you value <strong>clean, source-available software</strong>, zero telemetry, no suspicious cracks or serial activations, native Arabic and English support, and rock-solid multi-threaded resumption — Sayl is the cleanest modern choice for Windows.</p>
+        <p>If your daily workflow heavily relies on floating video grabber bars on proprietary streaming sites today, note that Sayl's video extraction integration is arriving in v0.2.0.</p>
+
+        <div class="cta" style="margin-top:32px">
+          <a class="btn pri" href="https://github.com/athar-studios/sayl/releases/latest">Download Sayl (Free)</a>
+          <a class="btn sec" href="/en/docs">Read the Docs</a>
+        </div>
+      </article>
+    </main>
+    <footer>
+      <div class="footer-wrap">
+        <div class="footer-brand">
+          <img class="footer-logo" src="/icon.svg" alt="Sayl" width="54" height="38">
+          <span><strong>Sayl · سيل</strong></span>
+        </div>
+        <div class="footer-links">
+          <a href="/en/docs">Docs</a>
+          <a href="/en/faq">FAQ</a>
+          <a href="/en/compare">Comparison</a>
+          <a href="/en/idm-alternative">IDM Alternative</a>
+          <a href="/en/free-download-manager-windows">Windows FDM</a>
+          <a href="/en/plugins">Plugins</a>
+          <a href="/en/themes">Themes</a>
+          <a href="/en/about">About Studio</a>
+          <a href="/en/support">Support</a>
+          <a href="/en/privacy">Privacy</a>
+          <a href="/en/terms">Terms</a>
+          <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </div>
+      </div>
+      <div style="margin-top:20px;text-align:center;color:#6b80ad;font-size:0.85rem">
+        Athar Studio · Licensed under PolyForm Noncommercial 1.0.0 · Zero tracking & zero telemetry
+      </div>
+    </footer>
+  </div>
+
+  <script src="/flow.js" defer></script>
+  <script src="/site.js" defer></script>
+</body>
+</html>

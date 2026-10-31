@@ -10,11 +10,12 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use sayl_core::id::TaskId;
 use crate::error::{Result, StoreError};
 use crate::record::{Checkpoint, TaskRecord};
+use sayl_core::id::TaskId;
 
 /// Specific mutation operation recorded in the write-ahead journal.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "payload")]
 pub enum JournalOp {
@@ -83,10 +84,13 @@ impl Journal {
     /// Opens or creates a journal at the specified file path.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
+        // The journal is append-only: an existing file is opened without
+        // truncation and new writes start after replay() seeks to the end.
         let file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(&path)?;
 
         let byte_len = file.metadata()?.len();
@@ -147,11 +151,13 @@ impl Journal {
 
         let (entries, stats) = Self::replay_path(&self.path)?;
 
-        // Re-open file in read/write mode
+        // Re-open file in read/write mode (never truncating: replay decides what
+        // stays, and a valid tail may be kept or trimmed below).
         let mut file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(&self.path)?;
 
         if stats.truncated_tail_ignored {
@@ -328,7 +334,8 @@ mod tests {
         // Deliberately append a half-written JSON line directly to the file
         {
             let mut file = OpenOptions::new().append(true).open(&journal_path).unwrap();
-            file.write_all(b"{\"seq\":2,\"op\":{\"type\":\"UpsertTask\",\"payload\":{\"id\":").unwrap();
+            file.write_all(b"{\"seq\":2,\"op\":{\"type\":\"UpsertTask\",\"payload\":{\"id\":")
+                .unwrap();
             file.flush().unwrap();
         }
 

@@ -113,9 +113,16 @@ mod tests {
 
     #[test]
     fn rejects_non_http_schemes() {
-        for bad in ["ftp://example.com/a.zip", "file:///C:/Windows/System32/x.dll", "javascript:alert(1)"] {
+        for bad in [
+            "ftp://example.com/a.zip",
+            "file:///C:/Windows/System32/x.dll",
+            "javascript:alert(1)",
+        ] {
             let err = validate_request_url(bad, true).unwrap_err();
-            assert!(matches!(err, BridgeError::InvalidUrl(_)), "{bad} gave {err:?}");
+            assert!(
+                matches!(err, BridgeError::InvalidUrl(_)),
+                "{bad} gave {err:?}"
+            );
         }
     }
 
@@ -123,7 +130,10 @@ mod tests {
     fn rejects_embedded_credentials() {
         let err = validate_request_url("https://user:secret@example.com/a.zip", false).unwrap_err();
         match err {
-            BridgeError::InvalidUrl(msg) => assert!(!msg.contains("secret"), "message leaked the password: {msg}"),
+            BridgeError::InvalidUrl(msg) => assert!(
+                !msg.contains("secret"),
+                "message leaked the password: {msg}"
+            ),
             other => panic!("expected InvalidUrl, got {other:?}"),
         }
     }
@@ -147,12 +157,20 @@ mod tests {
 
     #[test]
     fn traversal_filenames_are_neutralised_or_rejected() {
-        let cases = ["../../evil.exe", "..\\..\\evil.exe", "C:\\Windows\\evil.dll", ".."];
+        let cases = [
+            "../../evil.exe",
+            "..\\..\\evil.exe",
+            "C:\\Windows\\evil.dll",
+            "..",
+        ];
         for case in cases {
             match validate_suggested_filename(case) {
                 Ok(safe) => {
                     assert!(!safe.contains(".."), "{case} produced {safe}");
-                    assert!(!safe.contains('/') && !safe.contains('\\'), "{case} produced {safe}");
+                    assert!(
+                        !safe.contains('/') && !safe.contains('\\'),
+                        "{case} produced {safe}"
+                    );
                 }
                 Err(BridgeError::PathEscape) => {}
                 Err(other) => panic!("unexpected error for {case}: {other:?}"),

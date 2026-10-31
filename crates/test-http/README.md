@@ -1,6 +1,6 @@
 # `sayl-test-http` — Deterministic HTTP Fixture Server
 
-`sayl-test-http` is an in-memory, deterministic local HTTP fixture server designed for SAYL integration and unit tests without external internet connectivity. It binds exclusively to the local loopback interface (`127.0.0.1:0`) and accurately simulates all 27 download failure modes and protocol edge cases specified in **MASTER-PLAN §8**.
+`sayl-test-http` is an in-memory, deterministic local HTTP fixture server designed for SAYL integration and unit tests without external internet connectivity. It binds exclusively to the local loopback interface (`127.0.0.1:0`) and accurately simulates all 27 download failure modes and protocol edge cases.
 
 ---
 
@@ -26,7 +26,7 @@
 
 ---
 
-## All 27 Failure Modes (MASTER-PLAN §8)
+## All 27 Failure Modes
 
 | # | Scenario Identifier | Status Code | Key Headers & Behavior | Description |
 |---|---|---|---|---|

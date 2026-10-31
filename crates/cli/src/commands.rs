@@ -11,11 +11,7 @@ use crate::output::{self, TaskInfoOutput};
 use crate::progress::ProgressTracker;
 
 /// Resolves a full or prefix TaskId against current store tasks.
-pub fn resolve_task_id(
-    engine: &Engine,
-    prefix: &str,
-    lang: Language,
-) -> Result<TaskId, CliExit> {
+pub fn resolve_task_id(engine: &Engine, prefix: &str, lang: Language) -> Result<TaskId, CliExit> {
     let tasks = engine.list_tasks().map_err(|e| {
         eprintln!("{e}");
         CliExit::StoreIoError
@@ -84,7 +80,11 @@ pub async fn handle_add(engine: &Engine, args: &AddArgs, cli: &Cli) -> Result<Cl
 }
 
 /// Handles `sayl start <ID>` or `sayl start --all`
-pub async fn handle_start(engine: &Engine, args: &StartArgs, cli: &Cli) -> Result<CliExit, CliExit> {
+pub async fn handle_start(
+    engine: &Engine,
+    args: &StartArgs,
+    cli: &Cli,
+) -> Result<CliExit, CliExit> {
     if args.all {
         return handle_start_all(engine, cli).await;
     }
@@ -165,7 +165,9 @@ pub async fn handle_start(engine: &Engine, args: &StartArgs, cli: &Cli) -> Resul
         let res = start_handle.await;
         match res {
             Ok(r) => start_result = Some(r),
-            Err(e) => start_result = Some(Err(sayl_core::error::CoreError::internal(e.to_string()))),
+            Err(e) => {
+                start_result = Some(Err(sayl_core::error::CoreError::internal(e.to_string())))
+            }
         }
     }
 
@@ -202,7 +204,10 @@ pub async fn handle_start(engine: &Engine, args: &StartArgs, cli: &Cli) -> Resul
             _ => {
                 if let Some(Err(e)) = start_result {
                     if !cli.quiet && !cli.json {
-                        eprintln!("{}", messages::task_failed(task_id, &e.to_string(), cli.lang));
+                        eprintln!(
+                            "{}",
+                            messages::task_failed(task_id, &e.to_string(), cli.lang)
+                        );
                     }
                     Ok(CliExit::TaskFailed)
                 } else {

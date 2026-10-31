@@ -58,8 +58,11 @@ impl RetryPolicy {
     /// `[delay/2, delay]`, derived deterministically from the attempt number so a
     /// single run is reproducible.
     pub fn backoff(&self, attempt: u32) -> Duration {
-        let exp = self.base_delay.as_millis().saturating_mul(1u128 << attempt.min(32));
-        let capped = Duration::from_millis(exp.min(self.max_delay.as_millis() as u128) as u64);
+        let exp = self
+            .base_delay
+            .as_millis()
+            .saturating_mul(1u128 << attempt.min(32));
+        let capped = Duration::from_millis(exp.min(self.max_delay.as_millis()) as u64);
         if !self.jitter {
             return capped;
         }
@@ -136,6 +139,18 @@ pub fn status_of(err: &HttpError) -> Option<u16> {
 }
 
 #[cfg(test)]
+impl RetryPolicy {
+    /// Uncapped exponential delay, used by tests to bound jittered values.
+    pub(crate) fn backoff_cap(&self, attempt: u32) -> Duration {
+        let exp = self
+            .base_delay
+            .as_millis()
+            .saturating_mul(1u128 << attempt.min(32));
+        Duration::from_millis(exp.min(self.max_delay.as_millis()) as u64)
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -196,7 +211,10 @@ mod tests {
             policy.delay_for_attempt(0, Some(Duration::from_secs(600))),
             policy.max_delay
         );
-        assert_eq!(policy.delay_for_attempt(2, None), Duration::from_millis(1000));
+        assert_eq!(
+            policy.delay_for_attempt(2, None),
+            Duration::from_millis(1000)
+        );
     }
 
     #[test]
@@ -214,7 +232,10 @@ mod tests {
             assert!(is_retryable_status(status), "{status} should be retryable");
         }
         for status in [200u16, 206, 301, 400, 401, 403, 404, 410, 416] {
-            assert!(!is_retryable_status(status), "{status} must not be retryable");
+            assert!(
+                !is_retryable_status(status),
+                "{status} must not be retryable"
+            );
         }
     }
 
@@ -256,14 +277,5 @@ mod tests {
         };
         assert!(should_retry(&err));
         assert_eq!(status_of(&err), None);
-    }
-}
-
-#[cfg(test)]
-impl RetryPolicy {
-    /// Uncapped exponential delay, used by tests to bound jittered values.
-    pub(crate) fn backoff_cap(&self, attempt: u32) -> Duration {
-        let exp = self.base_delay.as_millis().saturating_mul(1u128 << attempt.min(32));
-        Duration::from_millis(exp.min(self.max_delay.as_millis() as u128) as u64)
     }
 }

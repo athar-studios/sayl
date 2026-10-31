@@ -66,3 +66,51 @@ HKCU\Software\Google\Chrome\NativeMessagingHosts\com.sayl.download
 ## اختبارات
 
 `cargo +stable-x86_64-pc-windows-gnu test -p sayl-bridge` يغطي: الإطار والطول الصفري وفوق السقف والقراءة المقتطعة، JSON تالف، نوع مجهول، جلسة كاملة Ping→Download→Status، رفض الشبكة المحلية والتمكين الصريح لها، حجب بيانات الاعتماد وعدم تسريبها في الخطأ، وتحييد أسماء الملفات المتسللة.
+
+## دليل التشغيل والتثبيت (v0.1.0)
+
+### 1. بناء ثنائية مضيف الرسائل الأصلية (`sayl-bridge`)
+
+```powershell
+$env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+$env:RUSTFLAGS = "-C linker=rust-lld"
+cargo +stable-x86_64-pc-windows-gnu build -p sayl-bridge
+```
+
+المسار الناتج للملف التنفيذي:
+`target\debug\sayl-bridge.exe` (أو `target\release\sayl-bridge.exe` عند البناء بعلم `--release`).
+
+### 2. تحميل الامتداد في متصفح Chromium / Edge
+
+1. افتح صفحة الامتدادات في المتصفح:
+   - Chrome: `chrome://extensions`
+   - Edge: `edge://extensions`
+2. فعّل خيار **وضع مطوّر البرامج** (Developer mode).
+3. انقر على **تحميل حزمة غير مضغوطة** (Load unpacked) واختر المجلد:
+   `extensions/browser/chromium`
+4. انسخ **معرّف الامتداد** (Extension ID) الظاهر في بطاقة الامتداد (مثل `abcdefghijklmnopqrstuvwxyzabcdef`).
+
+### 3. تسجيل المضيف الأصلي عبر سكربت PowerShell
+
+استخدم `tools/register-native-host.ps1` لتسجيل المضيف في الريجستري تحت المستخدم الحالي (`HKCU`):
+
+```powershell
+.\tools\register-native-host.ps1 -HostExe "C:\full\path\to\target\debug\sayl-bridge.exe" -ManifestPath "extensions\browser\host\com.sayl.downloader.json" -ExtensionId "<YOUR_EXTENSION_ID>"
+```
+
+يقوم السكربت بالتحقق من وجود الملف التنفيذي على القرص قبل التسجيل، ثم يربط كلا المتصفحين (Google Chrome و Microsoft Edge) بمفتاح:
+- `HKCU:\Software\Google\Chrome\NativeMessagingHosts\com.sayl.downloader`
+- `HKCU:\Software\Microsoft\Edge\NativeMessagingHosts\com.sayl.downloader`
+
+ولإلغاء التسجيل وحذف المفاتيح:
+```powershell
+.\tools\register-native-host.ps1 -Unregister
+```
+
+### 4. حدود الاختبار الفعلية (Honest Limitations)
+
+- تم اختبار البروتوكول ومحرك التوزيع ووظائف التحقق واختبارات الربط في الذاكرة بالكامل وتمر بنجاح عبر:
+  `cargo +stable-x86_64-pc-windows-gnu test -p sayl-bridge`
+- تم التحقق من سلامة ملفات JavaScript وmanifest عبر `node --check` ومحلل JSON.
+- التكامل مع المتصفح واعتراض التنزيلات من داخل بيئة تشغيل متصفح حقيقي لم يُختبر تفاعلياً ضد متصفح مفتوح أثناء هذه الجلسة، وصلاحية التثبيت مقيدة بما تثبته اختبارات الوحدة والسكربتات أعلاه.
+

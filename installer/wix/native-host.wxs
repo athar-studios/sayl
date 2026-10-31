@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <!--
+      SAYL Native Messaging Host and Browser Extension Staging (WiX Fragment)
+      Runs in per-user scope (HKCU), never requiring administrative privileges.
+      The sayl-bridge binary is the single writer of manifests and HKCU registry keys.
+    -->
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="NativeHostMarker" Guid="9B3A2C18-E782-4B65-98C3-72D6D3A08E2B">
+        <!-- HKCU KeyPath required for per-user component validation (ICE38) -->
+        <RegistryValue Root="HKCU" Key="Software\SAYL" Name="NativeHostConfigured" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- CustomAction: Stage unpacked browser extensions to %LOCALAPPDATA%\Sayl\extension -->
+    <CustomAction Id="StageBrowserExtensions"
+                  Directory="INSTALLDIR"
+                  ExeCommand="&quot;cmd.exe&quot; /c if exist &quot;[INSTALLDIR]extensions\browser\chromium&quot; (rd /s /q &quot;%LOCALAPPDATA%\Sayl\extension\chromium&quot; 2&gt;nul &amp; xcopy &quot;[INSTALLDIR]extensions\browser\chromium&quot; &quot;%LOCALAPPDATA%\Sayl\extension\chromium&quot; /E /I /Y) &amp; if exist &quot;[INSTALLDIR]extensions\browser\firefox&quot; (rd /s /q &quot;%LOCALAPPDATA%\Sayl\extension\firefox&quot; 2&gt;nul &amp; xcopy &quot;[INSTALLDIR]extensions\browser\firefox&quot; &quot;%LOCALAPPDATA%\Sayl\extension\firefox&quot; /E /I /Y)"
+                  Execute="deferred"
+                  Impersonate="yes"
+                  Return="check" />
+
+    <!-- CustomAction: Register native messaging host manifests and HKCU keys via sayl-bridge -->
+    <CustomAction Id="RegisterNativeHost"
+                  Directory="INSTALLDIR"
+                  ExeCommand="&quot;[INSTALLDIR]host\sayl-bridge.exe&quot; --register-host"
+                  Execute="deferred"
+                  Impersonate="yes"
+                  Return="check" />
+
+    <!-- CustomAction: Unregister native messaging host manifests and HKCU keys via sayl-bridge -->
+    <CustomAction Id="UnregisterNativeHost"
+                  Directory="INSTALLDIR"
+                  ExeCommand="&quot;[INSTALLDIR]host\sayl-bridge.exe&quot; --unregister-host"
+                  Execute="deferred"
+                  Impersonate="yes"
+                  Return="ignore" />
+
+    <!-- CustomAction: Clean up installer-staged extension and host directories under %LOCALAPPDATA%\Sayl -->
+    <CustomAction Id="CleanupStagedFiles"
+                  Directory="INSTALLDIR"
+                  ExeCommand="&quot;cmd.exe&quot; /c rd /s /q &quot;%LOCALAPPDATA%\Sayl\extension&quot; 2&gt;nul &amp; rd /s /q &quot;%LOCALAPPDATA%\Sayl\host&quot; 2&gt;nul"
+                  Execute="deferred"
+                  Impersonate="yes"
+                  Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="StageBrowserExtensions" After="InstallFiles">NOT (REMOVE = "ALL")</Custom>
+      <Custom Action="RegisterNativeHost" After="StageBrowserExtensions">NOT (REMOVE = "ALL")</Custom>
+      <Custom Action="UnregisterNativeHost" Before="RemoveFiles">REMOVE = "ALL"</Custom>
+      <Custom Action="CleanupStagedFiles" After="UnregisterNativeHost">REMOVE = "ALL"</Custom>
+    </InstallExecuteSequence>
+
+    <ComponentGroup Id="NativeHostComponents">
+      <ComponentRef Id="NativeHostMarker" />
+    </ComponentGroup>
+  </Fragment>
+</Wix>

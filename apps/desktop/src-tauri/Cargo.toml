@@ -2,6 +2,7 @@
 name = "sayl-desktop"
 version = "0.1.0"
 edition = "2021"
+license = "PolyForm-Noncommercial-1.0.0"
 
 [lib]
 name = "sayl_desktop_lib"
@@ -18,11 +19,32 @@ tauri-build = { version = "2", features = [] }
 sayl-app = { path = "../../../crates/app" }
 sayl-core = { path = "../../../crates/core", features = ["serde"] }
 sayl-storage = { path = "../../../crates/storage" }
-tauri = { version = "2", features = [] }
+sayl-bridge = { path = "../../../crates/bridge" }
+sayl-http = { path = "../../../crates/http" }
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-notification = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tokio = { version = "1.40", features = ["rt-multi-thread", "macros", "sync"] }
+tokio = { version = "1.40", features = ["rt-multi-thread", "macros", "sync", "time", "process", "net", "io-util"] }
+getrandom = "=0.3.4"
+url = "2"
 tracing = "0.1"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.56"
+# `Win32_UI_Shell`: `SHGetKnownFolderPath` + `FOLDERID_Downloads` (real Downloads
+# folder) and `ShellExecuteW` (open a finished file with its default app).
+# `Win32_System_Com`: `CoTaskMemFree`, required to release the path buffer that
+# `SHGetKnownFolderPath` allocates.
+windows-sys = { version = "0.61.2", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_System_DataExchange",
+    "Win32_System_Memory",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
 
 [dev-dependencies]
 tempfile = "3.10"

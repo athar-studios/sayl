@@ -1,8 +1,9 @@
 <script>
   import { t } from "./i18n.js";
-  import { createEventDispatcher, onMount } from "svelte";
+  import { createEventDispatcher } from "svelte";
 
   export let open = false;
+  export let initialUrl = "";
 
   let urlInput = "";
   let errorMsg = null;
@@ -10,10 +11,26 @@
 
   const dispatch = createEventDispatcher();
 
-  $: if (open && inputElement) {
-    setTimeout(() => {
-      inputElement?.focus();
-    }, 50);
+  let wasOpen = false;
+  let prevInitialUrl = "";
+
+  $: if (open) {
+    const newlyOpened = !wasOpen;
+    const urlChanged = initialUrl !== prevInitialUrl;
+    if ((newlyOpened && initialUrl) || (urlChanged && initialUrl)) {
+      urlInput = initialUrl;
+      errorMsg = null;
+    }
+    if (newlyOpened || (urlChanged && initialUrl)) {
+      setTimeout(() => {
+        inputElement?.focus();
+      }, 50);
+    }
+    wasOpen = true;
+    prevInitialUrl = initialUrl;
+  } else {
+    wasOpen = false;
+    prevInitialUrl = "";
   }
 
   function validateUrl(str) {
@@ -70,7 +87,7 @@
       <div class="dialog-header">
         <h3 id="dialog-title" class="dialog-title">{$t("dialog.addTitle")}</h3>
         <button class="close-btn" on:click={handleCancel} aria-label={$t("dialog.cancel")}>
-          <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18" aria-hidden="true">
             <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
           </svg>
         </button>
@@ -86,6 +103,7 @@
             type="text"
             dir="ltr"
             placeholder={$t("dialog.urlPlaceholder")}
+            class="form-control"
             class:input-error={errorMsg}
           />
           {#if errorMsg}
@@ -98,7 +116,7 @@
             {$t("dialog.cancel")}
           </button>
           <button type="submit" class="btn btn-primary">
-            <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true">
               <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
             </svg>
             <span>{$t("dialog.submit")}</span>
@@ -113,8 +131,8 @@
   .dialog-backdrop {
     position: fixed;
     inset: 0;
-    background-color: rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(2px);
+    background-color: rgba(7, 15, 46, 0.65);
+    backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -152,6 +170,9 @@
     height: 2rem;
     color: var(--color-text-muted);
     border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .close-btn:hover {
@@ -177,13 +198,31 @@
     color: var(--color-text);
   }
 
+  .form-control {
+    font-family: inherit;
+    font-size: 0.875rem;
+    color: var(--color-text);
+    background-color: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 0.85rem;
+    transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
+  }
+
+  .form-control:focus {
+    outline: none;
+    border-color: var(--color-border-focus);
+    box-shadow: 0 0 0 2px var(--color-accent-light);
+  }
+
   .input-error {
-    border-color: var(--color-danger);
+    border-color: var(--color-danger) !important;
   }
 
   .error-text {
     font-size: 0.775rem;
     color: var(--color-danger);
+    font-weight: 500;
   }
 
   .dialog-actions {
@@ -194,13 +233,18 @@
   }
 
   .btn {
-    padding: 0.5rem 1rem;
+    padding: 0.5rem 1.15rem;
     font-weight: 600;
+    border-radius: var(--radius-sm);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
   }
 
   .btn-secondary {
     background-color: var(--color-bg-alt);
     color: var(--color-text-muted);
+    border: 1px solid var(--color-border);
   }
 
   .btn-secondary:hover {
@@ -208,11 +252,16 @@
   }
 
   .btn-primary {
-    background-color: var(--color-accent);
-    color: var(--color-accent-text);
+    background: linear-gradient(135deg, #00b6bd, #0b1a4e) !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 4px rgba(0, 182, 189, 0.25);
   }
 
   .btn-primary:hover {
-    background-color: var(--color-accent-hover);
+    filter: brightness(1.08);
+  }
+
+  .btn-primary:active {
+    transform: scale(0.98);
   }
 </style>

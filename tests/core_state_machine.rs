@@ -1,8 +1,6 @@
 //! Integration tests for the download lifecycle state machine.
 
-use sayl_core::{
-    event_channel, transition, DownloadState, EventKind, EventPayload, TaskId,
-};
+use sayl_core::{event_channel, transition, DownloadState, EventKind, EventPayload, TaskId};
 
 #[test]
 fn test_complete_download_lifecycle() {
@@ -10,8 +8,8 @@ fn test_complete_download_lifecycle() {
     let (event_sender, mut event_receiver) = event_channel(32);
 
     let mut state = DownloadState::Queued;
-    assert_eq!(state.is_terminal(), false);
-    assert_eq!(state.is_active(), false);
+    assert!(!state.is_terminal());
+    assert!(!state.is_active());
 
     // Queued -> Probing
     state = transition(state, DownloadState::Probing).expect("Queued -> Probing");
@@ -104,8 +102,8 @@ fn test_cancellation_from_any_active_state() {
             .unwrap_or_else(|_| panic!("Failed to cancel from {:?}", initial));
         assert_eq!(cancelling, DownloadState::Cancelling);
 
-        let cancelled = transition(cancelling, DownloadState::Cancelled)
-            .expect("Cancelling -> Cancelled");
+        let cancelled =
+            transition(cancelling, DownloadState::Cancelled).expect("Cancelling -> Cancelled");
         assert_eq!(cancelled, DownloadState::Cancelled);
         assert!(cancelled.is_terminal());
     }

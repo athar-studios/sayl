@@ -2,11 +2,35 @@
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.pk8
 
 # Reports, artifacts, and agent runtime
 reports/
 artifacts/
 .agent-runtime/
+
+# Internal development and agent workflow files
+/STATUS.json
+/AGENTS.md
+/agents.config.json
+/KIT-VALIDATION.json
+/MANIFEST.sha256.json
+/STAGE-GATE.md
+/START-HERE-PROMPT.md
+/SAYL-FULL-EXECUTION-PROMPT.md
+/CONTINUE-AFTER-PHASE-1.md
+/prompts/
+/catalog/
+/templates/
+/docs/agent/
+/docs/versions/
+/docs/tasks/
+/docs/REPORT-CONTRACT.md
+/docs/DEBATER-SYSTEM.md
+/docs/MASTER-PLAN.md
+/tools/workflow.py
 
 # Build targets and dependencies
 target/
@@ -18,6 +42,8 @@ __pycache__/
 # Frontend build output and Tauri packaging artefacts
 apps/desktop/dist/
 apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/resources/
+apps/desktop/installer/
 releases/
 
 # Logs
@@ -37,3 +63,9 @@ desktop.ini
 *.swp
 *.swo
 
+
+# Wrangler / Cloudflare Pages local cache
+apps/website/.wrangler/
+.wrangler/
+
+tools/screenshots/

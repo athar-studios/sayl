@@ -94,9 +94,9 @@ impl ContentRange {
             ));
         }
 
-        let (range_part, total_part) = rest.split_once('/').ok_or_else(|| {
-            HttpError::invalid_header("Content-Range", "missing '/' delimiter")
-        })?;
+        let (range_part, total_part) = rest
+            .split_once('/')
+            .ok_or_else(|| HttpError::invalid_header("Content-Range", "missing '/' delimiter"))?;
 
         let total = if total_part.trim() == "*" {
             None
@@ -299,8 +299,7 @@ mod tests {
 
     #[test]
     fn test_verify_range_ignored_200() {
-        let (support, size) =
-            verify_range_probe_response(StatusCode::OK, None, Some(5000));
+        let (support, size) = verify_range_probe_response(StatusCode::OK, None, Some(5000));
         assert_eq!(support, RangeSupport::Ignored);
         assert_eq!(size, Some(5000));
     }

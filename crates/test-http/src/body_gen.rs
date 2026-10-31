@@ -98,8 +98,8 @@ mod tests {
     fn test_generate_bytes_sequence() {
         let b = generate_bytes(300);
         assert_eq!(b.len(), 300);
-        for i in 0..256 {
-            assert_eq!(b[i], i as u8);
+        for (i, byte) in b.iter().take(256).enumerate() {
+            assert_eq!(*byte, i as u8);
         }
         assert_eq!(b[256], 0);
         assert_eq!(b[299], 43);

@@ -1,8 +1,7 @@
 //! Core error types and classifications.
 //!
-//! Provides [`CoreError`] covering the seven failure categories defined in
-//! `docs/tasks/CORE-001.md`: `Http`, `Io`, `Storage`, `Scheduler`, `Validation`,
-//! `Cancelled`, and `Internal`.
+//! Provides [`CoreError`] covering the seven failure categories:
+//! `Http`, `Io`, `Storage`, `Scheduler`, `Validation`, `Cancelled`, and `Internal`.
 
 use std::fmt;
 use std::io;
@@ -63,9 +62,14 @@ pub enum CoreError {
 
 impl CoreError {
     /// Creates an HTTP error.
-    pub fn http(status_code: Option<u16>, message: impl Into<String>, retry_after: Option<u64>) -> Self {
+    pub fn http(
+        status_code: Option<u16>,
+        message: impl Into<String>,
+        retry_after: Option<u64>,
+    ) -> Self {
         let is_transient = match status_code {
-            Some(429 | 500 | 502 | 503 | 504) => true,
+            Some(408 | 425 | 429) => true,
+            Some(s) if (500..=599).contains(&s) => true,
             Some(_) => false,
             None => true, // Connection drops / timeouts without status code
         };
@@ -75,6 +79,11 @@ impl CoreError {
             retry_after_secs: retry_after,
             is_transient,
         }
+    }
+
+    /// Creates a timeout error.
+    pub fn timeout(message: impl Into<String>) -> Self {
+        Self::http(None, format!("timeout: {}", message.into()), None)
     }
 
     /// Creates an I/O error with context.
@@ -135,9 +144,87 @@ impl CoreError {
         }
     }
 
+    /// Returns the stable frontend error classification key (e.g. `http_429`, `too_many_redirects`).
+    pub fn error_kind(&self) -> &'static str {
+        match self {
+            Self::Cancelled { .. } => "cancelled",
+            Self::Http {
+                status_code,
+                message,
+                ..
+            } => {
+                let lower = message.to_ascii_lowercase();
+                if lower.contains("too many redirects") || lower.contains("redirect loop") {
+                    return "too_many_redirects";
+                }
+                if lower.contains("range unsupported")
+                    || lower.contains("range not satisfiable")
+                    || *status_code == Some(416)
+                {
+                    return "range_unsupported";
+                }
+                match status_code {
+                    Some(429) => "http_429",
+                    Some(503) => "http_503",
+                    Some(416) => "range_unsupported",
+                    Some(s) if (500..=599).contains(s) => "http_5xx",
+                    Some(s) if (400..=499).contains(s) => "http_4xx",
+                    _ => {
+                        if lower.contains("timed out") || lower.contains("timeout") {
+                            "timeout"
+                        } else if lower.contains("connection")
+                            || lower.contains("network")
+                            || lower.contains("reset")
+                            || lower.contains("broken pipe")
+                        {
+                            "network"
+                        } else if lower.contains("url") {
+                            "invalid_url"
+                        } else {
+                            "network"
+                        }
+                    }
+                }
+            }
+            Self::Io { source, .. } => match source.kind() {
+                io::ErrorKind::TimedOut => "timeout",
+                io::ErrorKind::ConnectionReset
+                | io::ErrorKind::ConnectionAborted
+                | io::ErrorKind::BrokenPipe
+                | io::ErrorKind::NotConnected => "network",
+                io::ErrorKind::NotFound
+                | io::ErrorKind::PermissionDenied
+                | io::ErrorKind::AlreadyExists
+                | io::ErrorKind::WriteZero => "disk",
+                _ => "disk",
+            },
+            Self::Storage { .. } => "disk",
+            Self::Validation { field, message } => {
+                let lower = message.to_ascii_lowercase();
+                match *field {
+                    "url" => "invalid_url",
+                    "range" | "content_range" | "range_lease" => "range_unsupported",
+                    "checksum" | "hash" => "integrity",
+                    _ if lower.contains("url") => "invalid_url",
+                    _ if lower.contains("range") => "range_unsupported",
+                    _ => "unknown",
+                }
+            }
+            Self::Scheduler { .. } => "unknown",
+            Self::Internal { message } => {
+                let lower = message.to_ascii_lowercase();
+                if lower.contains("url") {
+                    "invalid_url"
+                } else {
+                    "unknown"
+                }
+            }
+        }
+    }
+
     /// Returns `true` if this error is transient and safe to retry according to policy.
     ///
-    /// Following `docs/MASTER-PLAN.md` §6:
+    /// Retry policy rules:
     /// - 429, 503, network drops, timeouts, and transient I/O are retryable with backoff.
     /// - 401, 403, 404, validation errors, and cancellation are NOT retryable.
     pub fn is_retryable(&self) -> bool {
@@ -157,6 +244,15 @@ impl CoreError {
             Self::Validation { .. } => false,
             Self::Cancelled { .. } => false,
             Self::Internal { .. } => false,
+        }
+    }
+
+    /// Returns the HTTP status code if this is an HTTP error.
+    #[inline]
+    pub const fn status_code(&self) -> Option<u16> {
+        match self {
+            Self::Http { status_code, .. } => *status_code,
+            _ => None,
         }
     }
 
@@ -286,7 +382,8 @@ mod tests {
         assert!(http_err.to_string().contains("503"));
         assert!(http_err.to_string().contains("Retry-After: 5s"));
 
-        let io_err = CoreError::io_with_context(io::Error::from(io::ErrorKind::NotFound), "file write");
+        let io_err =
+            CoreError::io_with_context(io::Error::from(io::ErrorKind::NotFound), "file write");
         assert_eq!(io_err.category(), "Io");
         assert!(io_err.to_string().contains("file write"));
 
@@ -363,5 +460,70 @@ mod tests {
 
         let str_err: CoreError = "something failed".into();
         assert_eq!(str_err.category(), "Internal");
+    }
+
+    #[test]
+    fn test_error_kinds() {
+        assert_eq!(
+            CoreError::http(Some(429), "Too Many Requests", None).error_kind(),
+            "http_429"
+        );
+        assert_eq!(
+            CoreError::http(Some(503), "Service Unavailable", None).error_kind(),
+            "http_503"
+        );
+        assert_eq!(
+            CoreError::http(Some(500), "Internal Server Error", None).error_kind(),
+            "http_5xx"
+        );
+        assert_eq!(
+            CoreError::http(Some(502), "Bad Gateway", None).error_kind(),
+            "http_5xx"
+        );
+        assert_eq!(
+            CoreError::http(Some(404), "Not Found", None).error_kind(),
+            "http_4xx"
+        );
+        assert_eq!(
+            CoreError::http(Some(403), "Forbidden", None).error_kind(),
+            "http_4xx"
+        );
+        assert_eq!(
+            CoreError::http(Some(416), "Range Not Satisfiable", None).error_kind(),
+            "range_unsupported"
+        );
+        assert_eq!(
+            CoreError::http(
+                None,
+                "too many redirects: exceeded 10 hops, last host was 'example.com'",
+                None
+            )
+            .error_kind(),
+            "too_many_redirects"
+        );
+        assert_eq!(
+            CoreError::http(None, "connection timed out", None).error_kind(),
+            "timeout"
+        );
+        assert_eq!(
+            CoreError::http(None, "connection reset by peer", None).error_kind(),
+            "network"
+        );
+        assert_eq!(
+            CoreError::validation("url", "malformed url").error_kind(),
+            "invalid_url"
+        );
+        assert_eq!(
+            CoreError::cancelled("user clicked cancel").error_kind(),
+            "cancelled"
+        );
+        assert_eq!(
+            CoreError::from(io::Error::from(io::ErrorKind::PermissionDenied)).error_kind(),
+            "disk"
+        );
+        assert_eq!(
+            CoreError::storage("write", "database locked").error_kind(),
+            "disk"
+        );
     }
 }

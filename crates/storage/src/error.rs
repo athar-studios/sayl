@@ -3,8 +3,8 @@
 //! Provides [`StoreError`] covering I/O, serialization, corruption, missing entities,
 //! and lock contention, with seamless conversion into [`sayl_core::CoreError`].
 
-use sayl_core::id::TaskId;
 use sayl_core::error::CoreError;
+use sayl_core::id::TaskId;
 
 /// Storage-specific errors encountered during journal or snapshot operations.
 #[derive(Debug, thiserror::Error)]
@@ -57,7 +57,9 @@ impl From<StoreError> for CoreError {
             StoreError::Io(e) => CoreError::io_with_context(e, "sayl-storage"),
             StoreError::Serde(e) => CoreError::storage("serde", e.to_string()),
             StoreError::Corruption(msg) => CoreError::storage("corruption", msg),
-            StoreError::NotFound(id) => CoreError::storage("not_found", format!("task {id} not found")),
+            StoreError::NotFound(id) => {
+                CoreError::storage("not_found", format!("task {id} not found"))
+            }
             StoreError::Locked(msg) => CoreError::storage("locked", msg),
             StoreError::Other(msg) => CoreError::storage("other", msg),
         }
@@ -89,7 +91,10 @@ mod tests {
         let core_locked = locked.to_core_error();
         assert_eq!(core_locked.category(), "Storage");
 
-        let io_err = StoreError::Io(std::io::Error::new(std::io::ErrorKind::NotFound, "disk read error"));
+        let io_err = StoreError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "disk read error",
+        ));
         let core_io: CoreError = io_err.into();
         assert_eq!(core_io.category(), "Io");
     }

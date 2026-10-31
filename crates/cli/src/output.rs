@@ -1,8 +1,8 @@
 //! Output formatters for tabular stdout and structured JSON representations.
 
-use serde::Serialize;
-use sayl_storage::TaskRecord;
 use crate::progress::format_bytes;
+use sayl_storage::TaskRecord;
+use serde::Serialize;
 
 /// Detailed task information serialized when `--json` is supplied to `sayl info`.
 #[derive(Debug, Serialize)]
@@ -17,8 +17,14 @@ pub fn print_tasks_table(tasks: &[TaskRecord]) {
     if tasks.is_empty() {
         return;
     }
-    println!("{:<36}  {:<12}  {:>10}  {:>8}  {}", "ID", "State", "Size", "Progress", "Filename");
-    println!("{:-<36}  {:-<12}  {:->10}  {:->8}  {:-<20}", "", "", "", "", "");
+    println!(
+        "{:<36}  {:<12}  {:>10}  {:>8}  Filename",
+        "ID", "State", "Size", "Progress"
+    );
+    println!(
+        "{:-<36}  {:-<12}  {:->10}  {:->8}  {:-<20}",
+        "", "", "", "", ""
+    );
     for t in tasks {
         let size_str = match t.total_size {
             Some(s) => format_bytes(s),
@@ -26,7 +32,10 @@ pub fn print_tasks_table(tasks: &[TaskRecord]) {
         };
         let pct_str = match t.total_size {
             Some(total) if total > 0 => {
-                format!("{:.1}%", (t.written as f64 / total as f64 * 100.0).min(100.0))
+                format!(
+                    "{:.1}%",
+                    (t.written as f64 / total as f64 * 100.0).min(100.0)
+                )
             }
             _ if t.written > 0 => "running".to_string(),
             _ => "0.0%".to_string(),

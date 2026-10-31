@@ -1,4 +1,4 @@
-//! Failure mode scenarios specified in MASTER-PLAN §8.
+//! Failure mode scenarios and protocol edge cases.
 //!
 //! Provides all 27 mandatory download simulation scenarios:
 //! 1. Ok206
@@ -33,7 +33,7 @@ use std::fmt;
 use std::str::FromStr;
 use std::time::Duration;
 
-/// All 27 failure modes and protocol conditions from MASTER-PLAN §8.
+/// All 27 failure modes and protocol conditions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Scenario {
@@ -130,29 +130,47 @@ impl Scenario {
     /// Human-readable description of the failure mode or behavior.
     pub fn description(&self) -> &'static str {
         match self {
-            Self::Ok206 => "Standard 206 Partial Content with valid Content-Range and Accept-Ranges",
+            Self::Ok206 => {
+                "Standard 206 Partial Content with valid Content-Range and Accept-Ranges"
+            }
             Self::NoAcceptRanges => "200 OK without Accept-Ranges header, ignoring client Range",
             Self::IgnoredRange200 => "200 OK full body response despite explicit Range header",
-            Self::BadContentRange => "206 Partial Content with malformed or out-of-bounds Content-Range",
+            Self::BadContentRange => {
+                "206 Partial Content with malformed or out-of-bounds Content-Range"
+            }
             Self::BodyTruncation => "Body prematurely terminated before reaching declared size",
             Self::ConnectionReset => "Abrupt TCP socket reset or closure during transfer",
             Self::ETagChanged => "ETag value changes between consecutive probe/download requests",
             Self::WeakETagOnly => "Weak validator (W/\"...\") returned without strong validator",
             Self::NoValidator => "Response lacks both ETag and Last-Modified headers",
-            Self::RangeNotSatisfiable416 => "416 Range Not Satisfiable returned for out-of-bounds range",
+            Self::RangeNotSatisfiable416 => {
+                "416 Range Not Satisfiable returned for out-of-bounds range"
+            }
             Self::HeadRejected => "HEAD probe request rejected with 405 Method Not Allowed or 501",
-            Self::UnknownSize => "200 OK stream without Content-Length and without chunked encoding",
+            Self::UnknownSize => {
+                "200 OK stream without Content-Length and without chunked encoding"
+            }
             Self::EmptyFile => "200 OK response with 0-byte Content-Length",
-            Self::UnexpectedEncoding => "Unexpected Content-Encoding: gzip when identity was requested",
+            Self::UnexpectedEncoding => {
+                "Unexpected Content-Encoding: gzip when identity was requested"
+            }
             Self::RetryAfter429 => "429 Too Many Requests response with Retry-After header",
-            Self::RedirectWithSecrets => "Cross-domain redirect attempting to capture Authorization/Cookie",
+            Self::RedirectWithSecrets => {
+                "Cross-domain redirect attempting to capture Authorization/Cookie"
+            }
             Self::NoSpace => "Simulated storage space exhaustion (507 Insufficient Storage)",
             Self::PermissionDenied => "Simulated access denial (403 Forbidden)",
-            Self::MaliciousFilename => "Malicious path traversal or Arabic Unicode in Content-Disposition",
-            Self::PauseCancelDuringProbe => "Probe hangs indefinitely to test cancellation handling",
+            Self::MaliciousFilename => {
+                "Malicious path traversal or Arabic Unicode in Content-Disposition"
+            }
+            Self::PauseCancelDuringProbe => {
+                "Probe hangs indefinitely to test cancellation handling"
+            }
             Self::SlowWorker => "Artificially throttled streaming to test slow chunk workers",
             Self::OldLease => "Precondition failure simulating expired lease (412 / 410)",
-            Self::RecoveryAtFinalize => "Transfer drop just before finalize, allowing successful resume",
+            Self::RecoveryAtFinalize => {
+                "Transfer drop just before finalize, allowing successful resume"
+            }
             Self::ProxyTLS => "Proxy TLS challenge (407 Proxy Authentication Required / Via)",
             Self::LimitsOrigin => "Origin concurrency limit reached (503 Service Unavailable)",
             Self::FileTruncation => "Resource size shrunk upon resume compared to previous probe",
@@ -303,26 +321,45 @@ mod tests {
     #[test]
     fn test_all_27_scenarios_count() {
         let all = Scenario::all();
-        assert_eq!(all.len(), 27, "Must contain exactly 27 scenarios from MASTER-PLAN §8");
+        assert_eq!(all.len(), 27, "Must contain exactly 27 scenarios");
     }
 
     #[test]
     fn test_scenario_names_and_from_str() {
         for scenario in Scenario::all() {
             let name = scenario.name();
-            let parsed = Scenario::from_str(name).unwrap_or_else(|_| panic!("Failed parsing {}", name));
+            let parsed =
+                Scenario::from_str(name).unwrap_or_else(|_| panic!("Failed parsing {}", name));
             assert_eq!(*scenario, parsed);
         }
     }
 
     #[test]
     fn test_alternate_name_aliases() {
-        assert_eq!(Scenario::from_str("416RangeNotSatisfiable").unwrap(), Scenario::RangeNotSatisfiable416);
-        assert_eq!(Scenario::from_str("RangeNotSatisfiable416").unwrap(), Scenario::RangeNotSatisfiable416);
-        assert_eq!(Scenario::from_str("429RetryAfter").unwrap(), Scenario::RetryAfter429);
-        assert_eq!(Scenario::from_str("RetryAfter429").unwrap(), Scenario::RetryAfter429);
-        assert_eq!(Scenario::from_str("connection_reset").unwrap(), Scenario::ConnectionReset);
-        assert_eq!(Scenario::from_str("pause-cancel-during-probe").unwrap(), Scenario::PauseCancelDuringProbe);
+        assert_eq!(
+            Scenario::from_str("416RangeNotSatisfiable").unwrap(),
+            Scenario::RangeNotSatisfiable416
+        );
+        assert_eq!(
+            Scenario::from_str("RangeNotSatisfiable416").unwrap(),
+            Scenario::RangeNotSatisfiable416
+        );
+        assert_eq!(
+            Scenario::from_str("429RetryAfter").unwrap(),
+            Scenario::RetryAfter429
+        );
+        assert_eq!(
+            Scenario::from_str("RetryAfter429").unwrap(),
+            Scenario::RetryAfter429
+        );
+        assert_eq!(
+            Scenario::from_str("connection_reset").unwrap(),
+            Scenario::ConnectionReset
+        );
+        assert_eq!(
+            Scenario::from_str("pause-cancel-during-probe").unwrap(),
+            Scenario::PauseCancelDuringProbe
+        );
     }
 
     #[test]

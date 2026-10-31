@@ -1,4 +1,79 @@
 Sayl
-Copyright 2026 Mohamed Ashry / Sayl contributors
+Copyright 2026 Mohamed Ashry / Athar Studio
 
-Licensed under the Apache License, Version 2.0 (see LICENSE).
+Licensed under the PolyForm Noncommercial License 1.0.0 (see LICENSE).
+https://polyformproject.org/licenses/noncommercial/1.0.0
+
+Free for personal and non-commercial use. Commercial use requires
+written permission: contact@atharapp.download
+
+Required Notice: Copyright 2026 Mohamed Ashry / Athar Studio (https://github.com/athar-studios)
+
+--------------------------------------------------------------------------------
+THIRD-PARTY NOTICES
+--------------------------------------------------------------------------------
+
+AB Download Manager
+-------------------
+This product includes code and behavior derived from AB Download Manager,
+Copyright the AB Download Manager contributors, licensed under the Apache
+License, Version 2.0.
+
+  https://github.com/amir1376/ab-download-manager
+  https://github.com/amir1376/ab-download-manager-browser-integration
+  https://www.apache.org/licenses/LICENSE-2.0
+
+No AB Download Manager source file is copied verbatim. The browser-capture
+extension in this repository re-implements AB's download-interception pipeline
+in JavaScript with SAYL's own native-messaging/host bridge protocol retained.
+Every file listed below carries the header comment:
+
+  Portions derived from AB Download Manager
+  (https://github.com/amir1376/ab-download-manager), Apache-2.0
+
+What was derived, and from where:
+
+  extensions/browser/chromium/rules.mjs
+    Interception decision pipeline: guarding against the extension's own,
+    restored and stale downloads; the cancel-then-handoff sequence
+    (downloads.cancel -> erase -> hand off to the host) with a single
+    give-back-to-browser fallback only when the host is unreachable;
+    per-download dedupe between the onDeterminingFilename and onCreated
+    listeners; filename resolution and Content-Disposition parsing;
+    HTML-response rejection; the signed-CDN release-host allowlist.
+    Derived from:
+      - src/linkgrabber/DownloadLinkInterceptor.ts
+      - src/utils/ExtractFileNameFromHeader.ts
+      - src/utils/ForbiddenHeaders.ts
+
+  extensions/browser/chromium/background.js
+    Listener wiring for downloads.onDeterminingFilename (primary) with
+    downloads.onCreated as the Firefox fallback, the held/downloads-paused
+    handoff ordering, and the alt-click bypass cache.
+    Derived from:
+      - src/background/background.ts
+      - src/backend/nativemessaging/NativeMessagingTransport.ts
+      - src/backend/NativeMessagingApi.ts
+
+  extensions/browser/chromium/content.js
+    Alt-click "send this link to the download manager" bypass.
+    Derived from:
+      - src/contentscripts/ContentScript.ts
+
+  extensions/browser/chromium/rules.test.mjs
+    Test cases covering the derived pipeline (GitHub release redirect chains,
+    Google Drive confirm pages / drive.usercontent.google.com, and repeated
+    downloads of the same URL).
+
+  extensions/browser/firefox/rules.js
+  extensions/browser/firefox/background.js
+    Firefox ports of the two files above; the ES-module sources were adapted
+    to classic scripts and the callback APIs to browser.* Promises.
+
+The IDM-style download windows and the monotonic progress layer under
+apps/desktop/ are original to SAYL and are not derived from AB Download
+Manager. No code was taken from any GPL-licensed project (Gopeed, XDM, aria2,
+Persepolis or others).
+
+If you redistribute this software, keep this file and the per-file headers
+intact; Apache License 2.0, Section 4 requires them.

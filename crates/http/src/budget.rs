@@ -114,7 +114,10 @@ impl std::fmt::Debug for OriginBudget {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("OriginBudget")
             .field("per_host", &self.per_host)
-            .field("per_origin_requests_per_sec", &self.per_origin_requests_per_sec)
+            .field(
+                "per_origin_requests_per_sec",
+                &self.per_origin_requests_per_sec,
+            )
             .field("active_origins", &self.state.lock().unwrap().len())
             .finish()
     }
@@ -156,10 +159,12 @@ impl OriginBudget {
         let now = self.time_source.now();
         let mut state = self.state.lock().unwrap();
 
-        let entry = state.entry(origin.to_string()).or_insert_with(|| OriginState {
-            active: 0,
-            request_times: Vec::new(),
-        });
+        let entry = state
+            .entry(origin.to_string())
+            .or_insert_with(|| OriginState {
+                active: 0,
+                request_times: Vec::new(),
+            });
 
         // Clean up old request timestamps outside the 1-second window
         let window_start = now.checked_sub(Duration::from_secs(1)).unwrap_or(now);
@@ -190,7 +195,11 @@ impl OriginBudget {
         let mut state = self.state.lock().unwrap();
 
         if let Some(entry) = state.get_mut(origin) {
-            assert!(entry.active > 0, "release called without matching acquire for origin '{}'", origin);
+            assert!(
+                entry.active > 0,
+                "release called without matching acquire for origin '{}'",
+                origin
+            );
             entry.active -= 1;
 
             // Clean up empty entries to prevent memory growth
@@ -216,7 +225,11 @@ impl OriginBudget {
         let state = self.state.lock().unwrap();
         if let Some(entry) = state.get(origin) {
             let window_start = now.checked_sub(Duration::from_secs(1)).unwrap_or(now);
-            entry.request_times.iter().filter(|&&t| t >= window_start).count()
+            entry
+                .request_times
+                .iter()
+                .filter(|&&t| t >= window_start)
+                .count()
         } else {
             0
         }
@@ -279,7 +292,8 @@ mod tests {
     #[test]
     fn test_origin_budget_enforces_rate_limit() {
         let time_source = Arc::new(ManualTimeSource::default());
-        let budget = OriginBudget::with_time_source(10, 3, Arc::clone(&time_source) as Arc<dyn TimeSource>);
+        let budget =
+            OriginBudget::with_time_source(10, 3, Arc::clone(&time_source) as Arc<dyn TimeSource>);
         let origin = "https://example.com:443";
 
         // First 3 requests should succeed
@@ -337,7 +351,8 @@ mod tests {
     fn test_origin_budget_with_time_source_manual_control() {
         let time_source = ManualTimeSource::with_start(Instant::now());
         let handle = time_source.handle();
-        let budget = OriginBudget::with_time_source(5, 2, Arc::new(time_source) as Arc<dyn TimeSource>);
+        let budget =
+            OriginBudget::with_time_source(5, 2, Arc::new(time_source) as Arc<dyn TimeSource>);
         let origin = "https://test.com:443";
 
         assert!(budget.try_acquire(origin));

@@ -48,7 +48,15 @@ The repository owner or release manager must manually verify and tick every item
     ```
 
 ## 4. بناء الإصدار والتحقق من المخرجات / Release Build & Verification
-- [ ] **تشغيل سكربت الإصدار / Run release script:**
+- [ ] **خيار أ — البناء على GitHub Actions (لا يحتاج SDK محليًا) / Option A: build in CI (no local SDK needed):**
+  - ادفع الوسم ليبدأ `.github/workflows/release.yml`:
+    ```powershell
+    git tag v0.1.0
+    git push origin v0.1.0
+    ```
+  - السير العمل يبني على `windows-latest` (فيه Windows SDK)، ويتحقق من وجود الملفات الأربعة، ويرفعها كـ artifact باسم `sayl-<version>-windows-x64`.
+  - إن كان GitHub Release للوسم موجودًا مسبقًا، تُرفع الملفات إليه في وظيفة منفصلة تملك `contents: write`. **إنشاء الإصدار نفسه يبقى قرار المالك.**
+- [ ] **خيار ب — البناء محليًا (يتطلب Windows SDK مثبتًا بصلاحيات مدير) / Option B: local build (requires elevated Windows SDK):**
   - تنفيذ البناء الرسمي:
     ```powershell
     pwsh -NoProfile -File tools/release.ps1

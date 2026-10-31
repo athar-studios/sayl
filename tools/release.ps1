@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param (
     [Parameter(Mandatory = $false)]
     [string]$Version,
@@ -12,6 +12,9 @@ param (
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+
+# Set by the bundle-location step when a needed installer is missing.
+$MissingBundles = $false
 
 # ------------------------------------------------------------------------------
 # 1. Resolve Repository Root & Version
@@ -130,10 +133,76 @@ if (-not $SkipFrontend) {
 }
 
 # ------------------------------------------------------------------------------
+# 3.5. Build Native Bridge & Stage Bundle Resources
+# ------------------------------------------------------------------------------
+Write-Host "`n[الخطوة 3 / Step 3] بناء جسر المتصفح وتجهيز الموارد / Building Native Bridge & Staging Resources..." -ForegroundColor Yellow
+$CargoBridgeCmd = "cargo build --release -p sayl-bridge"
+$StageDir = Join-Path $DesktopDir "src-tauri\resources"
+$HostStageDir = Join-Path $StageDir "host"
+$ExtStageDir = Join-Path $StageDir "extensions\browser\chromium"
+$ExtFirefoxStageDir = Join-Path $StageDir "extensions\browser\firefox"
+
+if ($DryRun) {
+    Write-Host "[DRY-RUN] Working directory: $RepoRoot" -ForegroundColor Cyan
+    Write-Host "[DRY-RUN] Command: $CargoBridgeCmd | ExitCode: 0" -ForegroundColor DarkGray
+    Write-Host "[DRY-RUN] Staging layout: $StageDir" -ForegroundColor Cyan
+    Write-Host "[DRY-RUN]   - host/sayl-bridge.exe"
+    Write-Host "[DRY-RUN]   - host/com.sayl.downloader.json"
+    Write-Host "[DRY-RUN]   - host/icon.ico"
+    Write-Host "[DRY-RUN]   - extensions/browser/chromium/**"
+    Write-Host "[DRY-RUN]   - extensions/browser/firefox/**"
+} else {
+    Push-Location $RepoRoot
+    try {
+        Write-Host "Executing: $CargoBridgeCmd"
+        & cmd.exe /c "cargo build --release -p sayl-bridge"
+        $code = $LASTEXITCODE
+        Write-Host "Command: $CargoBridgeCmd | ExitCode: $code" -ForegroundColor DarkGray
+        if ($code -ne 0) { throw "cargo build sayl-bridge failed with exit code $code" }
+
+        $BuiltBridgePath = Join-Path $RepoRoot "target\release\sayl-bridge.exe"
+        if (-not (Test-Path -LiteralPath $BuiltBridgePath)) {
+            throw "Built sayl-bridge binary missing at: $BuiltBridgePath"
+        }
+
+        # Stage files for Tauri bundle resources
+        if (-not (Test-Path -LiteralPath $HostStageDir)) {
+            New-Item -ItemType Directory -Path $HostStageDir -Force | Out-Null
+        }
+        if (-not (Test-Path -LiteralPath $ExtStageDir)) {
+            New-Item -ItemType Directory -Path $ExtStageDir -Force | Out-Null
+        }
+        if (-not (Test-Path -LiteralPath $ExtFirefoxStageDir)) {
+            New-Item -ItemType Directory -Path $ExtFirefoxStageDir -Force | Out-Null
+        }
+
+        Copy-Item -LiteralPath $BuiltBridgePath -Destination (Join-Path $HostStageDir "sayl-bridge.exe") -Force
+        Copy-Item -LiteralPath (Join-Path $RepoRoot "extensions\browser\host\com.sayl.downloader.json") -Destination (Join-Path $HostStageDir "com.sayl.downloader.json") -Force
+        Copy-Item -LiteralPath (Join-Path $RepoRoot "assets\brand\icon.ico") -Destination (Join-Path $HostStageDir "icon.ico") -Force
+        Copy-Item -Path (Join-Path $RepoRoot "extensions\browser\chromium\*") -Destination $ExtStageDir -Recurse -Force
+        Copy-Item -Path (Join-Path $RepoRoot "extensions\browser\firefox\*") -Destination $ExtFirefoxStageDir -Recurse -Force
+        # Never ship test artifacts inside the extension payload
+        Get-ChildItem -LiteralPath $ExtStageDir -Recurse -Include "*.test.mjs", "*.test.js" -ErrorAction SilentlyContinue | Remove-Item -Force
+        Get-ChildItem -LiteralPath $ExtFirefoxStageDir -Recurse -Include "*.test.mjs", "*.test.js" -ErrorAction SilentlyContinue | Remove-Item -Force
+
+        # Stage release configuration overlay for Tauri CLI
+        $DesktopInstallerDir = Join-Path $DesktopDir "installer"
+        if (-not (Test-Path -LiteralPath $DesktopInstallerDir)) {
+            New-Item -ItemType Directory -Path $DesktopInstallerDir -Force | Out-Null
+        }
+        Copy-Item -LiteralPath (Join-Path $RepoRoot "installer\tauri.bundle-resources.json") -Destination (Join-Path $DesktopInstallerDir "tauri.bundle-resources.json") -Force
+
+        Write-Host "[نجاح / PASS] تم تجهيز موارد الحزمة بنجاح داخل $StageDir" -ForegroundColor Green
+    } finally {
+        Pop-Location
+    }
+}
+
+# ------------------------------------------------------------------------------
 # 4. Build Tauri Release Binary & Packages
 # ------------------------------------------------------------------------------
-Write-Host "`n[الخطوة 3 / Step 3] بناء حزمة Tauri الإنتاجية / Building Tauri Production Release..." -ForegroundColor Yellow
-$TauriBuildCmd = "npm run tauri -- build"
+Write-Host "`n[الخطوة 4 / Step 4] بناء حزمة Tauri الإنتاجية / Building Tauri Production Release..." -ForegroundColor Yellow
+$TauriBuildCmd = "npm run tauri -- build --config installer/tauri.bundle-resources.json"
 
 if ($DryRun) {
     Write-Host "[DRY-RUN] Working directory: $DesktopDir" -ForegroundColor Cyan
@@ -141,8 +210,26 @@ if ($DryRun) {
 } else {
     Push-Location $DesktopDir
     try {
-        Write-Host "Executing: $TauriBuildCmd"
-        & cmd.exe /c "npm run tauri -- build"
+        # Guard: Validate overlay and staged resources exist before invoking Tauri build
+        $DesktopOverlayPath = Join-Path $DesktopDir "installer\tauri.bundle-resources.json"
+        if (-not (Test-Path -LiteralPath $DesktopOverlayPath)) {
+            throw "Release configuration overlay missing at: $DesktopOverlayPath"
+        }
+
+        $RequiredStagedFiles = @(
+            (Join-Path $DesktopDir "src-tauri\resources\host\sayl-bridge.exe"),
+            (Join-Path $DesktopDir "src-tauri\resources\host\com.sayl.downloader.json"),
+            (Join-Path $DesktopDir "src-tauri\resources\extensions\browser\chromium"),
+            (Join-Path $DesktopDir "src-tauri\resources\extensions\browser\firefox")
+        )
+        foreach ($staged in $RequiredStagedFiles) {
+            if (-not (Test-Path -LiteralPath $staged)) {
+                throw "Required staged release resource missing before Tauri build: $staged"
+            }
+        }
+
+        Write-Host "Executing: $TauriBuildCmd in $DesktopDir"
+        & cmd.exe /c $TauriBuildCmd
         $code = $LASTEXITCODE
         Write-Host "Command: $TauriBuildCmd | ExitCode: $code" -ForegroundColor DarkGray
         if ($code -ne 0) { throw "Tauri build failed with exit code $code" }
@@ -163,7 +250,7 @@ $TargetMsiPath = Join-Path $ReleasesDir $ExpectedMsiName
 $TargetZipPath = Join-Path $ReleasesDir $ExpectedZipName
 $Sha256SumsPath = Join-Path $ReleasesDir "SHA256SUMS.txt"
 
-Write-Host "`n[الخطوة 4 / Step 4] تجميع وتسمية مخرجات الإصدار / Assembling Release Artefacts..." -ForegroundColor Yellow
+Write-Host "`n[الخطوة 5 / Step 5] تجميع وتسمية مخرجات الإصدار / Assembling Release Artefacts..." -ForegroundColor Yellow
 
 if ($DryRun) {
     Write-Host "[DRY-RUN] Target folder: $ReleasesDir" -ForegroundColor Cyan
@@ -174,30 +261,59 @@ if ($DryRun) {
         New-Item -ItemType Directory -Path $ReleasesDir -Force | Out-Null
     }
 
-    # Locate generated NSIS / MSI from Tauri bundle or installer output
-    $TauriBundleDir = Join-Path $DesktopDir "src-tauri\target\release\bundle"
-    $FoundExe = Get-ChildItem -Path (Join-Path $TauriBundleDir "nsis\*.exe") -ErrorAction SilentlyContinue | Select-Object -First 1
-    $FoundMsi = Get-ChildItem -Path (Join-Path $TauriBundleDir "msi\*.msi") -ErrorAction SilentlyContinue | Select-Object -First 1
+    # Locate generated NSIS / MSI from Tauri bundle or installer output.
+    # Get-ChildItem -Path with a wildcard treats [ and ] in a directory name as a
+    # character class, so a checkout path such as "C:\work\sayl[dev]" silently
+    # matches nothing; -LiteralPath is used for every directory here.
+    $TauriBundleDirs = @(
+        (Join-Path $RepoRoot "target\release\bundle"),
+        (Join-Path $DesktopDir "src-tauri\target\release\bundle")
+    )
+    $FoundExe = $null
+    $FoundMsi = $null
+    foreach ($dir in $TauriBundleDirs) {
+        $nsisDir = Join-Path $dir "nsis"
+        $msiDir = Join-Path $dir "msi"
+        if (-not $FoundExe -and (Test-Path -LiteralPath $nsisDir)) {
+            $FoundExe = Get-ChildItem -LiteralPath $nsisDir -Filter "*.exe" -File -ErrorAction SilentlyContinue |
+                Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        }
+        if (-not $FoundMsi -and (Test-Path -LiteralPath $msiDir)) {
+            $FoundMsi = Get-ChildItem -LiteralPath $msiDir -Filter "*.msi" -File -ErrorAction SilentlyContinue |
+                Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        }
+    }
+
+    Write-Host "Searched bundle directories: $($TauriBundleDirs -join '; ')"
 
     if ($FoundExe) {
         Copy-Item -LiteralPath $FoundExe.FullName -Destination $TargetExePath -Force
         Write-Host "Command: Copy-Item '$($FoundExe.FullName)' -> '$TargetExePath' | ExitCode: 0" -ForegroundColor DarkGray
     } else {
-        Write-Host "[تحذير / WARNING] لم يتم العثور على مثبت NSIS لنسخه إلى releases." -ForegroundColor Yellow
+        Write-Host "[خطأ / ERROR] لم يتم العثور على مثبت NSIS لنسخه إلى releases." -ForegroundColor Red
+        $MissingBundles = $true
     }
 
     if ($FoundMsi) {
         Copy-Item -LiteralPath $FoundMsi.FullName -Destination $TargetMsiPath -Force
         Write-Host "Command: Copy-Item '$($FoundMsi.FullName)' -> '$TargetMsiPath' | ExitCode: 0" -ForegroundColor DarkGray
     } else {
-        Write-Host "[تحذير / WARNING] لم يتم العثور على مثبت MSI لنسخه إلى releases." -ForegroundColor Yellow
+        Write-Host "[خطأ / ERROR] لم يتم العثور على مثبت MSI لنسخه إلى releases." -ForegroundColor Red
+        $MissingBundles = $true
+    }
+
+    if ($MissingBundles) {
+        # A pipeline that finishes without the installers must not report success.
+        Write-Host "[خطأ فادح / FATAL] اكتمل البناء دون مخرجات المثبتات؛ راجع مخرجات Tauri أعلاه." -ForegroundColor Red
+        Write-Host "Command: Locate-Bundles | ExitCode: 1" -ForegroundColor DarkGray
+        exit 1
     }
 }
 
 # ------------------------------------------------------------------------------
 # 6. Produce Source Archive via git archive
 # ------------------------------------------------------------------------------
-Write-Host "`n[الخطوة 5 / Step 5] إنشاء أرشيف كود المصدر / Generating Source Archive..." -ForegroundColor Yellow
+Write-Host "`n[الخطوة 6 / Step 6] إنشاء أرشيف كود المصدر / Generating Source Archive..." -ForegroundColor Yellow
 $GitArchiveCmd = "git archive --format=zip --prefix=SAYL-$Version/ -o releases/$ExpectedZipName HEAD"
 
 if ($DryRun) {
@@ -217,7 +333,7 @@ if ($DryRun) {
 # ------------------------------------------------------------------------------
 # 7. Generate SHA256SUMS.txt
 # ------------------------------------------------------------------------------
-Write-Host "`n[الخطوة 6 / Step 6] حساب التجزئات وكتابة SHA256SUMS.txt / Computing SHA256 Checksums..." -ForegroundColor Yellow
+Write-Host "`n[الخطوة 7 / Step 7] حساب التجزئات وكتابة SHA256SUMS.txt / Computing SHA256 Checksums..." -ForegroundColor Yellow
 
 if ($DryRun) {
     Write-Host "[DRY-RUN] Command: Generate-SHA256SUMS -> $Sha256SumsPath | ExitCode: 0" -ForegroundColor DarkGray
@@ -228,6 +344,7 @@ if ($DryRun) {
 } else {
     $ArtefactsToHash = @($TargetExePath, $TargetMsiPath, $TargetZipPath)
     $Lines = [System.Collections.Generic.List[string]]::new()
+    $HashFailures = 0
 
     foreach ($file in $ArtefactsToHash) {
         if (Test-Path -LiteralPath $file) {
@@ -235,15 +352,28 @@ if ($DryRun) {
             $fileName = [System.IO.Path]::GetFileName($file)
             $Lines.Add("$hash  $fileName")
         } else {
-            Write-Host "[تحذير / WARNING] الملف غير موجود لحساب تجزئته: $file" -ForegroundColor Yellow
+            # Every artefact is required: a short SHA256SUMS.txt would silently
+            # publish an incomplete release.
+            Write-Host "[خطأ / ERROR] الملف غير موجود لحساب تجزئته: $file" -ForegroundColor Red
+            $HashFailures++
         }
     }
 
     if ($Lines.Count -gt 0) {
         $content = ($Lines -join "`n") + "`n"
-        [System.IO.File]::WriteAllText($Sha256SumsPath, $content, [System.Text.Encoding]::UTF8)
+        # Plain UTF-8 without a BOM: `sha256sum -c SHA256SUMS.txt` treats a BOM as
+        # part of the first file name and fails. [IO.File]::WriteAllText without an
+        # encoding argument emits a BOM on Windows PowerShell 5.1, which is what the
+        # CI runner's `pwsh` wrapper may resolve to, so the encoding is explicit.
+        [System.IO.File]::WriteAllText($Sha256SumsPath, $content, [System.Text.UTF8Encoding]::new($false))
         Write-Host "Command: Write-SHA256SUMS -> $Sha256SumsPath | ExitCode: 0" -ForegroundColor DarkGray
         Write-Host "[نجاح / PASS] تم إنشاء ملف التجزئات بنجاح." -ForegroundColor Green
+    }
+
+    if ($HashFailures -gt 0) {
+        Write-Host "[خطأ فادح / FATAL] $HashFailures من مخرجات الإصدار مفقودة؛ SHA256SUMS.txt غير مكتمل." -ForegroundColor Red
+        Write-Host "Command: Generate-SHA256SUMS | ExitCode: 1" -ForegroundColor DarkGray
+        exit 1
     }
 }
 

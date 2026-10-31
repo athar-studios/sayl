@@ -1,258 +1,398 @@
 <script>
-  import { t, currentLang, toggleLanguage } from "./i18n.js";
+  import { t, toggleLanguage } from "./i18n.js";
+  import { canPauseTask, canResumeTask, isTaskPending } from "./format.js";
   import { createEventDispatcher } from "svelte";
 
+  export let selectedTask = null;
+  export let selectedCount = 0;
+  export let canPauseAny = false;
+  export let canResumeAny = false;
+  export let searchQuery = "";
   export let theme = "system";
+  export let autoShutdown = false;
+  export let pendingStart = null;
+
+  $: void theme;
+  $: void autoShutdown;
 
   const dispatch = createEventDispatcher();
 
-  function cycleTheme() {
-    let next = "system";
-    if (theme === "system") next = "dark";
-    else if (theme === "dark") next = "light";
-    else next = "system";
-    dispatch("theme", next);
+  $: isConnecting = selectedTask ? isTaskPending(pendingStart, selectedTask.id) : false;
+  $: canResumeSelected = selectedTask ? (canResumeTask(selectedTask.state) && !isConnecting) : false;
+  $: canPauseSelected = selectedTask ? canPauseTask(selectedTask.state) : false;
+  $: canResume = selectedTask ? canResumeSelected : canResumeAny;
+  $: canPause = selectedTask ? canPauseSelected : canPauseAny;
+  $: hasSelected = selectedCount > 0 || !!selectedTask;
+
+  function handleClearSearch() {
+    searchQuery = "";
+    dispatch("search", "");
   }
 </script>
 
-<header class="app-toolbar">
-  <div class="toolbar-start">
-    <div class="brand">
-      <div class="brand-logo" aria-hidden="true">
-        <svg viewBox="0 0 32 32" width="22" height="22" fill="none">
-          <rect x="2" y="2" width="28" height="28" rx="8" fill="var(--color-accent)" />
-          <path d="M16 8v12m0 0l-5-5m5 5l5-5" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-          <path d="M10 24h12" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" />
+<header class="app-toolbar" id="tour-toolbar" aria-label="Desktop Toolbar">
+  <div class="toolbar-buttons-row">
+    <!-- 1. إضافة رابط (Add URL) -->
+    <button
+      class="toolbar-btn btn-add"
+      id="tour-btn-add"
+      title="{$t('toolbar.addUrl')} (Ctrl+N)"
+      aria-label="{$t('toolbar.addUrl')} (Ctrl+N)"
+      on:click={() => dispatch("add")}
+    >
+      <div class="toolbar-icon icon-add" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+          <path d="M12 4a1 1 0 011 1v6h6a1 1 0 110 2h-6v6a1 1 0 11-2 0v-6H5a1 1 0 110-2h6V5a1 1 0 011-1z" />
         </svg>
       </div>
-      <div class="brand-text">
-        <span class="brand-name">{$t("app.name")}</span>
-        <span class="brand-badge">2.0</span>
+      <span class="toolbar-label">{$t("toolbar.addUrl")}</span>
+    </button>
+
+    <div class="toolbar-sep" aria-hidden="true"></div>
+
+    <!-- 2. استئناف (Resume) -->
+    <button
+      class="toolbar-btn"
+      class:disabled={!canResume || isConnecting}
+      disabled={!canResume || isConnecting}
+      title="{isConnecting ? $t('task.connecting') : $t('toolbar.resume')} (F5)"
+      aria-label="{isConnecting ? $t('task.connecting') : $t('toolbar.resume')} (F5)"
+      on:click={() => dispatch("resume")}
+    >
+      <div class="toolbar-icon icon-resume" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+          <path d="M8 5.14v13.72a1 1 0 001.5.86l11-6.86a1 1 0 000-1.72l-11-6.86A1 1 0 008 5.14z" />
+        </svg>
       </div>
-    </div>
-
-    <button class="btn btn-primary add-btn" on:click={() => dispatch("add")}>
-      <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-        <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
-      </svg>
-      <span>{$t("toolbar.add")}</span>
-      <kbd class="kbd-badge">Ctrl+N</kbd>
+      <span class="toolbar-label">{isConnecting ? $t("task.connecting") : $t("toolbar.resume")}</span>
     </button>
-  </div>
 
-  <div class="toolbar-center">
-    <div class="batch-controls">
-      <button
-        class="toolbar-btn"
-        title={$t("toolbar.resumeAll")}
-        aria-label={$t("toolbar.resumeAll")}
-        on:click={() => dispatch("resumeAll")}
-      >
-        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
-          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
-        </svg>
-        <span class="btn-text">{$t("toolbar.resumeAll")}</span>
-      </button>
-
-      <button
-        class="toolbar-btn"
-        title={$t("toolbar.pauseAll")}
-        aria-label={$t("toolbar.pauseAll")}
-        on:click={() => dispatch("pauseAll")}
-      >
-        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
-          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-        </svg>
-        <span class="btn-text">{$t("toolbar.pauseAll")}</span>
-      </button>
-    </div>
-  </div>
-
-  <div class="toolbar-end">
+    <!-- 3. إيقاف (Stop) -->
     <button
-      class="icon-button"
-      title={$t("toolbar.openFolder")}
-      aria-label={$t("toolbar.openFolder")}
-      on:click={() => dispatch("openFolder")}
+      class="toolbar-btn"
+      class:disabled={!canPause}
+      disabled={!canPause}
+      title={$t("toolbar.pause")}
+      aria-label={$t("toolbar.pause")}
+      on:click={() => dispatch("pause")}
     >
-      <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-        <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" />
-      </svg>
+      <div class="toolbar-icon icon-pause" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+          <path d="M6 5a2 2 0 012-2h1a2 2 0 012 2v14a2 2 0 01-2 2H8a2 2 0 01-2-2V5zm9 0a2 2 0 012-2h1a2 2 0 012 2v14a2 2 0 01-2 2h-1a2 2 0 01-2-2V5z" />
+        </svg>
+      </div>
+      <span class="toolbar-label">{$t("toolbar.pause")}</span>
     </button>
 
+    <!-- 4. إيقاف الكل (Stop All) -->
     <button
-      class="icon-button"
-      title="{$t('toolbar.theme')}: {$t('toolbar.theme' + theme.charAt(0).toUpperCase() + theme.slice(1))}"
-      aria-label="{$t('toolbar.theme')}"
-      on:click={cycleTheme}
+      class="toolbar-btn"
+      class:disabled={!canPauseAny}
+      disabled={!canPauseAny}
+      title={$t("toolbar.pauseAll")}
+      aria-label={$t("toolbar.pauseAll")}
+      on:click={() => dispatch("pauseAll")}
     >
-      {#if theme === 'dark'}
-        <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-          <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+      <div class="toolbar-icon icon-pause-all" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+          <path d="M5 6a2 2 0 012-2h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6z" />
         </svg>
-      {:else if theme === 'light'}
-        <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-          <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd" />
-        </svg>
-      {:else}
-        <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-          <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm2 0v8h10V5H5z" clip-rule="evenodd" />
-        </svg>
-      {/if}
+      </div>
+      <span class="toolbar-label">{$t("toolbar.pauseAll")}</span>
     </button>
 
+    <div class="toolbar-sep" aria-hidden="true"></div>
+
+    <!-- 5. حذف (Delete) -->
     <button
-      class="lang-toggle-btn"
-      title="{$t('toolbar.language')}"
-      aria-label="{$t('toolbar.language')}"
-      on:click={toggleLanguage}
+      class="toolbar-btn"
+      class:disabled={!hasSelected}
+      disabled={!hasSelected}
+      title="{$t('toolbar.delete')} (Del)"
+      aria-label="{$t('toolbar.delete')} (Del)"
+      on:click={() => dispatch("delete")}
     >
-      <span>{$t("toolbar.language")}</span>
+      <div class="toolbar-icon icon-delete" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+          <path fill-rule="evenodd" d="M9 3a1 1 0 00-.8.4L7.4 5H4a1 1 0 000 2h1v12a3 3 0 003 3h8a3 3 0 003-3V7h1a1 1 0 100-2h-3.4l-.8-1.6A1 1 0 0015 3H9zm-1 6a1 1 0 012 0v8a1 1 0 11-2 0V9zm5 0a1 1 0 012 0v8a1 1 0 11-2 0V9z" clip-rule="evenodd" />
+        </svg>
+      </div>
+      <span class="toolbar-label">{$t("toolbar.delete")}</span>
     </button>
 
+    <!-- 6. حذف المكتمل (Delete Completed) -->
     <button
-      class="icon-button"
-      title={$t("toolbar.settings")}
-      aria-label={$t("toolbar.settings")}
+      class="toolbar-btn"
+      title={$t("toolbar.deleteCompleted")}
+      aria-label={$t("toolbar.deleteCompleted")}
+      on:click={() => dispatch("deleteCompleted")}
+    >
+      <div class="toolbar-icon icon-delete-completed" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+          <path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-9 14l-4-4 1.4-1.4 2.6 2.6 6.6-6.6 1.4 1.4-8 8z" />
+        </svg>
+      </div>
+      <span class="toolbar-label">{$t("toolbar.deleteCompleted")}</span>
+    </button>
+
+    <div class="toolbar-sep" aria-hidden="true"></div>
+
+    <!-- 7. الإعدادات (Settings) -->
+    <button
+      class="toolbar-btn"
+      title="{$t('toolbar.settings')} (F10)"
+      aria-label="{$t('toolbar.settings')} (F10)"
       on:click={() => dispatch("settings")}
     >
-      <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-        <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
-      </svg>
+      <div class="toolbar-icon icon-settings" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+          <path fill-rule="evenodd" d="M11.49 3.17c.38-1.56 2.6-1.56 2.98 0a1.532 1.532 0 002.286.948c1.372-.836 2.942.734 2.106 2.106.54.886.061 2.042-.947 2.287 1.561.379 1.561 2.6 0 2.978a1.532 1.532 0 00.947 2.287c.836 1.372-.734 2.942-2.106 2.106a1.532 1.532 0 00-2.287.947c-.379 1.561-2.6 1.561-2.978 0a1.533 1.533 0 00-2.287-.947c-1.372.836-2.942-.734-2.106-2.106a1.533 1.533 0 00-.947-2.287c-1.561-.379-1.561-2.6 0-2.978a1.532 1.532 0 00.947-2.287c-.836-1.372.734-2.942 2.106-2.106a1.532 1.532 0 002.287-.947zM10 12a2 2 0 104 0 2 2 0 00-4 0z" clip-rule="evenodd" />
+        </svg>
+      </div>
+      <span class="toolbar-label">{$t("toolbar.settings")}</span>
     </button>
+
+    <!-- 8. الجدولة (Schedule) -->
+    <button
+      class="toolbar-btn"
+      title={$t("toolbar.schedule")}
+      aria-label={$t("toolbar.schedule")}
+      on:click={() => dispatch("schedule")}
+    >
+      <div class="toolbar-icon icon-schedule" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+          <path fill-rule="evenodd" d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 5a1 1 0 10-2 0v5a1 1 0 00.4.8l4 3a1 1 0 001.2-1.6l-3.6-2.7V7z" clip-rule="evenodd" />
+        </svg>
+      </div>
+      <span class="toolbar-label">{$t("toolbar.schedule")}</span>
+    </button>
+
+    <!-- Search Box on the Far Side -->
+    <div class="toolbar-search">
+      <div class="search-input-wrap">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" class="search-icon" aria-hidden="true">
+          <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+        </svg>
+        <input
+          type="text"
+          class="search-input"
+          placeholder={$t("toolbar.searchPlaceholder")}
+          aria-label={$t("toolbar.searchPlaceholder")}
+          bind:value={searchQuery}
+          on:input={(e) => dispatch("search", e.target.value)}
+        />
+        {#if searchQuery}
+          <button class="search-clear-btn" on:click={handleClearSearch} aria-label={$t("filter.clearSearch")}>
+            ×
+          </button>
+        {/if}
+      </div>
+    </div>
   </div>
 </header>
 
 <style>
   .app-toolbar {
-    height: 3.75rem;
-    background-color: var(--color-bg-card);
-    border-bottom: 1px solid var(--color-border);
+    height: 68px;
+    background: #f6f7f9;
+    border-bottom: 1px solid #dcdcdc;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 0 1.25rem;
-    gap: 1rem;
+    padding: 0 8px;
+    user-select: none;
+    -webkit-user-select: none;
     flex-shrink: 0;
   }
 
-  .toolbar-start, .toolbar-center, .toolbar-end {
+  :global([data-theme="dark"]) .app-toolbar {
+    background: #0b1a4e;
+    border-bottom-color: #162b6e;
+    color: #e2e8f0;
+  }
+
+  .toolbar-buttons-row {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-  }
-
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 0.625rem;
-    margin-inline-end: 0.5rem;
-  }
-
-  .brand-logo {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .brand-text {
-    display: flex;
-    align-items: baseline;
-    gap: 0.35rem;
-  }
-
-  .brand-name {
-    font-size: 1.15rem;
-    font-weight: 800;
-    color: var(--color-text);
-    letter-spacing: -0.02em;
-  }
-
-  .brand-badge {
-    font-size: 0.65rem;
-    font-weight: 700;
-    padding: 0.1rem 0.35rem;
-    background-color: var(--color-accent-light);
-    color: var(--color-accent);
-    border-radius: var(--radius-sm);
-  }
-
-  .btn {
-    padding: 0.45rem 0.9rem;
-    font-weight: 600;
-  }
-
-  .btn-primary {
-    background-color: var(--color-accent);
-    color: var(--color-accent-text);
-  }
-
-  .btn-primary:hover {
-    background-color: var(--color-accent-hover);
-  }
-
-  .add-btn {
-    gap: 0.5rem;
-  }
-
-  .kbd-badge {
-    font-size: 0.675rem;
-    font-family: inherit;
-    background-color: rgba(0, 0, 0, 0.2);
-    padding: 0.15rem 0.35rem;
-    border-radius: 4px;
-    margin-inline-start: 0.25rem;
-  }
-
-  .batch-controls {
-    display: flex;
-    align-items: center;
-    background-color: var(--color-bg-alt);
-    padding: 0.2rem;
-    border-radius: var(--radius-sm);
-    gap: 0.2rem;
+    width: 100%;
+    gap: 4px;
   }
 
   .toolbar-btn {
-    padding: 0.35rem 0.65rem;
-    color: var(--color-text-muted);
-    font-size: 0.8rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 72px;
+    height: 60px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    color: #333333;
+    gap: 3px;
+    padding: 2px 4px;
+    transition: background-color 0.1s, border-color 0.1s;
+  }
+
+  :global([data-theme="dark"]) .toolbar-btn {
+    color: #f1f5f9;
+  }
+
+  .toolbar-btn:hover:not(:disabled) {
+    background: #e9ecf1;
+    border-color: #d0d7de;
+  }
+
+  :global([data-theme="dark"]) .toolbar-btn:hover:not(:disabled) {
+    background: #162b6e;
+    border-color: #254499;
+  }
+
+  .toolbar-btn:active:not(:disabled) {
+    background: #dde2ea;
+  }
+
+  :global([data-theme="dark"]) .toolbar-btn:active:not(:disabled) {
+    background: #102361;
+  }
+
+  .toolbar-btn.disabled,
+  .toolbar-btn:disabled {
+    opacity: 0.42;
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .toolbar-icon {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #2b3340;
+  }
+
+  :global([data-theme="dark"]) .toolbar-icon {
+    color: #e2e8f0;
+  }
+
+  .icon-add {
+    color: #008f95;
+  }
+
+  :global([data-theme="dark"]) .icon-add {
+    color: #00b6bd;
+  }
+
+  .icon-resume {
+    color: #16a34a;
+  }
+
+  .icon-pause {
+    color: #d97706;
+  }
+
+  .icon-pause-all {
+    color: #dc2626;
+  }
+
+  .icon-delete {
+    color: #dc2626;
+  }
+
+  .icon-delete-completed {
+    color: #0284c7;
+  }
+
+  .icon-settings,
+  .icon-schedule {
+    color: #4b5563;
+  }
+
+  :global([data-theme="dark"]) .icon-settings,
+  :global([data-theme="dark"]) .icon-schedule {
+    color: #94a3b8;
+  }
+
+  .toolbar-label {
+    font-size: 11px;
     font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 68px;
   }
 
-  .toolbar-btn:hover {
-    background-color: var(--color-bg-card);
-    color: var(--color-text);
+  .toolbar-sep {
+    width: 1px;
+    height: 44px;
+    background: #dcdcdc;
+    margin: 0 4px;
   }
 
-  @media (max-width: 720px) {
-    .btn-text, .kbd-badge {
-      display: none;
-    }
+  :global([data-theme="dark"]) .toolbar-sep {
+    background: #162b6e;
   }
 
-  .icon-button {
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: var(--radius-sm);
-    color: var(--color-text-muted);
+  .toolbar-search {
+    margin-inline-start: auto;
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
   }
 
-  .icon-button:hover {
-    background-color: var(--color-bg-alt);
-    color: var(--color-text);
+  .search-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
   }
 
-  .lang-toggle-btn {
-    padding: 0.35rem 0.65rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    font-size: 0.775rem;
-    font-weight: 600;
-    color: var(--color-text);
+  .search-icon {
+    position: absolute;
+    inset-inline-start: 8px;
+    color: #9ca3af;
+    pointer-events: none;
   }
 
-  .lang-toggle-btn:hover {
-    background-color: var(--color-bg-alt);
+  .search-input {
+    height: 30px;
+    width: 210px;
+    border: 1px solid #c5cbd3;
+    border-radius: 4px;
+    padding: 0 28px 0 30px;
+    font-size: 12px;
+    font-family: inherit;
+    background: #ffffff;
+    color: #1f2937;
+    outline: none;
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
+  :global([data-theme="dark"]) .search-input {
+    background: #070f2e;
+    border-color: #1e3a8a;
+    color: #f1f5f9;
+  }
+
+  .search-input:focus {
+    border-color: #00b6bd;
+    box-shadow: 0 0 0 1px #00b6bd;
+  }
+
+  .search-clear-btn {
+    position: absolute;
+    inset-inline-end: 6px;
+    background: transparent;
+    border: none;
+    font-size: 16px;
+    line-height: 1;
+    color: #9ca3af;
+    cursor: default;
+    padding: 0 4px;
+  }
+
+  .search-clear-btn:hover {
+    color: #4b5563;
   }
 </style>

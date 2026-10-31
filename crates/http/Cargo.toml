@@ -2,6 +2,7 @@
 name = "sayl-http"
 version = "0.1.0"
 edition = "2021"
+license = "PolyForm-Noncommercial-1.0.0"
 
 [lib]
 # Documented examples are kept in the source but not executed as doctests:

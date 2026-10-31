@@ -25,6 +25,8 @@ impl Dispatcher for HostLike {
             Request::Ping { version } => Response::Pong {
                 version,
                 app_version: "test".into(),
+                app_connected: None,
+                app_error: None,
             },
             Request::Download {
                 url,
@@ -50,6 +52,23 @@ impl Dispatcher for HostLike {
                     Err(err) => Response::error("path_escape", err.to_string()),
                 }
             }
+            Request::Capture { url, .. } => {
+                if let Err(err) = validate_request_url(&url, self.allow_private_hosts) {
+                    return Response::error("invalid_url", err.to_string());
+                }
+                let task_id = format!("task-{}", self.accepted.len() + 1);
+                self.accepted
+                    .push((task_id.clone(), self.download_dir.join("download.bin")));
+                Response::Accepted { task_id }
+            }
+            Request::Health { .. } => Response::Health {
+                version: 1,
+                app_connected: true,
+                app_version: Some("test".into()),
+                app_protocol: Some(1),
+                app_error: None,
+            },
+            Request::Log { .. } => Response::Ok,
             Request::Status { task_id } => Response::Status {
                 state: format!("unknown:{task_id}"),
                 bytes: 0,
@@ -98,7 +117,9 @@ fn full_session_ping_download_status() {
     assert!(matches!(parsed[1], Response::Accepted { .. }));
     assert!(matches!(parsed[2], Response::Status { .. }));
     assert_eq!(dispatcher.accepted.len(), 1);
-    assert!(dispatcher.accepted[0].1.starts_with(Path::new("C:\\Downloads")));
+    assert!(dispatcher.accepted[0]
+        .1
+        .starts_with(Path::new("C:\\Downloads")));
 }
 
 #[test]
@@ -120,8 +141,14 @@ fn hostile_frames_are_answered_without_breaking_the_session() {
     assert_eq!(handled, 5);
 
     let parsed = responses(&out);
-    assert!(matches!(parsed[0], Response::Error { .. }), "loopback must be refused");
-    assert!(matches!(parsed[1], Response::Error { .. }), "file: must be refused");
+    assert!(
+        matches!(parsed[0], Response::Error { .. }),
+        "loopback must be refused"
+    );
+    assert!(
+        matches!(parsed[1], Response::Error { .. }),
+        "file: must be refused"
+    );
     // The traversal filename is either refused or neutralised into a plain child.
     match &parsed[2] {
         Response::Error { .. } => {}
@@ -136,8 +163,14 @@ fn hostile_frames_are_answered_without_breaking_the_session() {
         }
         other => panic!("unexpected response: {other:?}"),
     }
-    assert!(matches!(parsed[3], Response::Error { .. }), "unknown type must be refused");
-    assert!(matches!(parsed[4], Response::Accepted { .. }), "valid request still handled");
+    assert!(
+        matches!(parsed[3], Response::Error { .. }),
+        "unknown type must be refused"
+    );
+    assert!(
+        matches!(parsed[4], Response::Accepted { .. }),
+        "valid request still handled"
+    );
 }
 
 #[test]
@@ -156,9 +189,7 @@ fn private_hosts_can_be_enabled_by_the_owner() {
 
 #[test]
 fn credentials_never_appear_in_an_error_response() {
-    let input = frames(&[
-        r#"{"type":"Download","url":"https://user:hunter2@example.com/a.zip"}"#,
-    ]);
+    let input = frames(&[r#"{"type":"Download","url":"https://user:hunter2@example.com/a.zip"}"#]);
     let mut dispatcher = HostLike {
         download_dir: PathBuf::from("C:\\Downloads"),
         allow_private_hosts: false,
@@ -167,8 +198,14 @@ fn credentials_never_appear_in_an_error_response() {
     let mut out = Vec::new();
     serve(Cursor::new(input), &mut out, &mut dispatcher).unwrap();
     let text = String::from_utf8(out).unwrap();
-    assert!(!text.contains("hunter2"), "password leaked into the response: {text}");
-    assert!(text.contains("credentials"), "expected a credentials error, got {text}");
+    assert!(
+        !text.contains("hunter2"),
+        "password leaked into the response: {text}"
+    );
+    assert!(
+        text.contains("credentials"),
+        "expected a credentials error, got {text}"
+    );
 }
 
 #[test]

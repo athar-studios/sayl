@@ -3,7 +3,7 @@
 //! Deterministic local HTTP fixture server and failure mode simulator for the
 //! SAYL download manager test harness.
 //!
-//! Provides simulation for all 27 failure modes described in MASTER-PLAN §8,
+//! Provides simulation for all 27 failure modes and protocol edge cases,
 //! including partial content range validation, connection drops, corrupted headers,
 //! rate limiting, and slow chunk streaming.
 //!

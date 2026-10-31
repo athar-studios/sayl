@@ -55,7 +55,10 @@ impl ProxyConfig {
     fn into_reqwest_proxy(self) -> Result<Proxy, HttpError> {
         let parsed = Url::parse(&self.url).map_err(|e| {
             let redacted = redact_proxy_url(&self.url);
-            HttpError::validation("proxy_url", format!("invalid proxy URL '{}': {}", redacted, e))
+            HttpError::validation(
+                "proxy_url",
+                format!("invalid proxy URL '{}': {}", redacted, e),
+            )
         })?;
 
         let scheme = parsed.scheme();
@@ -63,7 +66,10 @@ impl ProxyConfig {
             let redacted = redact_proxy_url(&self.url);
             return Err(HttpError::validation(
                 "proxy_url",
-                format!("unsupported proxy scheme '{}' in '{}'; only http and https are allowed", scheme, redacted),
+                format!(
+                    "unsupported proxy scheme '{}' in '{}'; only http and https are allowed",
+                    scheme, redacted
+                ),
             ));
         }
 
@@ -74,7 +80,10 @@ impl ProxyConfig {
         }
         .map_err(|e| {
             let redacted = redact_proxy_url(&self.url);
-            HttpError::validation("proxy_url", format!("failed to create proxy from '{}': {}", redacted, e))
+            HttpError::validation(
+                "proxy_url",
+                format!("failed to create proxy from '{}': {}", redacted, e),
+            )
         })?;
 
         if let (Some(user), Some(pass)) = (self.username, self.password) {
@@ -224,15 +233,30 @@ mod tests {
 
     #[test]
     fn test_redact_proxy_url_no_credentials() {
-        assert_eq!(redact_proxy_url("http://proxy.example.com:8080"), "http://proxy.example.com:8080");
-        assert_eq!(redact_proxy_url("https://proxy.example.com"), "https://proxy.example.com");
+        assert_eq!(
+            redact_proxy_url("http://proxy.example.com:8080"),
+            "http://proxy.example.com:8080"
+        );
+        assert_eq!(
+            redact_proxy_url("https://proxy.example.com"),
+            "https://proxy.example.com"
+        );
     }
 
     #[test]
     fn test_redact_proxy_url_with_credentials() {
-        assert_eq!(redact_proxy_url("http://user:pass@proxy.example.com:8080"), "http://***@proxy.example.com:8080");
-        assert_eq!(redact_proxy_url("https://user@proxy.example.com"), "https://***@proxy.example.com");
-        assert_eq!(redact_proxy_url("http://user:secret@192.168.1.1:3128"), "http://***@192.168.1.1:3128");
+        assert_eq!(
+            redact_proxy_url("http://user:pass@proxy.example.com:8080"),
+            "http://***@proxy.example.com:8080"
+        );
+        assert_eq!(
+            redact_proxy_url("https://user@proxy.example.com"),
+            "https://***@proxy.example.com"
+        );
+        assert_eq!(
+            redact_proxy_url("http://user:secret@192.168.1.1:3128"),
+            "http://***@192.168.1.1:3128"
+        );
     }
 
     #[test]
@@ -248,15 +272,24 @@ mod tests {
         assert_eq!(config.connect_timeout, DEFAULT_CONNECT_TIMEOUT);
         assert_eq!(config.read_timeout, DEFAULT_READ_TIMEOUT);
         assert_eq!(config.total_timeout, None);
-        assert_eq!(config.max_connections_per_host, DEFAULT_MAX_CONNECTIONS_PER_HOST);
+        assert_eq!(
+            config.max_connections_per_host,
+            DEFAULT_MAX_CONNECTIONS_PER_HOST
+        );
         assert_eq!(config.max_idle_per_host, DEFAULT_MAX_IDLE_PER_HOST);
         assert_eq!(config.pool_idle_timeout, DEFAULT_POOL_IDLE_TIMEOUT);
         assert!(config.user_agent.starts_with("SAYL/"));
         assert!(config.proxy.is_none());
         assert!(config.no_proxy.is_empty());
-        assert_eq!(config.redirect_policy.max_hops(), crate::redirect::DEFAULT_MAX_REDIRECT_HOPS);
+        assert_eq!(
+            config.redirect_policy.max_hops(),
+            crate::redirect::DEFAULT_MAX_REDIRECT_HOPS
+        );
         assert!(config.allow_private_hosts);
-        assert_eq!(config.max_response_headers_bytes, DEFAULT_MAX_RESPONSE_HEADERS_BYTES);
+        assert_eq!(
+            config.max_response_headers_bytes,
+            DEFAULT_MAX_RESPONSE_HEADERS_BYTES
+        );
     }
 
     #[test]
@@ -326,8 +359,16 @@ mod tests {
         };
         let err = proxy.into_reqwest_proxy().unwrap_err();
         let err_str = err.to_string();
-        assert!(err_str.contains("***"), "credentials not redacted in error: {}", err_str);
-        assert!(!err_str.contains("secretpassword"), "password leaked in error: {}", err_str);
+        assert!(
+            err_str.contains("***"),
+            "credentials not redacted in error: {}",
+            err_str
+        );
+        assert!(
+            !err_str.contains("secretpassword"),
+            "password leaked in error: {}",
+            err_str
+        );
     }
 
     #[test]
@@ -341,18 +382,24 @@ mod tests {
     fn test_build_client_with_proxy_credentials_redacted_in_error() {
         // Use an invalid URL that will fail at reqwest proxy construction
         // but after our validation passes
-        let mut config = ClientConfig::default();
-        config.proxy = Some(ProxyConfig {
-            url: "http://user:secret@[invalid-ipv6]".to_string(),
-            mode: ProxyMode::Http,
-            username: None,
-            password: None,
-        });
+        let config = ClientConfig {
+            proxy: Some(ProxyConfig {
+                url: "http://user:secret@[invalid-ipv6]".to_string(),
+                mode: ProxyMode::Http,
+                username: None,
+                password: None,
+            }),
+            ..Default::default()
+        };
         let result = build_client(&config);
         // The error should not contain the password
         if let Err(e) = result {
             let err_str = e.to_string();
-            assert!(!err_str.contains("secret"), "password leaked in error: {}", err_str);
+            assert!(
+                !err_str.contains("secret"),
+                "password leaked in error: {}",
+                err_str
+            );
         }
     }
 }

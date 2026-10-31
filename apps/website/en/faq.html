@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Frequently Asked Questions · Sayl FAQ</title>
+  <meta name="description" content="Answers to common questions about Sayl: free license, security, SmartScreen walkthrough, browser integration, and roadmap.">
+  <meta name="theme-color" content="#070F2E">
+  <link rel="canonical" href="https://sayl.site/en/faq">
+  <link rel="alternate" hreflang="ar" href="https://sayl.site/faq">
+  <link rel="alternate" hreflang="en" href="https://sayl.site/en/faq">
+  <link rel="alternate" hreflang="x-default" href="https://sayl.site/faq">
+
+  <!-- Favicons & App Icons (?v=2) -->
+  <link rel="icon" href="/favicon.ico?v=2" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
+  <link rel="manifest" href="/site.webmanifest">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:site_name" content="سيل · SAYL">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sayl.site/en/faq">
+  <meta property="og:title" content="Frequently Asked Questions · Sayl FAQ">
+  <meta property="og:description" content="Answers to common questions about Sayl: free license, security, SmartScreen walkthrough, browser integration, and roadmap.">
+  <meta property="og:image" content="https://sayl.site/og-image-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Frequently Asked Questions · Sayl FAQ">
+  <meta name="twitter:description" content="Answers to common questions about Sayl: free license, security, SmartScreen walkthrough, browser integration, and roadmap.">
+  <meta name="twitter:image" content="https://sayl.site/og-image-en.png">
+
+  <!-- Preload Fonts & Stylesheet -->
+  <link rel="preload" href="/fonts/IBMPlexSansArabic-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/IBMPlexSansArabic-Bold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Athar Studio",
+    "url": "https://sayl.site",
+    "logo": "https://sayl.site/icon-512.png",
+    "sameAs": [
+      "https://github.com/athar-studios",
+      "https://ko-fi.com/athar_studio"
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Is Sayl truly free and without ads?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes, Sayl is 100% free for personal use, with source code available under the PolyForm Noncommercial 1.0.0 license. It contains zero ads, no popups, no bundled junkware, and requires no subscriptions or serial keys."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is Sayl safe? What about the Windows SmartScreen warning?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes, Sayl is completely safe and its full source code is on GitHub. Because independent projects without costly EV code-signing certificates trigger Microsoft Defender SmartScreen initially, simply click 'More info' and then 'Run anyway' to launch."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What are the system requirements for Sayl?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Sayl runs on Windows 10 and Windows 11 (64-bit). The engine is built in ultra-efficient Rust, consuming negligible RAM and CPU even during massive multi-gigabyte transfers."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How does Sayl accelerate downloads compared to browsers?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Browsers typically download through a single stream. Sayl splits each file into multiple parallel parts (up to 16 concurrent connections), transferring all chunks simultaneously to maximize network bandwidth."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I install the browser extension?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Simply go to Sayl > Settings > Browser Extension > Activate, then follow the install steps it shows (the extension is not yet listed in browser stores; Sayl registers the native host automatically). Chrome/Edge/Brave: open chrome://extensions or edge://extensions, enable Developer mode, click Load unpacked and select the folder Sayl shows. Firefox: about:debugging#/runtime/this-firefox → Load Temporary Add-on → select manifest.json. Then check the Connected status in Sayl Settings."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Where does Sayl store files and local data?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Completed files are saved to `Downloads\\SAYL`. Task records and local journals reside inside `.data` on your disk. No data is ever sent to external cloud servers."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What happens if my connection drops or PC turns off?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Sayl writes byte progress atomically into a `.part` file. When connection restores, it validates server ETag/headers and resumes exactly where it stopped without restarting."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does Sayl download videos from YouTube and social platforms?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "In the current v0.1.0 release, Sayl handles direct HTTP/HTTPS files. Dedicated video extraction with quality selection is scheduled for v0.2.0 via yt-dlp and FFmpeg integration."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What are Plugins and Themes in Sayl?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "We are building a flexible, source-available plugin and theme architecture for v0.2.0, enabling support for video providers and custom color palettes without altering the core engine."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How does auto-shutdown on completion work?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Enable it in Settings. Once all active tasks finish successfully, Sayl presents a 30-second warning countdown allowing you to cancel anytime before shutdown occurs."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I completely uninstall Sayl?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Sayl leaves no hidden registry residue. Simply delete the application directory and the `.data` folder, and all traces are cleanly removed."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How can I contribute to Sayl or support the project?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Contributions and feedback are warmly welcomed on GitHub! You can also support ongoing development and code-signing costs by sponsoring on Ko-fi (https://ko-fi.com/athar_studio)."
+      }
+    }
+  ]
+}
+  </script>
+</head>
+<body class="page-inner">
+  <canvas id="flow" aria-hidden="true"></canvas>
+  <div class="lang-modal-overlay" id="lang-modal" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
+    <div class="lang-modal-card">
+      <img src="/favicon.svg?v=2" alt="Sayl logo" width="56" height="38" style="margin-bottom:12px">
+      <h2 id="lang-modal-title">Choose Language · اختر لغة الموقع</h2>
+      <p>You can toggle your preferred language anytime from the header button.</p>
+      <div class="lang-choices">
+        <button type="button" class="lang-choice-btn" data-choose-lang="ar">
+          <strong>العربية</strong>
+          <small>Arabic RTL Interface</small>
+        </button>
+        <button type="button" class="lang-choice-btn primary" data-choose-lang="en">
+          <strong>English</strong>
+          <small>Default English experience</small>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <header>
+      <a href="/en" class="brand" aria-label="Sayl - Home">
+        <img class="brand-logo" src="/icon.svg" alt="Sayl" width="57" height="40">
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="/en/docs">Docs</a>
+        <a href="/en#features" class="hide-mobile">Features</a>
+        <a href="/en/faq" class="active">FAQ</a>
+        <a href="/en/compare">Compare</a>
+        <a href="/en/plugins">Plugins</a>
+        <a href="/en/support">Support</a>
+      </nav>
+      <div class="header-actions">
+        <a href="/faq" class="lang-btn" aria-label="التبديل إلى العربية">العربية</a>
+      </div>
+    </header>
+    <main class="page-shell">
+      <article class="page-card">
+        <h1>Frequently Asked Questions · Sayl</h1>
+        <p class="lead" style="color:#b9c8e6;font-size:1.15rem;margin-bottom:28px">Clear and direct answers about using, configuring, and contributing to Sayl.</p>
+        <div class="faq-list">
+          <details>
+            <summary>Is Sayl truly free and without ads?</summary>
+            <p>Yes, Sayl is 100% free for personal use, with source code available under the PolyForm Noncommercial 1.0.0 license. It contains zero ads, no popups, no bundled junkware, and requires no subscriptions or serial keys.</p>
+          </details>
+          <details>
+            <summary>Is Sayl safe? What about the Windows SmartScreen warning?</summary>
+            <p>Yes, Sayl is completely safe and its full source code is on GitHub. Because independent projects without costly EV code-signing certificates trigger Microsoft Defender SmartScreen initially, simply click 'More info' and then 'Run anyway' to launch.</p>
+          </details>
+          <details>
+            <summary>What are the system requirements for Sayl?</summary>
+            <p>Sayl runs on Windows 10 and Windows 11 (64-bit). The engine is built in ultra-efficient Rust, consuming negligible RAM and CPU even during massive multi-gigabyte transfers.</p>
+          </details>
+          <details>
+            <summary>How does Sayl accelerate downloads compared to browsers?</summary>
+            <p>Browsers typically download through a single stream. Sayl splits each file into multiple parallel parts (up to 16 concurrent connections), transferring all chunks simultaneously to maximize network bandwidth.</p>
+          </details>
+          <details>
+            <summary>How do I install the browser extension?</summary>
+            <p>Simply go to Sayl > Settings > Browser Extension > Activate, then follow the install steps it shows (the extension is not yet listed in browser stores; Sayl registers the native host automatically). Chrome/Edge/Brave: open chrome://extensions or edge://extensions, enable Developer mode, click Load unpacked and select the folder Sayl shows (copy-path / open-folder buttons). Firefox: about:debugging#/runtime/this-firefox → Load Temporary Add-on → select manifest.json. Then check the Connected status in Sayl Settings; captures happen automatically.</p>
+          </details>
+          <details>
+            <summary>Where does Sayl store files and local data?</summary>
+            <p>Completed files are saved to `Downloads\SAYL`. Task records and local journals reside inside `.data` on your disk. No data is ever sent to external cloud servers.</p>
+          </details>
+          <details>
+            <summary>What happens if my connection drops or PC turns off?</summary>
+            <p>Sayl writes byte progress atomically into a `.part` file. When connection restores, it validates server ETag/headers and resumes exactly where it stopped without restarting.</p>
+          </details>
+          <details>
+            <summary>Does Sayl download videos from YouTube and social platforms?</summary>
+            <p>In the current v0.1.0 release, Sayl handles direct HTTP/HTTPS files. Dedicated video extraction with quality selection is scheduled for v0.2.0 via yt-dlp and FFmpeg integration.</p>
+          </details>
+          <details>
+            <summary>What are Plugins and Themes in Sayl?</summary>
+            <p>We are building a flexible, source-available plugin and theme architecture for v0.2.0, enabling support for video providers and custom color palettes without altering the core engine.</p>
+          </details>
+          <details>
+            <summary>How does auto-shutdown on completion work?</summary>
+            <p>Enable it in Settings. Once all active tasks finish successfully, Sayl presents a 30-second warning countdown allowing you to cancel anytime before shutdown occurs.</p>
+          </details>
+          <details>
+            <summary>How do I completely uninstall Sayl?</summary>
+            <p>Sayl leaves no hidden registry residue. Simply delete the application directory and the `.data` folder, and all traces are cleanly removed.</p>
+          </details>
+          <details>
+            <summary>How can I contribute to Sayl or support the project?</summary>
+            <p>Contributions and feedback are warmly welcomed on GitHub! You can also support ongoing development and code-signing costs by sponsoring on Ko-fi (https://ko-fi.com/athar_studio).</p>
+          </details>
+        </div>
+        <div class="note note-teal" style="margin-top:36px">
+          <strong>Have another question?</strong> Feel free to open a discussion on <a href="https://github.com/athar-studios/sayl/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a> or reach out directly.
+        </div>
+      </article>
+    </main>
+    <footer>
+      <div class="footer-wrap">
+        <div class="footer-brand">
+          <img class="footer-logo" src="/icon.svg" alt="Sayl" width="54" height="38">
+          <span><strong>Sayl · سيل</strong></span>
+        </div>
+        <div class="footer-links">
+          <a href="/en/docs">Docs</a>
+          <a href="/en/faq">FAQ</a>
+          <a href="/en/compare">Comparison</a>
+          <a href="/en/idm-alternative">IDM Alternative</a>
+          <a href="/en/free-download-manager-windows">Windows FDM</a>
+          <a href="/en/plugins">Plugins</a>
+          <a href="/en/themes">Themes</a>
+          <a href="/en/about">About Studio</a>
+          <a href="/en/support">Support</a>
+          <a href="/en/privacy">Privacy</a>
+          <a href="/en/terms">Terms</a>
+          <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </div>
+      </div>
+      <div style="margin-top:20px;text-align:center;color:#6b80ad;font-size:0.85rem">
+        Athar Studio · Licensed under PolyForm Noncommercial 1.0.0 · Zero tracking & zero telemetry
+      </div>
+    </footer>
+  </div>
+
+  <script src="/flow.js" defer></script>
+  <script src="/site.js" defer></script>
+</body>
+</html>

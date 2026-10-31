@@ -102,18 +102,36 @@ URL_REGEX = re.compile(r'https?://[^\s"\'`<>)]+')
 
 # Allowed URL patterns in application code
 ALLOWED_URL_HOST_PATTERNS = [
-    r"^https?://(?:127\.0\.0\.1|localhost|\[::1\]|0\.0\.0\.0)(?::\d+)?(?:/.*)?$",
+    r"^https?://(?:127\.0\.0\.1|localhost|\[::1\]|0\.0\.0\.0)(?::(?:\d+|\{[A-Za-z0-9_]*\}))?(?:/.*)?$",
     r"^http://ipc\.localhost(?:/.*)?$",
     r"^https?://github\.com(?:/.*)?$",
     r"^https?://raw\.githubusercontent\.com(?:/.*)?$",
-    r"^http://www\.w3\.org/2000/svg$",
+    r"^http://www\.w3\.org/(?:2000/svg|1999/xlink)$",
     r"^https?://(?:[a-zA-Z0-9_\-]+\.)*example\.(?:com|org)(?::\d+)?(?:/.*)?$",
     r"^https?://releases\.ubuntu\.com(?:/.*)?$",
     r"^https?://(?:[a-zA-Z0-9_\-]+\.)*public-cdn\.com(?:/.*)?$",
     r"^https?://hops\.com(?:/.*)?$",
     r"^https?://loop\.com(?:/.*)?$",
     r"^https?://(?:a|origin1|cdn\.other)\.com(?:/.*)?$",
+    # Official project support page (no tracking parameters, not application telemetry).
+    r"^https?://ko-fi\.com/athar_studio(?:/.*)?$",
+    # Official project website, sister app, metadata schemas, and license references
+    r"^https?://(?:[a-zA-Z0-9_\-]+\.)*sayl\.site(?:/.*)?$",
+    r"^https?://atharapp\.download(?:/.*)?$",
+    r"^https?://schema\.org(?:/.*)?$",
+    r"^https?://(?:www\.)?apache\.org/licenses/LICENSE-2\.0(?:/.*)?$",
+    r"^https?://polyformproject\.org/licenses/noncommercial/1\.0\.0(?:/.*)?$",
+    # Competitor and comparison reference sites
+    r"^https?://(?:www\.)?(?:internetdownloadmanager|freedownloadmanager)\.com(?:/.*)?$",
+    r"^https?://aria2\.github\.io(?:/.*)?$",
 ]
+
+# A URL template whose host is filled in at runtime from a bound socket address,
+# e.g. `format!("http://{}", addr)`. This is only tolerated inside the benchmark
+# harness, which binds loopback fixture servers; it is scoped to that directory
+# so a real remote URL elsewhere cannot hide behind the pattern.
+RUNTIME_HOST_TEMPLATE_REGEX = re.compile(r"^https?://\{\}$")
+RUNTIME_HOST_TEMPLATE_DIRS = ("crates/bench/",)
 
 
 def is_binary_file(file_path: Path) -> bool:
@@ -291,16 +309,32 @@ def run_audit(root_dir: Path) -> dict:
                         cleaned_url = url.rstrip('";,\')')
                         # Check against allowed list
                         is_allowed = any(p.match(cleaned_url) for p in compiled_allowed_urls)
-                        if is_allowed:
+                        runtime_template = (
+                            RUNTIME_HOST_TEMPLATE_REGEX.match(cleaned_url)
+                            and rel_path.replace("\\", "/").startswith(RUNTIME_HOST_TEMPLATE_DIRS)
+                        )
+                        if is_allowed or runtime_template:
                             # Classify allowance reason
                             if "127.0.0.1" in cleaned_url or "localhost" in cleaned_url:
                                 reason = "Localhost/fixture server address"
-                            elif "github.com" in cleaned_url:
+                            elif runtime_template:
+                                reason = "Runtime-filled loopback host template (benchmark harness only)"
+                            elif "github.com" in cleaned_url or "raw.githubusercontent.com" in cleaned_url:
                                 reason = "Documentation/repository link"
                             elif "w3.org" in cleaned_url:
                                 reason = "Standard XML/SVG namespace"
                             elif "example." in cleaned_url or "ubuntu." in cleaned_url:
                                 reason = "Documentation/mock placeholder address"
+                            elif "sayl.site" in cleaned_url:
+                                reason = "Official project website link"
+                            elif "atharapp.download" in cleaned_url:
+                                reason = "Sister application link"
+                            elif "schema.org" in cleaned_url:
+                                reason = "Standard metadata schema context"
+                            elif "apache.org" in cleaned_url:
+                                reason = "Open source license reference"
+                            elif "ko-fi.com" in cleaned_url:
+                                reason = "Donation/support link"
                             else:
                                 reason = "Permitted reference"
                             results["outbound_urls"]["allowances"].append({
@@ -395,6 +429,8 @@ def print_human_report(report: dict, root_dir: Path):
 
 
 def main():
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="SAYL Privacy and Network Audit")
     parser.add_argument("--json", action="store_true", help="Output audit report as JSON")
     parser.add_argument("--root", type=str, default=None, help="Root directory to audit")

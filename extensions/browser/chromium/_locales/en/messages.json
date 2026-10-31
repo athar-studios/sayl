@@ -1,0 +1,38 @@
+{
+  "extension_name": {
+    "message": "Sayl",
+    "description": "Extension name as shown in the browser"
+  },
+  "extension_description": {
+    "message": "Send downloads to Sayl. When Sayl is not running the browser keeps downloading as usual.",
+    "description": "Extension description as shown in the browser"
+  },
+  "context_menu_download": {
+    "message": "Download with Sayl",
+    "description": "Right-click menu item on links (English UI)"
+  },
+  "action_title": {
+    "message": "Sayl",
+    "description": "Tooltip of the toolbar button"
+  },
+  "notify_accepted_title": {
+    "message": "Download accepted",
+    "description": "Notification title when Sayl takes over a download"
+  },
+  "notify_error_title": {
+    "message": "Could not reach Sayl",
+    "description": "Notification title for host errors"
+  },
+  "status_connected": {
+    "message": "Connected",
+    "description": "Status word when Sayl is connected"
+  },
+  "status_not_installed": {
+    "message": "Not installed",
+    "description": "Status word when Sayl cannot be reached"
+  },
+  "status_app_disconnected": {
+    "message": "Not connected",
+    "description": "Status word when Sayl is not running"
+  }
+}

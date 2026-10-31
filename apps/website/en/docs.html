@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentation & User Guide · Sayl Docs</title>
+  <meta name="description" content="Complete guide for Sayl: installation, SmartScreen walkthrough, browser extension, CLI reference, and settings.">
+  <meta name="theme-color" content="#070F2E">
+  <link rel="canonical" href="https://sayl.site/en/docs">
+  <link rel="alternate" hreflang="ar" href="https://sayl.site/docs">
+  <link rel="alternate" hreflang="en" href="https://sayl.site/en/docs">
+  <link rel="alternate" hreflang="x-default" href="https://sayl.site/docs">
+
+  <!-- Favicons & App Icons (?v=2) -->
+  <link rel="icon" href="/favicon.ico?v=2" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
+  <link rel="manifest" href="/site.webmanifest">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:site_name" content="سيل · SAYL">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sayl.site/en/docs">
+  <meta property="og:title" content="Documentation & User Guide · Sayl Docs">
+  <meta property="og:description" content="Complete guide for Sayl: installation, SmartScreen walkthrough, browser extension, CLI reference, and settings.">
+  <meta property="og:image" content="https://sayl.site/og-image-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Documentation & User Guide · Sayl Docs">
+  <meta name="twitter:description" content="Complete guide for Sayl: installation, SmartScreen walkthrough, browser extension, CLI reference, and settings.">
+  <meta name="twitter:image" content="https://sayl.site/og-image-en.png">
+
+  <!-- Preload Fonts & Stylesheet -->
+  <link rel="preload" href="/fonts/IBMPlexSansArabic-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/IBMPlexSansArabic-Bold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Athar Studio",
+    "url": "https://sayl.site",
+    "logo": "https://sayl.site/icon-512.png",
+    "sameAs": [
+      "https://github.com/athar-studios",
+      "https://ko-fi.com/athar_studio"
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://sayl.site/en/"},
+      {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://sayl.site/en/docs.html"}
+    ]
+  }
+  </script>
+</head>
+<body class="page-inner">
+  <canvas id="flow" aria-hidden="true"></canvas>
+  <div class="lang-modal-overlay" id="lang-modal" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
+    <div class="lang-modal-card">
+      <img src="/favicon.svg?v=2" alt="Sayl logo" width="56" height="38" style="margin-bottom:12px">
+      <h2 id="lang-modal-title">Choose Language · اختر لغة الموقع</h2>
+      <p>You can toggle your preferred language anytime from the header button.</p>
+      <div class="lang-choices">
+        <button type="button" class="lang-choice-btn" data-choose-lang="ar">
+          <strong>العربية</strong>
+          <small>Arabic RTL Interface</small>
+        </button>
+        <button type="button" class="lang-choice-btn primary" data-choose-lang="en">
+          <strong>English</strong>
+          <small>Default English experience</small>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <header>
+      <a href="/en" class="brand" aria-label="Sayl - Home">
+        <img class="brand-logo" src="/icon.svg" alt="Sayl" width="57" height="40">
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="/en/docs" class="active">Docs</a>
+        <a href="/en#features" class="hide-mobile">Features</a>
+        <a href="/en/faq">FAQ</a>
+        <a href="/en/compare">Compare</a>
+        <a href="/en/plugins">Plugins</a>
+        <a href="/en/support">Support</a>
+      </nav>
+      <div class="header-actions">
+        <a href="/docs" class="lang-btn" aria-label="التبديل إلى العربية">العربية</a>
+      </div>
+    </header>
+<div class="docs">
+      <!-- Sticky Sidebar -->
+      <aside aria-label="فهرس الدليل">
+        <input type="text" class="docs-search" placeholder="ابحث في أقسام الدليل..." data-ar-placeholder="ابحث في أقسام الدليل..." data-en-placeholder="Search sections..." aria-label="بحث في الدليل">
+
+        <button type="button" class="docs-mobile-toggle" aria-expanded="false">
+          <span >Table of Contents</span>
+          <span>☰</span>
+        </button>
+
+        <div class="docs-nav-links">
+          <div class="docs-nav-group-title" >Everyday Use</div>
+          <a class="on" href="#install" >Getting Started & Install</a>
+          <a href="#add" >Adding a Download</a>
+          <a href="#categories" >Categories & Search</a>
+          <a href="#progress-window" >Progress Window</a>
+          <a href="#tray" >Background & System Tray</a>
+          <a href="#startup" >Start with Windows</a>
+          <a href="#shutdown" >Auto Shutdown</a>
+          <a href="#sleep" >Prevent Sleep</a>
+          <a href="#resume" >Resume & Server Errors</a>
+
+          <div class="docs-nav-group-title" >Integration & Power</div>
+          <a href="#ext" >Browser Extension</a>
+          <a href="#cli" >Command-Line (CLI)</a>
+          <a href="#settings" >Settings Breakdown</a>
+          <a href="#data-locations" >Data Storage Locations</a>
+
+          <div class="docs-nav-group-title" >Development & Roadmap</div>
+          <a href="#build" >Building from Source</a>
+          <a href="#contribute" >Contributing Code</a>
+          <a href="#issues" >Reporting Issues</a>
+          <a href="#plugins" >Plugins (Roadmap)</a>
+          <a href="#themes" >Themes (Roadmap)</a>
+          <a href="#faq" >FAQ</a>
+        </div>
+      </aside>
+
+      <!-- Documentation Article -->
+      <article>
+        <h1 >Complete Sayl Documentation</h1>
+        <p >This guide covers everything you need to run and configure Sayl, from initial installation to low-level CLI commands, targeting v0.1.0 on Windows.</p>
+
+        <!-- 1. Installation & SmartScreen -->
+        <h2 id="install" >1. Getting Started & Installation</h2>
+        <p >Sayl currently supports 64-bit Windows 10 and Windows 11.</p>
+        <ol class="steps">
+          <li >Open the <a href='https://github.com/athar-studios/sayl/releases/latest' target='_blank'>latest GitHub Release</a> and download <code>SAYL-Setup-x64-0.1.0.exe</code>.</li>
+          <li >Launch the installer; it installs inside user scope without requiring administrator elevation.</li>
+          <li >Sayl will be ready in your Start Menu and Desktop shortcuts.</li>
+        </ol>
+
+        <div class="note">
+          <strong >Windows SmartScreen Notice & How to Proceed:</strong><br>
+          <span >Because Sayl is a new independent project without a costly commercial EV code-signing certificate, Windows may display a blue warning screen saying 'Windows protected your PC / Unknown Publisher'.</span><br><br>
+          <strong >How to continue:</strong><br>
+          <span >1. Click <strong>'More info'</strong> inside the prompt.<br>2. Click <strong>'Run anyway'</strong> that appears at the bottom.<br>Sayl's full source code is available and auditable on GitHub for full verification.</span>
+        </div>
+
+        <!-- 2. Adding a Download -->
+        <h2 id="add" >2. Adding a Download</h2>
+        <p >Sayl provides multiple quick ways to start a download:</p>
+        <ul>
+          <li ><strong>Toolbar or shortcut:</strong> Click 'Add Download' or press <kbd>Ctrl + N</kbd>. If you have a URL in your clipboard, it is pasted automatically.</li>
+          <li ><strong>Drag and drop:</strong> Drag any download link directly from your browser into the Sayl window.</li>
+          <li ><strong>Duplicate detection:</strong> If the link already exists in your tasks, Sayl asks whether you want to reveal the existing task or download it anew, preventing accidental duplicates.</li>
+        </ul>
+
+        <!-- 3. Categories & Search -->
+        <h2 id="categories" >3. Categories & Search</h2>
+        <p >As your downloads grow, Sayl automatically groups them based on file extensions and MIME types:</p>
+        <ul>
+          <li ><strong>6 Functional Categories:</strong> Video, Audio, Documents, Programs, Compressed, and Other for miscellaneous files.</li>
+          <li ><strong>Status Filters:</strong> Switch between All, Active, Paused, Completed, or Failed tasks.</li>
+          <li ><strong>Live Instant Search:</strong> Type in the search box to filter files and URLs in real-time.</li>
+          <li ><strong>View Modes:</strong> Choose between Cards view for rich detail or Table view for dense listing.</li>
+        </ul>
+
+        <!-- 4. Progress Window -->
+        <h2 id="progress-window" >4. Progress Window</h2>
+        <p >When downloading, Sayl can show a dedicated progress window providing deep insights into transfer health:</p>
+        <ul>
+          <li ><strong>Parallel Segment Bars:</strong> Visual segmented progress bars showing the buffer fill rate of each individual connection.</li>
+          <li ><strong>Live Metrics:</strong> Real-time transfer speed, downloaded vs total size, and estimated time remaining (ETA).</li>
+          <li ><strong>Direct Actions:</strong> Quick buttons to open the finished file or reveal it in Windows Explorer.</li>
+          <li >In Settings, you can enable/disable this popup or configure it to close automatically once done.</li>
+        </ul>
+
+        <!-- 5. Background Operation & Tray Icon -->
+        <h2 id="tray" >5. Background Operation & System Tray</h2>
+        <p >Sayl operates quietly in the background without getting in your way:</p>
+        <ul>
+          <li >Closing or minimizing the window keeps tasks running in the background with an icon in the Windows notification tray.</li>
+          <li >Double-clicking the tray icon restores the main application window immediately.</li>
+          <li >Right-clicking the tray icon provides quick options to Pause All, Resume All, or Exit completely.</li>
+        </ul>
+
+        <!-- 6. Start with Windows -->
+        <h2 id="startup" >6. Start with Windows</h2>
+        <p >You can configure Sayl to launch automatically on Windows startup. This allows pending downloads to continue automatically whenever you boot up your PC, with negligible memory footprint.</p>
+
+        <!-- 7. Shutdown Computer on Complete -->
+        <h2 id="shutdown" >7. Auto-Shutdown on Completion</h2>
+        <p >When downloading large files overnight or before leaving your desk, enable 'Shutdown PC when all downloads complete':</p>
+        <ul>
+          <li ><strong>30-Second Safety Countdown:</strong> Upon completion, Sayl displays a clear 30-second warning dialog with an instant cancel button.</li>
+          <li ><strong>Strict Safety Guardrails:</strong> Shutdown will not trigger if any tasks are paused, failed, or incomplete.</li>
+        </ul>
+
+        <!-- 8. Prevent Sleep -->
+        <h2 id="sleep" >8. Prevent Sleep</h2>
+        <p >Downloads often fail when Windows enters sleep mode after inactivity. Sayl utilizes Windows power APIs to inhibit system sleep while downloads are actively in flight, releasing the lock automatically once tasks finish.</p>
+
+        <!-- 9. Resuming & Server Errors -->
+        <h2 id="resume" >9. Resumption & Server Errors</h2>
+        <p >Sayl is built with strict integrity guarantees for your downloaded files:</p>
+        <ul>
+          <li ><strong>How Resumption Works:</strong> Requests byte chunks using HTTP Range requests and validates strong ETag and Last-Modified headers before stitching data.</li>
+          <li ><strong>Atomic <code>.part</code> Files:</strong> Data writes exclusively to a <code>.part</code> file, synced via <code>fsync</code>, and only renamed to the final filename upon 100% verified completion.</li>
+          <li ><strong>Server Failures:</strong> Clear error reporting for expired tokens (403) or server overload (503), retaining downloaded chunks safely.</li>
+          <li ><strong>Crash Recovery:</strong> WAL replay automatically safely sets incomplete tasks to Paused after an unexpected system shutdown.</li>
+        </ul>
+
+        <!-- 10. Browser Extension & Activation -->
+        <h2 id="ext" >10. Browser Extension & Setup</h2>
+        <p >The browser extension allows Sayl to capture download links directly from Google Chrome, Microsoft Edge, Brave, and compatible Chromium browsers:</p>
+        <ol class="steps">
+          <li >Open Sayl, then go to <strong>Settings</strong> (gear icon or <kbd>Ctrl+,</kbd>).</li>
+          <li >Navigate to the <strong>Browser Extension</strong> section and click <strong>Activate</strong>.</li>
+          <li >The extension is not yet listed in browser stores; Sayl installs it locally (it registers the native messaging host automatically). Open Sayl > Settings > Browser Extension > Activate, then follow the steps it shows:</li>
+          <li >In your browser: open the extensions page (<code>chrome://extensions</code> or <code>edge://extensions</code>) and enable 'Developer mode'.</li>
+          <li >Click 'Load unpacked' and select the extension folder shown by Sayl (use the copy-path / open-folder buttons).</li>
+          <li >For Firefox: open <code>about:debugging#/runtime/this-firefox</code> → 'Load Temporary Add-on' → select <code>manifest.json</code>.</li>
+          <li >After install, check the 'Connected' status in Sayl Settings; captures then happen automatically.</li>
+        </ol>
+        <p >Once installed, Sayl captures downloads seamlessly, and you can right-click any link to choose <strong>'Download with Sayl'</strong>.</p>
+
+        <details class="note">
+          <summary >Advanced: Manual Developer Installation (Load unpacked)</summary>
+          <div style="margin-top:14px">
+            <p >If you are building from source or developing the extension locally, you can load it unpacked:</p>
+            <ol class="steps">
+              <li >Open extension settings in your browser: <code>chrome://extensions</code> or <code>edge://extensions</code>.</li>
+              <li >Enable 'Developer mode' in the top toolbar.</li>
+              <li >Click 'Load unpacked' and select <code>extensions/browser/chromium</code>.</li>
+              <li >Copy the assigned Extension ID.</li>
+              <li >Run the registration script in PowerShell:<br><code>powershell -ExecutionPolicy Bypass -File tools/register-native-host.ps1 -ExtensionId &lt;EXTENSION_ID&gt;</code></li>
+            </ol>
+          </div>
+        </details>
+
+        <!-- 11. Full CLI Reference -->
+        <h2 id="cli" >11. Command-Line Interface (sayl CLI)</h2>
+        <p >Sayl includes a high-performance standalone CLI (<code>sayl.exe</code>) providing full programmatic control:</p>
+
+        <h3 >Core Commands:</h3>
+        <div class="table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th >Command & Syntax</th>
+                <th >Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>sayl add &lt;urls...&gt;</code></td>
+                <td >Add one or more URLs to the download queue.</td>
+              </tr>
+              <tr>
+                <td><code>sayl start &lt;id&gt; | --all</code></td>
+                <td >Start a specific queued task by ID, or start every queued task.</td>
+              </tr>
+              <tr>
+                <td><code>sayl list [--json]</code></td>
+                <td >List all download tasks in tabular format or structured JSON.</td>
+              </tr>
+              <tr>
+                <td><code>sayl info &lt;id&gt;</code></td>
+                <td >Display detailed telemetry and state information about a task.</td>
+              </tr>
+              <tr>
+                <td><code>sayl pause &lt;id&gt;</code></td>
+                <td >Pause an active or queued download task safely.</td>
+              </tr>
+              <tr>
+                <td><code>sayl cancel &lt;id&gt;</code></td>
+                <td >Cancel an active or queued download task.</td>
+              </tr>
+              <tr>
+                <td><code>sayl remove &lt;id&gt; [--delete-file]</code></td>
+                <td >Remove a task record, optionally deleting downloaded and partial files.</td>
+              </tr>
+              <tr>
+                <td><code>sayl recover</code></td>
+                <td >Recover non-terminal tasks interrupted by crash or restart.</td>
+              </tr>
+              <tr>
+                <td><code>sayl events [--idle-exit &lt;ms&gt;]</code></td>
+                <td >Stream live engine events as JSON lines until interrupted.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 >Global Options:</h3>
+        <div class="table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th >Option</th>
+                <th >Default</th>
+                <th >Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>--download-dir &lt;PATH&gt;</code></td>
+                <td><code>%USERPROFILE%\Downloads\SAYL</code></td>
+                <td >Target destination directory for downloads.</td>
+              </tr>
+              <tr>
+                <td><code>--data-dir &lt;PATH&gt;</code></td>
+                <td><code>&lt;download-dir&gt;\.data</code></td>
+                <td >Storage directory for task records and journals.</td>
+              </tr>
+              <tr>
+                <td><code>--connections &lt;N&gt;</code></td>
+                <td><code>4</code></td>
+                <td >Max concurrent connections per task.</td>
+              </tr>
+              <tr>
+                <td><code>--concurrent &lt;N&gt;</code></td>
+                <td><code>3</code></td>
+                <td >Max concurrent active download tasks.</td>
+              </tr>
+              <tr>
+                <td><code>--lang &lt;ar|en&gt;</code></td>
+                <td><code>ar</code></td>
+                <td >CLI output language (Arabic or English).</td>
+              </tr>
+              <tr>
+                <td><code>--json</code></td>
+                <td>—</td>
+                <td >Output command results in JSON format.</td>
+              </tr>
+              <tr>
+                <td><code>-q, --quiet</code></td>
+                <td>—</td>
+                <td >Suppress progress bars and informational messages.</td>
+              </tr>
+              <tr>
+                <td><code>-v, --verbose</code></td>
+                <td>—</td>
+                <td >Enable verbose diagnostic logs.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 >Exit Codes:</h3>
+        <p ><code>0</code>: Success · <code>2</code>: Usage error · <code>3</code>: Task failed · <code>4</code>: Cancelled · <code>5</code>: Store or I/O error.</p>
+
+        <!-- 12. Settings Breakdown -->
+        <h2 id="settings" >12. Settings Option by Option</h2>
+        <p >Open settings anytime by clicking the gear icon or pressing <kbd>Ctrl + ,</kbd>. Here is what each option controls:</p>
+        <div class="table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th >Setting</th>
+                <th >Range</th>
+                <th >Default</th>
+                <th >Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>مجلد حفظ التنزيلات</strong><br><small>download_dir</small></td>
+                <td>مسار مجلد صالح</td>
+                <td><code>%USERPROFILE%\Downloads</code></td>
+                <td >Default destination directory for finished downloads.</td>
+              </tr>
+              <tr>
+                <td><strong>أقصى تنزيلات نشطة</strong><br><small>max_concurrent_tasks</small></td>
+                <td>من 1 إلى 32</td>
+                <td><code>3</code></td>
+                <td >Number of active download tasks allowed concurrently.</td>
+              </tr>
+              <tr>
+                <td><strong>أقصى اتصالات للمهمة</strong><br><small>max_connections_per_task</small></td>
+                <td>من 1 إلى 64</td>
+                <td><code>4</code></td>
+                <td >Number of chunked connections opened per task for parallel acceleration.</td>
+              </tr>
+              <tr>
+                <td><strong>سمة المظهر</strong><br><small>theme</small></td>
+                <td>تلقائي / داكن / فاتح</td>
+                <td><code>system</code></td>
+                <td >Theme appearance: follow system preference, dark, or light.</td>
+              </tr>
+              <tr>
+                <td><strong>لغة الواجهة</strong><br><small>language</small></td>
+                <td>العربية / English</td>
+                <td><code>ar</code></td>
+                <td >Application language and layout direction.</td>
+              </tr>
+              <tr>
+                <td><strong>طريقة العرض</strong><br><small>view_mode</small></td>
+                <td>بطاقات / جدول</td>
+                <td><code>cards</code></td>
+                <td >Default layout: rich visual Cards or compact Table.</td>
+              </tr>
+              <tr>
+                <td><strong>منع نوم الجهاز</strong><br><small>prevent_sleep</small></td>
+                <td>مفعّل / معطّل</td>
+                <td><code>true</code></td>
+                <td >Prevents Windows from entering sleep mode while downloads are in flight.</td>
+              </tr>
+              <tr>
+                <td><strong>إظهار نافذة التحميل</strong><br><small>show_download_window</small></td>
+                <td>مفعّل / معطّل</td>
+                <td><code>true</code></td>
+                <td >Automatically shows dedicated progress window when a download starts.</td>
+              </tr>
+              <tr>
+                <td><strong>إغلاق نافذة التحميل تلقائيًا</strong><br><small>close_download_window_on_finish</small></td>
+                <td>مفعّل / معطّل</td>
+                <td><code>false</code></td>
+                <td >Automatically closes the progress window when task finishes.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 >Keyboard Shortcuts:</h3>
+        <ul>
+          <li><kbd>Ctrl + N</kbd>: <span >Add a new download and auto-paste URL.</span></li>
+          <li><kbd>Space</kbd>: <span >Pause or resume selected task.</span></li>
+          <li><kbd>Delete</kbd>: <span >Cancel or remove selected task.</span></li>
+          <li><kbd>Ctrl + O</kbd>: <span >Open Downloads directory in Windows Explorer.</span></li>
+          <li><kbd>Ctrl + ,</kbd>: <span >Open settings dialog.</span></li>
+          <li><kbd>Esc</kbd>: <span >Close dialog or cancel input.</span></li>
+        </ul>
+
+        <!-- 13. Data Locations -->
+        <h2 id="data-locations" >13. Data Storage Locations</h2>
+        <p >Sayl keeps its data transparent and self-contained on your PC:</p>
+        <ul>
+          <li ><strong>Settings & Store:</strong> Saved in standard Windows app data:<br><code>%APPDATA%\SAYL\</code><br>containing <code>settings.json</code> and the <code>store\</code> directory.</li>
+          <li ><strong>Completed Files:</strong> Located in <code>%USERPROFILE%\Downloads\</code> or your custom directory.</li>
+          <li ><strong>Partial Files (.part):</strong> Kept next to download destination until 100% complete.</li>
+          <li ><strong>Complete Cleanup:</strong> To erase all data, simply delete <code>%APPDATA%\SAYL\</code>.</li>
+        </ul>
+
+        <!-- 14. Building from Source -->
+        <h2 id="build" >14. Building Sayl from Source</h2>
+        <p >Sayl's source code is fully available; you can compile and audit it locally:</p>
+        <ol class="steps">
+          <li ><strong>Prerequisites:</strong><br>• Windows 10/11 x64<br>• Rust GNU toolchain: <code>stable-x86_64-pc-windows-gnu</code><br>• Node.js 18+ with npm</li>
+          <li ><strong>Setup Environment in PowerShell:</strong><br><code>$env:RUSTFLAGS = &quot;-C linker=rust-lld&quot;</code></li>
+          <li ><strong>Run Checks and Test Suite:</strong><br><code>cargo check --workspace</code><br><code>cargo test --workspace</code></li>
+          <li ><strong>Build Desktop UI (Tauri):</strong><br><code>cd apps/desktop</code><br><code>npm install</code><br><code>npm run tauri build</code></li>
+        </ol>
+
+        <!-- 15. Contributing Code -->
+        <h2 id="contribute" >15. Contributing Code</h2>
+        <p >Contributions are welcome. Before submitting a Pull Request, please ensure:</p>
+        <ul>
+          <li >All deterministic workspace tests pass cleanly via <code>cargo test --workspace</code>.</li>
+          <li >Code is formatted according to standard formatting using <code>cargo fmt --all</code>.</li>
+          <li >Use standard imperative commit messages (e.g., <code>fix(http): handle chunk timeout gracefully</code>).</li>
+          <li >Consult <code>CONTRIBUTING.md</code> in the repository for full guidelines.</li>
+        </ul>
+
+        <!-- 16. Reporting Issues -->
+        <h2 id="issues" >16. Reporting Issues</h2>
+        <p >If you encounter a bug or unexpected behavior:</p>
+        <ul>
+          <li ><strong>General Bugs & Features:</strong> Open an issue on <a href='https://github.com/athar-studios/sayl/issues' target='_blank'>GitHub Issues</a> using our issue templates.</li>
+          <li ><strong>Security Vulnerabilities:</strong> Please report security concerns privately per the instructions in <code>SECURITY.md</code>.</li>
+        </ul>
+
+        <!-- 17. Plugins Section (Explicitly Roadmap) -->
+        <h2 id="plugins" >17. Plugins</h2>
+        <div class="note note-teal">
+          <strong >Roadmap Feature — Not Yet Available in v0.1.0:</strong><br>
+          <span >A sandboxed WebAssembly plugin runtime is planned for future milestones (targeted for v0.5.0). In the current release (v0.1.0), plugin APIs do not exist yet. Follow our GitHub releases for roadmap progress.</span>
+        </div>
+
+        <!-- 18. Themes Section (Explicitly Roadmap) -->
+        <h2 id="themes" >18. Themes</h2>
+        <div class="note note-teal">
+          <strong >Roadmap Feature — Not Yet Available in v0.1.0:</strong><br>
+          <span >Sayl currently features two built-in official themes: Dark and Light, plus automatic system switching. Custom user-created theme packs and catalogs are planned for upcoming releases and are not part of v0.1.0.</span>
+        </div>
+
+        <!-- 19. FAQ -->
+        <h2 id="faq" >19. Frequently Asked Questions</h2>
+        <details open>
+          <summary >Does Sayl download videos from YouTube right now?</summary>
+          <p >Not in v0.1.0. Full video stream extraction and quality selection are scheduled for v0.2.0.</p>
+        </details>
+        <details>
+          <summary >Does Sayl collect any analytics or link telemetry?</summary>
+          <p >Zero telemetry. Sayl has no analytics, no account requirements, and no intermediate proxy servers. All traffic goes directly from your PC to the download host.</p>
+        </details>
+        <details>
+          <summary >A download stalled at a certain percentage, what should I do?</summary>
+          <p >Press Pause and then Resume. If the server issued a temporary token that expired, copy the fresh URL to restart.</p>
+        </details>
+        <details>
+          <summary >Does Sayl support BitTorrent or Magnet links?</summary>
+          <p >BitTorrent protocol support is on the roadmap for v0.4.0 via librqbit. v0.1.0 focuses exclusively on direct HTTP/HTTPS downloads.</p>
+        </details>
+      </article>
+    </div>
+    <footer>
+      <div class="footer-wrap">
+        <div class="footer-brand">
+          <img class="footer-logo" src="/icon.svg" alt="Sayl" width="54" height="38">
+          <span><strong>Sayl · سيل</strong></span>
+        </div>
+        <div class="footer-links">
+          <a href="/en/docs">Docs</a>
+          <a href="/en/faq">FAQ</a>
+          <a href="/en/compare">Comparison</a>
+          <a href="/en/idm-alternative">IDM Alternative</a>
+          <a href="/en/free-download-manager-windows">Windows FDM</a>
+          <a href="/en/plugins">Plugins</a>
+          <a href="/en/themes">Themes</a>
+          <a href="/en/about">About Studio</a>
+          <a href="/en/support">Support</a>
+          <a href="/en/privacy">Privacy</a>
+          <a href="/en/terms">Terms</a>
+          <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </div>
+      </div>
+      <div style="margin-top:20px;text-align:center;color:#6b80ad;font-size:0.85rem">
+        Athar Studio · Licensed under PolyForm Noncommercial 1.0.0 · Zero tracking & zero telemetry
+      </div>
+    </footer>
+  </div>
+
+  <script src="/flow.js" defer></script>
+  <script src="/site.js" defer></script>
+</body>
+</html>

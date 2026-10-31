@@ -1,0 +1,11 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/tooling/cli/schema.json",
+  "bundle": {
+    "resources": {
+      "resources/host/sayl-bridge.exe": "host/sayl-bridge.exe",
+      "resources/host/com.sayl.downloader.json": "host/com.sayl.downloader.json",
+      "resources/extensions/browser/chromium/": "extensions/browser/chromium/",
+      "resources/extensions/browser/firefox/": "extensions/browser/firefox/"
+    }
+  }
+}

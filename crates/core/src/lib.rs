@@ -4,12 +4,15 @@
 //! contracts for the SAYL Download Manager engine.
 //!
 //! ## Overview
+//! - [`category`]: 6-kind file category taxonomy ([`FileCategory`]) and the per-category
+//!   destination folder names used for IDM-style automatic save paths.
 //! - [`state`]: 11-state download lifecycle state machine ([`DownloadState`]) with guarded [`transition`] logic.
 //! - [`error`]: 7-category error taxonomy ([`CoreError`]) with classification for retries, fatal errors, and cancellations.
 //! - [`event`]: 8-kind event stream ([`Event`]) backed by bounded mpsc delivery ([`event_channel`]) and sequence numbering.
 //! - [`idempotency`]: In-memory deduplication store ([`IdempotencyStore`]) keyed by UUID ([`IdempotencyKey`]) with configurable TTL.
 //! - [`id`]: Strongly-typed time-ordered task identifier ([`TaskId`]) based on UUID v7.
 
+pub mod category;
 pub mod error;
 pub mod event;
 pub mod id;
@@ -17,6 +20,7 @@ pub mod idempotency;
 pub mod state;
 
 // Re-export primary contracts at crate root
+pub use category::{categorize, extract_extension, FileCategory};
 pub use error::CoreError;
 pub use event::{
     event_channel, DateTime, Event, EventKind, EventPayload, EventReceiver, EventSender,
@@ -26,4 +30,4 @@ pub use id::TaskId;
 pub use idempotency::{
     IdempotencyKey, IdempotencyRecord, IdempotencyStore, DEFAULT_IDEMPOTENCY_TTL,
 };
-pub use state::{transition, DownloadState, StateTransitionError};
+pub use state::{transition, transition_for_task, DownloadState, StateTransitionError};

@@ -1,0 +1,242 @@
+/**
+ * Pure settings definition and normalization module.
+ * Conforms strictly to the Tauri backend Settings struct contract (13 snake_case keys).
+ */
+
+export const DEFAULT_SETTINGS = {
+  download_dir: "",
+  max_concurrent_tasks: 3,
+  max_connections_per_task: 4,
+  theme: "system",
+  language: "ar",
+  view_mode: "table",
+  sidebar_collapsed: false,
+  prevent_sleep: true,
+  show_download_window: true,
+  show_download_complete_window: true,
+  close_download_window_on_finish: false,
+  close_action: "background",
+  run_at_startup: false,
+  close_notice_shown: false,
+  clipboard_monitor: true,
+};
+
+export const SETTINGS_KEYS = [
+  "download_dir",
+  "max_concurrent_tasks",
+  "max_connections_per_task",
+  "theme",
+  "language",
+  "view_mode",
+  "sidebar_collapsed",
+  "prevent_sleep",
+  "show_download_window",
+  "show_download_complete_window",
+  "close_download_window_on_finish",
+  "close_action",
+  "run_at_startup",
+  "close_notice_shown",
+  "clipboard_monitor",
+];
+
+export const SETTINGS_SECTIONS = [
+  { id: "general", labelKey: "settings.navGeneral" },
+  { id: "downloads", labelKey: "settings.navDownloads" },
+  { id: "categories", labelKey: "settings.navCategories" },
+  { id: "notifications", labelKey: "settings.navNotifications" },
+  { id: "power", labelKey: "settings.navPower" },
+  { id: "appearance", labelKey: "settings.navAppearance" },
+  { id: "extension", labelKey: "settings.navExtension" },
+  { id: "about", labelKey: "settings.navAbout" },
+];
+
+/**
+ * Merges partial or backend settings with DEFAULT_SETTINGS, ensuring all keys are present
+ * while preserving unknown/new backend fields.
+ *
+ * @param {object|null|undefined} settings
+ * @returns {typeof DEFAULT_SETTINGS & Record<string, any>}
+ */
+export function normalizeSettings(settings = {}) {
+  const s = settings && typeof settings === "object" ? settings : {};
+
+  return {
+    ...DEFAULT_SETTINGS,
+    ...s,
+    download_dir: typeof s.download_dir === "string" ? s.download_dir : DEFAULT_SETTINGS.download_dir,
+    max_concurrent_tasks:
+      typeof s.max_concurrent_tasks === "number" && s.max_concurrent_tasks >= 1
+        ? s.max_concurrent_tasks
+        : DEFAULT_SETTINGS.max_concurrent_tasks,
+    max_connections_per_task:
+      typeof s.max_connections_per_task === "number" && s.max_connections_per_task >= 1
+        ? s.max_connections_per_task
+        : DEFAULT_SETTINGS.max_connections_per_task,
+    theme: ["system", "dark", "light"].includes(s.theme) ? s.theme : DEFAULT_SETTINGS.theme,
+    language: ["ar", "en"].includes(s.language) ? s.language : DEFAULT_SETTINGS.language,
+    view_mode: ["cards", "table"].includes(s.view_mode) ? s.view_mode : DEFAULT_SETTINGS.view_mode,
+    sidebar_collapsed:
+      typeof s.sidebar_collapsed === "boolean"
+        ? s.sidebar_collapsed
+        : DEFAULT_SETTINGS.sidebar_collapsed,
+    prevent_sleep:
+      typeof s.prevent_sleep === "boolean"
+        ? s.prevent_sleep
+        : DEFAULT_SETTINGS.prevent_sleep,
+    show_download_window:
+      typeof s.show_download_window === "boolean"
+        ? s.show_download_window
+        : DEFAULT_SETTINGS.show_download_window,
+    show_download_complete_window:
+      typeof s.show_download_complete_window === "boolean"
+        ? s.show_download_complete_window
+        : DEFAULT_SETTINGS.show_download_complete_window,
+    close_download_window_on_finish:
+      typeof s.close_download_window_on_finish === "boolean"
+        ? s.close_download_window_on_finish
+        : DEFAULT_SETTINGS.close_download_window_on_finish,
+    close_action:
+      ["background", "quit"].includes(s.close_action)
+        ? s.close_action
+        : DEFAULT_SETTINGS.close_action,
+    run_at_startup:
+      typeof s.run_at_startup === "boolean"
+        ? s.run_at_startup
+        : DEFAULT_SETTINGS.run_at_startup,
+    close_notice_shown:
+      typeof s.close_notice_shown === "boolean"
+        ? s.close_notice_shown
+        : DEFAULT_SETTINGS.close_notice_shown,
+    clipboard_monitor:
+      typeof s.clipboard_monitor === "boolean"
+        ? s.clipboard_monitor
+        : DEFAULT_SETTINGS.clipboard_monitor,
+  };
+}
+
+/**
+ * Default subfolder created under the download directory for each category.
+ *
+ * Keep the names in sync with `FileCategory::subfolder` in
+ * `crates/core/src/category.rs`: the backend owns the folders it resolves itself.
+ */
+export const CATEGORY_SUBFOLDER_DEFAULTS = {
+  programs: "Programs",
+  video: "Video",
+  audio: "Music",
+  documents: "Documents",
+  compressed: "Compressed",
+  other: "Other",
+};
+
+/** Category ids that own a save folder, in the order the settings panel lists them. */
+export const CATEGORY_FOLDER_IDS = [
+  "programs",
+  "video",
+  "audio",
+  "documents",
+  "compressed",
+  "other",
+];
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function trimFolder(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * Normalizes the backend `category_folders` map, keeping only known category ids.
+ *
+ * @param {Record<string, unknown>|null|undefined} raw
+ * @returns {Record<string, string>}
+ */
+export function normalizeCategoryOverrides(raw) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  const overrides = {};
+  for (const id of CATEGORY_FOLDER_IDS) {
+    overrides[id] = trimFolder(source[id]);
+  }
+  return overrides;
+}
+
+/**
+ * Appends a category subfolder to `base`, matching the base folder's separator.
+ *
+ * @param {string} base
+ * @param {string} categoryId
+ * @returns {string}
+ */
+export function joinCategoryFolder(base, categoryId) {
+  const root = trimFolder(base).replace(/[/\\]+$/, "");
+  if (!root) return "";
+  const sub = CATEGORY_SUBFOLDER_DEFAULTS[categoryId] || CATEGORY_SUBFOLDER_DEFAULTS.other;
+  const sep = root.includes("\\") ? "\\" : "/";
+  return `${root}${sep}${sub}`;
+}
+
+/**
+ * Compares two folders the way Windows does: case and trailing separators ignored.
+ *
+ * @param {string} left
+ * @param {string} right
+ * @returns {boolean}
+ */
+export function sameFolderPath(left, right) {
+  const normalize = (value) =>
+    trimFolder(value).replace(/[/\\]+$/, "").replace(/\//g, "\\").toLowerCase();
+  const a = normalize(left);
+  return a.length > 0 && a === normalize(right);
+}
+
+/**
+ * Resolves a category folder: explicit override first, else the default subfolder.
+ *
+ * @param {string} downloadDir
+ * @param {string} categoryId
+ * @param {Record<string, string>|null|undefined} overrides
+ * @returns {string}
+ */
+export function resolveCategoryFolder(downloadDir, categoryId, overrides) {
+  const custom = normalizeCategoryOverrides(overrides)[categoryId];
+  if (custom) return custom;
+  return joinCategoryFolder(downloadDir, categoryId);
+}
+
+/**
+ * Rows rendered by the settings panel, one per category.
+ *
+ * @param {string} downloadDir
+ * @param {Record<string, string>|null|undefined} overrides
+ * @returns {Array<{ id: string, folder: string, isCustom: boolean }>}
+ */
+export function categoryFolderRows(downloadDir, overrides) {
+  const normalized = normalizeCategoryOverrides(overrides);
+  return CATEGORY_FOLDER_IDS.map((id) => ({
+    id,
+    folder: normalized[id] || joinCategoryFolder(downloadDir, id),
+    isCustom: Boolean(normalized[id]),
+  }));
+}
+
+/**
+ * Drops overrides that only repeat the default, so the saved settings stay minimal
+ * and keep following the download directory when the user changes it later.
+ *
+ * @param {Record<string, string>|null|undefined} overrides
+ * @param {string} downloadDir
+ * @returns {Record<string, string>}
+ */
+export function pruneCategoryOverrides(overrides, downloadDir) {
+  const normalized = normalizeCategoryOverrides(overrides);
+  const result = {};
+  for (const id of CATEGORY_FOLDER_IDS) {
+    const value = normalized[id];
+    if (!value) continue;
+    if (sameFolderPath(value, joinCategoryFolder(downloadDir, id))) continue;
+    result[id] = value;
+  }
+  return result;
+}

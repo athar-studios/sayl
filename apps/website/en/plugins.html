@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sayl Plugins · Coming in v0.2.0</title>
+  <meta name="description" content="Discover Sayl's upcoming modular plugin architecture for seamless video and media downloads in v0.2.0.">
+  <meta name="theme-color" content="#070F2E">
+  <link rel="canonical" href="https://sayl.site/en/plugins">
+  <link rel="alternate" hreflang="ar" href="https://sayl.site/plugins">
+  <link rel="alternate" hreflang="en" href="https://sayl.site/en/plugins">
+  <link rel="alternate" hreflang="x-default" href="https://sayl.site/plugins">
+
+  <!-- Favicons & App Icons (?v=2) -->
+  <link rel="icon" href="/favicon.ico?v=2" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
+  <link rel="manifest" href="/site.webmanifest">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:site_name" content="سيل · SAYL">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sayl.site/en/plugins">
+  <meta property="og:title" content="Sayl Plugins · Coming in v0.2.0">
+  <meta property="og:description" content="Discover Sayl's upcoming modular plugin architecture for seamless video and media downloads in v0.2.0.">
+  <meta property="og:image" content="https://sayl.site/og-image-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Sayl Plugins · Coming in v0.2.0">
+  <meta name="twitter:description" content="Discover Sayl's upcoming modular plugin architecture for seamless video and media downloads in v0.2.0.">
+  <meta name="twitter:image" content="https://sayl.site/og-image-en.png">
+
+  <!-- Preload Fonts & Stylesheet -->
+  <link rel="preload" href="/fonts/IBMPlexSansArabic-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/IBMPlexSansArabic-Bold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Athar Studio",
+    "url": "https://sayl.site",
+    "logo": "https://sayl.site/icon-512.png",
+    "sameAs": [
+      "https://github.com/athar-studios",
+      "https://ko-fi.com/athar_studio"
+    ]
+  }
+  </script>
+</head>
+<body class="page-inner">
+  <canvas id="flow" aria-hidden="true"></canvas>
+  <div class="lang-modal-overlay" id="lang-modal" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title">
+    <div class="lang-modal-card">
+      <img src="/favicon.svg?v=2" alt="Sayl logo" width="56" height="38" style="margin-bottom:12px">
+      <h2 id="lang-modal-title">Choose Language · اختر لغة الموقع</h2>
+      <p>You can toggle your preferred language anytime from the header button.</p>
+      <div class="lang-choices">
+        <button type="button" class="lang-choice-btn" data-choose-lang="ar">
+          <strong>العربية</strong>
+          <small>Arabic RTL Interface</small>
+        </button>
+        <button type="button" class="lang-choice-btn primary" data-choose-lang="en">
+          <strong>English</strong>
+          <small>Default English experience</small>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <header>
+      <a href="/en" class="brand" aria-label="Sayl - Home">
+        <img class="brand-logo" src="/icon.svg" alt="Sayl" width="57" height="40">
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="/en/docs">Docs</a>
+        <a href="/en#features" class="hide-mobile">Features</a>
+        <a href="/en/faq">FAQ</a>
+        <a href="/en/compare">Compare</a>
+        <a href="/en/plugins" class="active">Plugins</a>
+        <a href="/en/support">Support</a>
+      </nav>
+      <div class="header-actions">
+        <a href="/plugins" class="lang-btn" aria-label="التبديل إلى العربية">العربية</a>
+      </div>
+    </header>
+    <main class="page-shell">
+      <article class="page-card">
+        <h1>Sayl Plugins (Coming in v0.2.0)</h1>
+        <p class="lead" style="color:#b9c8e6;font-size:1.15rem;margin-bottom:24px">An open and modular plugin architecture expanding Sayl to capture and download video and media from major global platforms.</p>
+
+        <div class="note">
+          <strong>Important & Transparent Note:</strong> The plugin architecture is scheduled on our roadmap for <strong>release v0.2.0</strong> and is not present in the current v0.1.0 release (which focuses exclusively on high-speed direct HTTP/HTTPS downloads). Integration will rely on proven open-source tooling (such as yt-dlp and FFmpeg) without inventing unverified APIs. Follow roadmap progress on GitHub.
+        </div>
+
+        <h2 style="margin-top:36px">Planned Official Plugins</h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px;margin:20px 0 36px">
+
+          <div style="background:rgba(11,26,78,0.5);border:1px solid rgba(29,46,102,0.8);border-radius:16px;padding:22px;display:flex;flex-direction:column;justify-content:space-between">
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <h3 style="margin:0;font-size:1.15rem;color:#ffffff">YouTube Download Plugin</h3>
+                <span style="font-size:0.75rem;background:rgba(242,196,107,0.15);color:var(--sand);padding:3px 8px;border-radius:6px;font-weight:600">Coming in v0.2.0</span>
+              </div>
+              <p style="color:#b9c8e6;font-size:0.92rem;line-height:1.6;margin:0 0 16px">Extract YouTube videos in pristine quality (4K, 1080p, 60fps), with direct audio stream extraction (MP3/M4A) and subtitle selection.</p>
+            </div>
+            <a href="/en/plugins/youtube" style="color:var(--teal);text-decoration:none;font-weight:600;font-size:0.9rem">View plugin details →</a>
+          </div>
+          <div style="background:rgba(11,26,78,0.5);border:1px solid rgba(29,46,102,0.8);border-radius:16px;padding:22px;display:flex;flex-direction:column;justify-content:space-between">
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <h3 style="margin:0;font-size:1.15rem;color:#ffffff">Facebook Video Plugin</h3>
+                <span style="font-size:0.75rem;background:rgba(242,196,107,0.15);color:var(--sand);padding:3px 8px;border-radius:6px;font-weight:600">Coming in v0.2.0</span>
+              </div>
+              <p style="color:#b9c8e6;font-size:0.92rem;line-height:1.6;margin:0 0 16px">Download Facebook videos, watch clips, and Reels in original resolution directly from post URLs.</p>
+            </div>
+            <a href="/en/plugins/facebook" style="color:var(--teal);text-decoration:none;font-weight:600;font-size:0.9rem">View plugin details →</a>
+          </div>
+          <div style="background:rgba(11,26,78,0.5);border:1px solid rgba(29,46,102,0.8);border-radius:16px;padding:22px;display:flex;flex-direction:column;justify-content:space-between">
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <h3 style="margin:0;font-size:1.15rem;color:#ffffff">Instagram Media Plugin</h3>
+                <span style="font-size:0.75rem;background:rgba(242,196,107,0.15);color:var(--sand);padding:3px 8px;border-radius:6px;font-weight:600">Coming in v0.2.0</span>
+              </div>
+              <p style="color:#b9c8e6;font-size:0.92rem;line-height:1.6;margin:0 0 16px">Save Instagram Reels, video stories, and carousel media in full fidelity without watermark degradation.</p>
+            </div>
+            <a href="/en/plugins/instagram" style="color:var(--teal);text-decoration:none;font-weight:600;font-size:0.9rem">View plugin details →</a>
+          </div>
+          <div style="background:rgba(11,26,78,0.5);border:1px solid rgba(29,46,102,0.8);border-radius:16px;padding:22px;display:flex;flex-direction:column;justify-content:space-between">
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <h3 style="margin:0;font-size:1.15rem;color:#ffffff">TikTok Video Plugin</h3>
+                <span style="font-size:0.75rem;background:rgba(242,196,107,0.15);color:var(--sand);padding:3px 8px;border-radius:6px;font-weight:600">Coming in v0.2.0</span>
+              </div>
+              <p style="color:#b9c8e6;font-size:0.92rem;line-height:1.6;margin:0 0 16px">Fast downloads for TikTok videos, featuring high-bitrate video streams and audio-only extraction.</p>
+            </div>
+            <a href="/en/plugins/tiktok" style="color:var(--teal);text-decoration:none;font-weight:600;font-size:0.9rem">View plugin details →</a>
+          </div>
+          <div style="background:rgba(11,26,78,0.5);border:1px solid rgba(29,46,102,0.8);border-radius:16px;padding:22px;display:flex;flex-direction:column;justify-content:space-between">
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <h3 style="margin:0;font-size:1.15rem;color:#ffffff">X (Twitter) Video Plugin</h3>
+                <span style="font-size:0.75rem;background:rgba(242,196,107,0.15);color:var(--sand);padding:3px 8px;border-radius:6px;font-weight:600">Coming in v0.2.0</span>
+              </div>
+              <p style="color:#b9c8e6;font-size:0.92rem;line-height:1.6;margin:0 0 16px">Download videos and GIFs embedded in posts on X (formerly Twitter) with instant stream quality selection.</p>
+            </div>
+            <a href="/en/plugins/x" style="color:var(--teal);text-decoration:none;font-weight:600;font-size:0.9rem">View plugin details →</a>
+          </div>
+          <div style="background:rgba(11,26,78,0.5);border:1px solid rgba(29,46,102,0.8);border-radius:16px;padding:22px;display:flex;flex-direction:column;justify-content:space-between">
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <h3 style="margin:0;font-size:1.15rem;color:#ffffff">LinkedIn Video Plugin</h3>
+                <span style="font-size:0.75rem;background:rgba(242,196,107,0.15);color:var(--sand);padding:3px 8px;border-radius:6px;font-weight:600">Coming in v0.2.0</span>
+              </div>
+              <p style="color:#b9c8e6;font-size:0.92rem;line-height:1.6;margin:0 0 16px">Save professional talks, presentations, and feed videos from LinkedIn for offline playback.</p>
+            </div>
+            <a href="/en/plugins/linkedin" style="color:var(--teal);text-decoration:none;font-weight:600;font-size:0.9rem">View plugin details →</a>
+          </div>
+          <div style="background:rgba(11,26,78,0.5);border:1px solid rgba(29,46,102,0.8);border-radius:16px;padding:22px;display:flex;flex-direction:column;justify-content:space-between">
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <h3 style="margin:0;font-size:1.15rem;color:#ffffff">Dailymotion Video Plugin</h3>
+                <span style="font-size:0.75rem;background:rgba(242,196,107,0.15);color:var(--sand);padding:3px 8px;border-radius:6px;font-weight:600">Coming in v0.2.0</span>
+              </div>
+              <p style="color:#b9c8e6;font-size:0.92rem;line-height:1.6;margin:0 0 16px">Download Dailymotion videos and episodic series in full HD with segmented transfer support.</p>
+            </div>
+            <a href="/en/plugins/dailymotion" style="color:var(--teal);text-decoration:none;font-weight:600;font-size:0.9rem">View plugin details →</a>
+          </div>
+        </div>
+
+        <h2>How the Plugin Architecture Will Work</h2>
+        <ul>
+          <li><strong>Automatic Stream Detection:</strong> Pasting a supported link triggers the matching plugin, presenting direct resolution and bitrate options.</li>
+          <li><strong>Local On-Device Processing:</strong> Media parsing and multiplexing run entirely on your local machine with zero remote tracking servers.</li>
+          <li><strong>Independent Updates:</strong> Site extractors can update seamlessly when platforms tweak formats, without requiring a complete engine rebuild.</li>
+        </ul>
+
+        <div class="cta" style="margin-top:36px">
+          <a class="btn pri" href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">Follow v0.2.0 on GitHub</a>
+          <a class="btn sec" href="/en/docs">Documentation</a>
+        </div>
+      </article>
+    </main>
+    <footer>
+      <div class="footer-wrap">
+        <div class="footer-brand">
+          <img class="footer-logo" src="/icon.svg" alt="Sayl" width="54" height="38">
+          <span><strong>Sayl · سيل</strong></span>
+        </div>
+        <div class="footer-links">
+          <a href="/en/docs">Docs</a>
+          <a href="/en/faq">FAQ</a>
+          <a href="/en/compare">Comparison</a>
+          <a href="/en/idm-alternative">IDM Alternative</a>
+          <a href="/en/free-download-manager-windows">Windows FDM</a>
+          <a href="/en/plugins">Plugins</a>
+          <a href="/en/themes">Themes</a>
+          <a href="/en/about">About Studio</a>
+          <a href="/en/support">Support</a>
+          <a href="/en/privacy">Privacy</a>
+          <a href="/en/terms">Terms</a>
+          <a href="https://github.com/athar-studios/sayl" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </div>
+      </div>
+      <div style="margin-top:20px;text-align:center;color:#6b80ad;font-size:0.85rem">
+        Athar Studio · Licensed under PolyForm Noncommercial 1.0.0 · Zero tracking & zero telemetry
+      </div>
+    </footer>
+  </div>
+
+  <script src="/flow.js" defer></script>
+  <script src="/site.js" defer></script>
+</body>
+</html>

@@ -1,8 +1,8 @@
-use std::time::Instant;
 use futures_util::StreamExt;
 use sayl_http::{build_client, ClientConfig};
 use sayl_test_http::{HttpFixtureServer, Scenario};
 use serde::{Deserialize, Serialize};
+use std::time::Instant;
 
 #[cfg(windows)]
 pub fn get_peak_rss_bytes() -> Option<u64> {
@@ -300,12 +300,7 @@ pub async fn run_range_overhead(
             .await?;
 
         if res.status() != reqwest::StatusCode::PARTIAL_CONTENT {
-            return Err(format!(
-                "Range request {} failed with status {}",
-                i,
-                res.status()
-            )
-            .into());
+            return Err(format!("Range request {} failed with status {}", i, res.status()).into());
         }
 
         let mut stream = res.bytes_stream();
@@ -448,7 +443,12 @@ pub async fn run_all_benchmarks(
 
     let mut seq_throughput = None;
 
-    if run_all || filter == "sequential" || filter == "parallel" || filter == "parallel_4" || filter == "parallel_8" {
+    if run_all
+        || filter == "sequential"
+        || filter == "parallel"
+        || filter == "parallel_4"
+        || filter == "parallel_8"
+    {
         let seq = run_sequential(&client, &server_url, size).await?;
         seq_throughput = Some(seq.throughput_mb_s);
         if run_all || filter == "sequential" {
@@ -562,7 +562,10 @@ impl BenchmarkReport {
             out.push_str(&format!(
                 "{:<24} | {:<12} | {:<12} | {:<12} | re-fetched: {} B ({:.1}%)\n",
                 "4. Resume Correctness Cost",
-                format!("{:.2} MiB", r.total_bytes_transferred as f64 / (1024.0 * 1024.0)),
+                format!(
+                    "{:.2} MiB",
+                    r.total_bytes_transferred as f64 / (1024.0 * 1024.0)
+                ),
                 "-",
                 "-",
                 r.re_fetched_bytes,
@@ -577,11 +580,7 @@ impl BenchmarkReport {
             };
             out.push_str(&format!(
                 "{:<24} | {:<12} | {:<12} | {:<12} | peak RSS: {}\n",
-                "5. Process Memory",
-                "-",
-                "-",
-                "-",
-                mem_str
+                "5. Process Memory", "-", "-", "-", mem_str
             ));
         }
 

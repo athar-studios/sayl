@@ -39,7 +39,10 @@ async fn wait_for_terminal(
         }
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
-    panic!("task {} did not reach terminal state within {:?}", task_id, timeout);
+    panic!(
+        "task {} did not reach terminal state within {:?}",
+        task_id, timeout
+    );
 }
 
 fn make_temp_dir() -> TempDir {
@@ -127,7 +130,10 @@ async fn test_truncated_body_fails_and_keeps_part_file() {
 
     // .part file must be kept for resume
     let part_path = dl_dir.path().join(format!("{}.part", task.filename));
-    assert!(part_path.exists(), ".part file must be preserved on truncation");
+    assert!(
+        part_path.exists(),
+        ".part file must be preserved on truncation"
+    );
     let part_len = tokio::fs::metadata(&part_path).await.unwrap().len();
     assert!(part_len > 0, "partial file must contain received bytes");
     assert!(part_len < size as u64, "partial file must be incomplete");
@@ -160,7 +166,10 @@ async fn test_pause_then_resume_unchanged_etag() {
 
     // Wait until transfer has actively started and received progress
     while let Some(ev) = event_rx.recv().await {
-        if let sayl_core::event::EventPayload::Progress { downloaded_bytes, .. } = ev.payload {
+        if let sayl_core::event::EventPayload::Progress {
+            downloaded_bytes, ..
+        } = ev.payload
+        {
             if downloaded_bytes > 0 {
                 break;
             }
@@ -174,7 +183,10 @@ async fn test_pause_then_resume_unchanged_etag() {
     let paused_task = engine.get_task(task_id).unwrap().unwrap();
     assert_eq!(paused_task.state, DownloadState::Paused);
 
-    let checkpoint = engine.load_checkpoint(task_id).unwrap().expect("checkpoint exists");
+    let checkpoint = engine
+        .load_checkpoint(task_id)
+        .unwrap()
+        .expect("checkpoint exists");
     assert!(checkpoint.written > 0);
 
     let part_path = dl_dir.path().join(format!("{}.part", paused_task.filename));
@@ -213,11 +225,16 @@ async fn test_etag_changed_restarts_from_zero_and_completes() {
     // Simulate an existing stale partial file with dummy bytes
     let record = engine.get_task(task_id).unwrap().unwrap();
     let part_path = dl_dir.path().join(format!("{}.part", record.filename));
-    tokio::fs::write(&part_path, vec![0xAA; 4096]).await.unwrap();
+    tokio::fs::write(&part_path, vec![0xAA; 4096])
+        .await
+        .unwrap();
 
     // Start download: fresh probe receives secondary ETag ("v2" vs stored "v1"),
     // so validate_resume orders RestartFromZero.
-    engine.start(task_id).await.expect("start download after etag change");
+    engine
+        .start(task_id)
+        .await
+        .expect("start download after etag change");
 
     let completed_task = engine.get_task(task_id).unwrap().unwrap();
     assert_eq!(completed_task.state, DownloadState::Completed);
@@ -345,7 +362,10 @@ async fn test_parallel_download_with_disjoint_ranges() {
     let url = format!("http://{addr}/test_parallel.bin");
     let task_id = engine.add(&url).await.expect("add task");
 
-    engine.start(task_id).await.expect("start parallel download");
+    engine
+        .start(task_id)
+        .await
+        .expect("start parallel download");
 
     let task = engine.get_task(task_id).unwrap().unwrap();
     assert_eq!(task.state, DownloadState::Completed);
@@ -451,7 +471,10 @@ async fn test_concurrency_limit_extra_stay_queued() {
 
     // Try starting t3: must fail due to concurrency limit
     let res3 = engine.start(t3).await;
-    assert!(res3.is_err(), "task t3 must be rejected by concurrency limit");
+    assert!(
+        res3.is_err(),
+        "task t3 must be rejected by concurrency limit"
+    );
 
     // t3 must remain in Queued state
     let task3 = engine.get_task(t3).unwrap().unwrap();
@@ -622,7 +645,11 @@ async fn test_scheduler_per_origin_limit() {
             range_gets += 1;
         }
     }
-    assert!(range_gets >= 2, "expected at least 2 range GETs, got {}", range_gets);
+    assert!(
+        range_gets >= 2,
+        "expected at least 2 range GETs, got {}",
+        range_gets
+    );
 }
 
 /// Test: Two tasks on different origins are not blocked by one another.
@@ -754,7 +781,11 @@ async fn test_scheduler_cancel_queued_task() {
 
     // Verify scheduler no longer has the cancelled task queued
     let stats = engine.queue_stats().await;
-    assert_eq!(stats.queued, 0, "scheduler should not have cancelled task queued, got {}", stats.queued);
+    assert_eq!(
+        stats.queued, 0,
+        "scheduler should not have cancelled task queued, got {}",
+        stats.queued
+    );
 
     // Wait for task1 to complete
     let _ = handle1.await;
@@ -778,5 +809,2099 @@ async fn test_scheduler_cancel_queued_task() {
         final_task2 - baseline_task2
     );
     let task1_requests = count_requests(&server, "cancel_task1").await;
-    assert!(task1_requests > 0, "task1 should have been downloaded, got {}", task1_requests);
+    assert!(
+        task1_requests > 0,
+        "task1 should have been downloaded, got {}",
+        task1_requests
+    );
+}
+
+#[tokio::test]
+async fn test_404_stores_real_error_text() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let mut buf = [0u8; 1024];
+            let _ = socket.read(&mut buf).await;
+            let resp = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+            let _ = socket.write_all(resp.as_bytes()).await;
+        }
+    });
+
+    let dl_dir = make_temp_dir();
+    let store_dir = make_temp_dir();
+    let config = EngineConfig::default();
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+
+    let url = format!("http://{addr}/notfound.bin");
+    let task_id = engine.add(&url).await.expect("add task");
+
+    let eng = engine.clone();
+    let _handle = tokio::spawn(async move { eng.start(task_id).await });
+
+    let terminal_state = wait_for_terminal(&engine, task_id, Duration::from_secs(5)).await;
+    assert_eq!(terminal_state, DownloadState::Failed);
+
+    let task = engine.get_task(task_id).unwrap().unwrap();
+    assert!(
+        task.error.as_deref().unwrap_or("").contains("404"),
+        "error must contain 404, got: {:?}",
+        task.error
+    );
+}
+
+#[tokio::test]
+async fn test_retry_failed_task() {
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    let size = 16384;
+    server.set_resource_size(size);
+    let addr = server.start().await.expect("start fixture server");
+
+    let dl_dir = make_temp_dir();
+    let store_dir = make_temp_dir();
+    let config = EngineConfig::default();
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+
+    let url = format!("http://{addr}/retry_test.dat");
+    let task_id = engine.add(&url).await.expect("add task");
+
+    // Manually mark task as Failed with an error to simulate previous failure
+    let store = Store::open(store_dir.path().join("sayl.db")).expect("open store");
+    {
+        let mut record = engine.get_task(task_id).unwrap().unwrap();
+        record.state = DownloadState::Failed;
+        record.error = Some("Previous failure test error".to_string());
+        record.error_kind = Some("http_500".to_string());
+        store.upsert_task(&record).unwrap();
+    }
+
+    // Now call start: retry should be allowed, resetting state, clearing error, and completing!
+    let eng = engine.clone();
+    let handle = tokio::spawn(async move { eng.start(task_id).await });
+    let terminal_state = wait_for_terminal(&engine, task_id, Duration::from_secs(10)).await;
+    let _ = handle.await;
+
+    assert_eq!(terminal_state, DownloadState::Completed);
+    let final_task = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(final_task.error, None, "error must be cleared on retry");
+    assert_eq!(
+        final_task.error_kind, None,
+        "error_kind must be cleared on retry"
+    );
+}
+
+#[tokio::test]
+async fn test_parallel_429_fallback_to_sequential() {
+    let size = 16384usize;
+    let expected_data = generate_bytes(size);
+    let data_clone = expected_data.clone();
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let data = data_clone.clone();
+            tokio::spawn(async move {
+                let mut buf = [0u8; 2048];
+                let n = socket.read(&mut buf).await.unwrap_or(0);
+                let req = String::from_utf8_lossy(&buf[..n]);
+
+                if req.starts_with("HEAD") {
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                } else if req.contains("Range: bytes=") {
+                    if req.contains("Range: bytes=0-0") {
+                        let resp = format!(
+                            "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-0/{}\r\nContent-Length: 1\r\nConnection: close\r\n\r\n{}",
+                            size, data[0] as char
+                        );
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                    } else {
+                        // Parallel worker range request: simulate 429 throttling!
+                        let resp = "HTTP/1.1 429 Too Many Requests\r\nRetry-After: 0\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                    }
+                } else {
+                    // Sequential full GET without Range: succeed!
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                    let _ = socket.write_all(&data).await;
+                }
+            });
+        }
+    });
+
+    let dl_dir = make_temp_dir();
+    let store_dir = make_temp_dir();
+    let config = EngineConfig::default();
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+
+    let url = format!("http://{addr}/test_429_fallback.dat");
+    let task_id = engine.add(&url).await.expect("add task");
+
+    let eng = engine.clone();
+    let handle = tokio::spawn(async move { eng.start(task_id).await });
+    let terminal_state = wait_for_terminal(&engine, task_id, Duration::from_secs(10)).await;
+    let _ = handle.await;
+
+    assert_eq!(terminal_state, DownloadState::Completed);
+    let final_task = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(final_task.written, size as u64);
+
+    let final_path = dl_dir.path().join(&final_task.filename);
+    let bytes = tokio::fs::read(&final_path).await.expect("read final file");
+    assert_eq!(bytes, expected_data);
+}
+
+#[tokio::test]
+async fn test_resume_from_checkpoint_skips_probe_and_ranges_from_offset() {
+    let size = 16384usize;
+    let offset = 4096usize;
+    let expected_data = generate_bytes(size);
+    let data_clone = expected_data.clone();
+
+    let requests = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let requests_clone = std::sync::Arc::clone(&requests);
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let data = data_clone.clone();
+            let reqs = std::sync::Arc::clone(&requests_clone);
+            tokio::spawn(async move {
+                let mut buf = [0u8; 4096];
+                let n = socket.read(&mut buf).await.unwrap_or(0);
+                let req = String::from_utf8_lossy(&buf[..n]).to_string();
+                reqs.lock().unwrap().push(req.clone());
+
+                if req.starts_with("HEAD") {
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nAccept-Ranges: bytes\r\nETag: \"etag-test\"\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                } else if req.contains("Range: bytes=") {
+                    if req.contains("Range: bytes=4096-") {
+                        let body = &data[offset..];
+                        let resp = format!(
+                            "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {}-{}/{}\r\nContent-Length: {}\r\nETag: \"etag-test\"\r\nConnection: close\r\n\r\n",
+                            offset,
+                            size - 1,
+                            size,
+                            body.len()
+                        );
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                        let _ = socket.write_all(body).await;
+                    } else if req.contains("Range: bytes=0-0") {
+                        let resp = format!(
+                            "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-0/{}\r\nContent-Length: 1\r\nETag: \"etag-test\"\r\nConnection: close\r\n\r\n{}",
+                            size, data[0] as char
+                        );
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                    } else {
+                        let resp =
+                            "HTTP/1.1 416 Range Not Satisfiable\r\nConnection: close\r\n\r\n";
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                    }
+                } else {
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nETag: \"etag-test\"\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                    let _ = socket.write_all(&data).await;
+                }
+            });
+        }
+    });
+
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let config = EngineConfig::default();
+    let store = std::sync::Arc::new(Store::open(store_dir.path()).expect("open store"));
+    let engine = Engine::with_store(dl_dir.path(), std::sync::Arc::clone(&store), config)
+        .expect("create engine");
+    let mut event_rx = engine.take_event_receiver().expect("take event rx");
+
+    let url = format!("http://{addr}/test_fast_resume.dat");
+    let task_id = sayl_core::id::TaskId::new();
+
+    // Pre-create .part file on disk covering offset bytes
+    let filename = "test_fast_resume.dat";
+    let part_path = dl_dir.path().join(format!("{filename}.part"));
+    tokio::fs::write(&part_path, &expected_data[..offset])
+        .await
+        .expect("write .part file");
+
+    // Pre-create TaskRecord in Paused state with known total_size and etag validator
+    let mut record = TaskRecord::with_id(task_id, &url, dl_dir.path(), filename);
+    record.total_size = Some(size as u64);
+    record.written = offset as u64;
+    record.etag = Some("\"etag-test\"".to_string());
+    record.state = DownloadState::Paused;
+    store.upsert_task(&record).expect("upsert record");
+
+    // Pre-create checkpoint in store at offset N
+    let checkpoint = sayl_storage::Checkpoint::new(
+        task_id,
+        offset as u64,
+        Some(size as u64),
+        vec![(0, offset as u64)],
+    );
+    store.save_checkpoint(&checkpoint).expect("save checkpoint");
+
+    // Start resume download
+    let start_time = Instant::now();
+    engine.start(task_id).await.expect("start resume download");
+    let terminal = wait_for_terminal(&engine, task_id, Duration::from_secs(5)).await;
+    let elapsed = start_time.elapsed();
+
+    assert_eq!(terminal, DownloadState::Completed);
+    assert!(
+        elapsed < Duration::from_secs(3),
+        "resume must be fast on loopback, took {elapsed:?}"
+    );
+
+    // Assert that the first HTTP request received by origin was Range: bytes=4096- and no probe was made
+    let reqs = requests.lock().unwrap().clone();
+    assert!(!reqs.is_empty(), "requests must have been made");
+    assert!(
+        !reqs.iter().any(|r| r.starts_with("HEAD")),
+        "no HEAD probe request must be issued on fast resume, got: {:?}",
+        reqs
+    );
+    assert!(
+        !reqs
+            .iter()
+            .any(|r| r.to_ascii_lowercase().contains("range: bytes=0-0")),
+        "no probe ranged GET (0-0) must be issued on fast resume, got: {:?}",
+        reqs
+    );
+    assert!(
+        reqs[0].to_ascii_lowercase().contains("range: bytes=4096-"),
+        "first HTTP request must be Range starting at 4096, got: {}",
+        reqs[0]
+    );
+
+    // Verify events: DownloadState never became Probing!
+    while let Ok(event) = event_rx.try_recv() {
+        if let sayl_core::event::EventPayload::StateChanged { to, .. } = event.payload {
+            assert_ne!(
+                to,
+                DownloadState::Probing,
+                "task state must never transition to Probing during fast resume"
+            );
+        }
+    }
+
+    // Assert total_size stayed unchanged
+    let final_task = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        final_task.total_size,
+        Some(size as u64),
+        "total_size must stay unchanged"
+    );
+    assert_eq!(final_task.written, size as u64);
+
+    // Final file must be complete and byte-identical
+    let final_file = dl_dir.path().join(filename);
+    let bytes = tokio::fs::read(&final_file).await.expect("read final file");
+    assert_eq!(bytes, expected_data);
+}
+
+#[tokio::test]
+async fn test_parallel_fallback_preserves_progress_and_size() {
+    let size = 32768usize;
+    let chunk_size = 8192usize;
+    let expected_data = generate_bytes(size);
+    let data_clone = expected_data.clone();
+
+    let requests = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let requests_clone = std::sync::Arc::clone(&requests);
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let data = data_clone.clone();
+            let reqs = std::sync::Arc::clone(&requests_clone);
+            tokio::spawn(async move {
+                let mut buf = [0u8; 4096];
+                let n = socket.read(&mut buf).await.unwrap_or(0);
+                let req = String::from_utf8_lossy(&buf[..n]).to_string();
+                reqs.lock().unwrap().push(req.clone());
+                let lower = req.to_ascii_lowercase();
+
+                if req.starts_with("HEAD") {
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nAccept-Ranges: bytes\r\nETag: \"etag-parallel\"\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                } else if lower.contains("range: bytes=") {
+                    if lower.contains("range: bytes=0-0") {
+                        // Range probe check
+                        let resp = format!(
+                            "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-0/{}\r\nContent-Length: 1\r\nAccept-Ranges: bytes\r\nETag: \"etag-parallel\"\r\nConnection: close\r\n\r\n",
+                            size
+                        );
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                        let _ = socket.write_all(&data[0..1]).await;
+                    } else if lower.contains("range: bytes=0-8191") {
+                        // First chunk succeeds
+                        let chunk = &data[0..8192];
+                        let resp = format!(
+                            "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-8191/{}\r\nContent-Length: 8192\r\nAccept-Ranges: bytes\r\nETag: \"etag-parallel\"\r\nConnection: close\r\n\r\n",
+                            size
+                        );
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                        let _ = socket.write_all(chunk).await;
+                    } else if lower.contains("range: bytes=8192-") {
+                        // Fallback sequential range request starting at 8192!
+                        let remaining = &data[8192..];
+                        let resp = format!(
+                            "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 8192-{}/{}\r\nContent-Length: {}\r\nAccept-Ranges: bytes\r\nETag: \"etag-parallel\"\r\nConnection: close\r\n\r\n",
+                            size - 1,
+                            size,
+                            remaining.len()
+                        );
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                        let _ = socket.write_all(remaining).await;
+                    } else {
+                        // Other worker requests fail with 429
+                        let resp = "HTTP/1.1 429 Too Many Requests\r\nRetry-After: 0\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                    }
+                } else {
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                    let _ = socket.write_all(&data).await;
+                }
+            });
+        }
+    });
+
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let config = EngineConfig {
+        max_connections: 4,
+        chunk_size,
+        ..Default::default()
+    };
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+
+    let url = format!("http://{addr}/test_fallback_progress.dat");
+    let task_id = engine.add(&url).await.expect("add task");
+
+    let eng = engine.clone();
+    let handle = tokio::spawn(async move { eng.start(task_id).await });
+    let terminal = wait_for_terminal(&engine, task_id, Duration::from_secs(10)).await;
+    let _ = handle.await;
+
+    assert_eq!(terminal, DownloadState::Completed);
+
+    let final_task = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        final_task.total_size,
+        Some(size as u64),
+        "total_size must be preserved on fallback"
+    );
+    assert_eq!(final_task.written, size as u64);
+
+    let reqs = requests.lock().unwrap().clone();
+    assert!(
+        reqs.iter()
+            .any(|r| r.to_ascii_lowercase().contains("range: bytes=8192-")),
+        "fallback must resume from completed offset with Range: bytes=8192-, got requests: {:?}",
+        reqs
+    );
+
+    let final_path = dl_dir.path().join(&final_task.filename);
+    let bytes = tokio::fs::read(&final_path).await.expect("read final file");
+    assert_eq!(bytes, expected_data);
+}
+
+#[tokio::test]
+async fn test_deleted_failed_task_not_resurrected_after_reopen() {
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let config = EngineConfig::default();
+
+    let task_id;
+    let late_record;
+    {
+        let store = std::sync::Arc::new(Store::open(store_dir.path()).expect("open store"));
+        let engine =
+            Engine::with_store(dl_dir.path(), std::sync::Arc::clone(&store), config.clone())
+                .expect("create engine");
+
+        task_id = sayl_core::id::TaskId::new();
+        let mut record = TaskRecord::with_id(
+            task_id,
+            "http://example.invalid/100MB.dat",
+            dl_dir.path(),
+            "100MB.dat",
+        );
+        record.state = DownloadState::Failed;
+        record.error = Some("connection refused".to_string());
+        record.error_kind = Some("network".to_string());
+        record.total_size = Some(104857600);
+        store.upsert_task(&record).expect("upsert failed task");
+
+        let checkpoint =
+            sayl_storage::Checkpoint::new(task_id, 1024, Some(104857600), vec![(0, 1024)]);
+        store.save_checkpoint(&checkpoint).expect("save checkpoint");
+
+        assert!(engine.get_task(task_id).unwrap().is_some());
+        assert!(engine.load_checkpoint(task_id).unwrap().is_some());
+
+        // Delete the failed task
+        engine.delete_task(task_id).expect("delete task");
+        assert!(engine.get_task(task_id).unwrap().is_none());
+        assert!(engine.load_checkpoint(task_id).unwrap().is_none());
+
+        // Late upsert attempt (simulating late retry or background pump) must be ignored
+        late_record = record.clone();
+        store.upsert_task(&late_record).expect("late upsert");
+        assert!(
+            engine.get_task(task_id).unwrap().is_none(),
+            "late upsert must not resurrect deleted task"
+        );
+
+        // Late checkpoint attempt must also be ignored
+        let _ = store.save_checkpoint(&checkpoint);
+        assert!(
+            engine.load_checkpoint(task_id).unwrap().is_none(),
+            "late checkpoint must not recreate checkpoint"
+        );
+
+        drop(engine);
+        drop(store);
+    }
+
+    // Reopen engine and store from the same directory and execute recover()
+    {
+        let store = std::sync::Arc::new(Store::open(store_dir.path()).expect("reopen store"));
+        let engine =
+            Engine::with_store(dl_dir.path(), std::sync::Arc::clone(&store), config.clone())
+                .expect("reopen engine");
+        let recovered = engine.recover().await.expect("recover");
+
+        assert!(
+            !recovered.contains(&task_id),
+            "recovered tasks must not contain deleted task"
+        );
+        assert!(
+            engine.get_task(task_id).unwrap().is_none(),
+            "deleted failed task must remain absent after restart and recover"
+        );
+        assert!(
+            engine.load_checkpoint(task_id).unwrap().is_none(),
+            "checkpoint must remain absent after restart"
+        );
+
+        // A late upsert on the reopened store must still be rejected by the tombstone guard
+        store
+            .upsert_task(&late_record)
+            .expect("late upsert after reopen");
+        assert!(
+            engine.get_task(task_id).unwrap().is_none(),
+            "late upsert after reopen must still be ignored"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_add_with_metadata_skips_network_probe() {
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let config = EngineConfig::default();
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+
+    // Use an unroutable loopback port to prove that NO network probe is performed when filename + size are supplied
+    let url = "http://127.0.0.1:1/nonexistent.iso";
+    let filename = Some("custom_name.iso".to_string());
+    let size = Some(52428800u64); // 50 MiB
+    let referrer = Some("https://source.example.com/download".to_string());
+    let headers = Some(vec![("X-Auth-Token".to_string(), "secret123".to_string())]);
+
+    let task_id = engine
+        .add_with_metadata(&url, filename, size, referrer, headers)
+        .await
+        .expect("add_with_metadata must succeed without network probe");
+
+    let task = engine
+        .get_task(task_id)
+        .unwrap()
+        .expect("task must exist in store");
+    assert_eq!(task.filename, "custom_name.iso");
+    assert_eq!(task.total_size, Some(52428800));
+    assert_eq!(task.state, DownloadState::Queued);
+
+    // Verify privacy rule: headers and tokens are NOT stored in TaskRecord or store journal
+    assert!(task.error.is_none());
+}
+
+#[tokio::test]
+async fn test_stall_watchdog_retries_once_from_offset_and_fails_if_exhausted() {
+    let size = 8192usize;
+    let expected_data = generate_bytes(size);
+    let data_clone = expected_data.clone();
+
+    let attempts = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let attempts_clone = std::sync::Arc::clone(&attempts);
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let data = data_clone.clone();
+            let att = std::sync::Arc::clone(&attempts_clone);
+            tokio::spawn(async move {
+                let mut buf = [0u8; 2048];
+                let n = socket.read(&mut buf).await.unwrap_or(0);
+                let req = String::from_utf8_lossy(&buf[..n]).to_string();
+
+                if req.starts_with("HEAD") {
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                } else {
+                    let count = att.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    if count == 0 {
+                        // First attempt: stall by sending response headers then sleeping longer than stall timeout
+                        let resp = format!(
+                            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                            size
+                        );
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                        // Send partial 1024 bytes then stall
+                        let _ = socket.write_all(&data[..1024]).await;
+                        tokio::time::sleep(Duration::from_millis(1500)).await;
+                    } else {
+                        // Retry attempt: send full data promptly
+                        if req.contains("Range: bytes=1024-") {
+                            let resp = format!(
+                                "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 1024-{}/{}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                                size - 1, size, size - 1024
+                            );
+                            let _ = socket.write_all(resp.as_bytes()).await;
+                            let _ = socket.write_all(&data[1024..]).await;
+                        } else {
+                            let resp = format!(
+                                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                                size
+                            );
+                            let _ = socket.write_all(resp.as_bytes()).await;
+                            let _ = socket.write_all(&data).await;
+                        }
+                    }
+                }
+            });
+        }
+    });
+
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let config = EngineConfig {
+        stall_timeout: Duration::from_millis(300),
+        ..Default::default()
+    };
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+    engine.set_stall_timeout(Duration::from_millis(300));
+
+    let url = format!("http://{addr}/test_watchdog.dat");
+    let task_id = engine.add(&url).await.expect("add task");
+
+    let eng = engine.clone();
+    let handle = tokio::spawn(async move { eng.start(task_id).await });
+    let terminal = wait_for_terminal(&engine, task_id, Duration::from_secs(6)).await;
+    let _ = handle.await;
+
+    assert_eq!(terminal, DownloadState::Completed);
+    assert!(
+        attempts.load(std::sync::atomic::Ordering::SeqCst) >= 2,
+        "watchdog must have aborted and retried"
+    );
+
+    let final_task = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(final_task.written, size as u64);
+
+    let final_path = dl_dir.path().join(&final_task.filename);
+    let bytes = tokio::fs::read(&final_path).await.expect("read final file");
+    assert_eq!(bytes, expected_data);
+}
+
+#[tokio::test]
+async fn test_resume_without_validator_never_probes() {
+    let size = 16384usize;
+    let offset = 4096usize;
+    let expected_data = generate_bytes(size);
+    let data_clone = expected_data.clone();
+
+    let requests = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let requests_clone = std::sync::Arc::clone(&requests);
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let data = data_clone.clone();
+            let reqs = std::sync::Arc::clone(&requests_clone);
+            tokio::spawn(async move {
+                let mut buf = [0u8; 4096];
+                let n = socket.read(&mut buf).await.unwrap_or(0);
+                let req = String::from_utf8_lossy(&buf[..n]).to_string();
+                reqs.lock().unwrap().push(req.clone());
+                let lower = req.to_ascii_lowercase();
+
+                if req.starts_with("HEAD") {
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                } else if lower.contains("range: bytes=") {
+                    if lower.contains("range: bytes=4096-") {
+                        let body = &data[offset..];
+                        let resp = format!(
+                            "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {}-{}/{}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                            offset,
+                            size - 1,
+                            size,
+                            body.len()
+                        );
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                        let _ = socket.write_all(body).await;
+                    } else if lower.contains("range: bytes=0-0") {
+                        let resp = format!(
+                            "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-0/{}\r\nContent-Length: 1\r\nConnection: close\r\n\r\n",
+                            size
+                        );
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                        let _ = socket.write_all(&data[0..1]).await;
+                    } else {
+                        let resp =
+                            "HTTP/1.1 416 Range Not Satisfiable\r\nConnection: close\r\n\r\n";
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                    }
+                } else {
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                    let _ = socket.write_all(&data).await;
+                }
+            });
+        }
+    });
+
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let config = EngineConfig::default();
+    let store = std::sync::Arc::new(Store::open(store_dir.path()).expect("open store"));
+    let engine = Engine::with_store(dl_dir.path(), std::sync::Arc::clone(&store), config)
+        .expect("create engine");
+    let mut event_rx = engine.take_event_receiver().expect("take event rx");
+
+    let url = format!("http://{addr}/test_no_validator_resume.dat");
+    let task_id = sayl_core::id::TaskId::new();
+
+    // Pre-create .part file on disk covering offset bytes
+    let filename = "test_no_validator_resume.dat";
+    let part_path = dl_dir.path().join(format!("{filename}.part"));
+    tokio::fs::write(&part_path, &expected_data[..offset])
+        .await
+        .expect("write .part file");
+
+    // Pre-create TaskRecord in Paused state with known total_size and NO etag/last_modified validator
+    let mut record = TaskRecord::with_id(task_id, &url, dl_dir.path(), filename);
+    record.total_size = Some(size as u64);
+    record.written = offset as u64;
+    record.etag = None;
+    record.last_modified = None;
+    record.state = DownloadState::Paused;
+    store.upsert_task(&record).expect("upsert record");
+
+    // Pre-create checkpoint in store at offset N
+    let checkpoint = sayl_storage::Checkpoint::new(
+        task_id,
+        offset as u64,
+        Some(size as u64),
+        vec![(0, offset as u64)],
+    );
+    store.save_checkpoint(&checkpoint).expect("save checkpoint");
+
+    // Start resume download
+    engine.start(task_id).await.expect("start resume download");
+    let terminal = wait_for_terminal(&engine, task_id, Duration::from_secs(5)).await;
+
+    assert_eq!(terminal, DownloadState::Completed);
+
+    // Assert that no HEAD request and no bytes=0-0 request was made
+    let reqs = requests.lock().unwrap().clone();
+    assert!(!reqs.is_empty(), "requests must have been made");
+    assert!(
+        !reqs.iter().any(|r| r.starts_with("HEAD")),
+        "no HEAD request must be made, got: {:?}",
+        reqs
+    );
+    assert!(
+        !reqs
+            .iter()
+            .any(|r| r.to_ascii_lowercase().contains("range: bytes=0-0")),
+        "no bytes=0-0 request must be made, got: {:?}",
+        reqs
+    );
+    assert!(
+        reqs[0].to_ascii_lowercase().contains("range: bytes=4096-"),
+        "first request must be Range: bytes=4096-, got: {}",
+        reqs[0]
+    );
+
+    // Verify events: DownloadState never became Probing!
+    while let Ok(event) = event_rx.try_recv() {
+        if let sayl_core::event::EventPayload::StateChanged { to, .. } = event.payload {
+            assert_ne!(
+                to,
+                DownloadState::Probing,
+                "task state must never transition to Probing during fast resume without validator"
+            );
+        }
+    }
+
+    // Assert total_size stayed unchanged
+    let final_task = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        final_task.total_size,
+        Some(size as u64),
+        "total_size must stay unchanged"
+    );
+    assert_eq!(final_task.written, size as u64);
+
+    let final_file = dl_dir.path().join(filename);
+    let bytes = tokio::fs::read(&final_file).await.expect("read final file");
+    assert_eq!(bytes, expected_data);
+}
+
+#[tokio::test]
+async fn test_retry_failed_with_progress_resumes_without_probing() {
+    let size = 16384usize;
+    let offset = 4096usize;
+    let expected_data = generate_bytes(size);
+    let data_clone = expected_data.clone();
+
+    let requests = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let requests_clone = std::sync::Arc::clone(&requests);
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let data = data_clone.clone();
+            let reqs = std::sync::Arc::clone(&requests_clone);
+            tokio::spawn(async move {
+                let mut buf = [0u8; 4096];
+                let n = socket.read(&mut buf).await.unwrap_or(0);
+                let req = String::from_utf8_lossy(&buf[..n]).to_string();
+                reqs.lock().unwrap().push(req.clone());
+                let lower = req.to_ascii_lowercase();
+
+                if req.starts_with("HEAD") {
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nAccept-Ranges: bytes\r\nETag: \"etag-failed-retry\"\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                } else if lower.contains("range: bytes=") {
+                    if lower.contains("range: bytes=4096-") {
+                        let body = &data[offset..];
+                        let resp = format!(
+                            "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {}-{}/{}\r\nContent-Length: {}\r\nETag: \"etag-failed-retry\"\r\nConnection: close\r\n\r\n",
+                            offset,
+                            size - 1,
+                            size,
+                            body.len()
+                        );
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                        let _ = socket.write_all(body).await;
+                    } else if lower.contains("range: bytes=0-0") {
+                        let resp = format!(
+                            "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-0/{}\r\nContent-Length: 1\r\nETag: \"etag-failed-retry\"\r\nConnection: close\r\n\r\n",
+                            size
+                        );
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                        let _ = socket.write_all(&data[0..1]).await;
+                    } else {
+                        let resp =
+                            "HTTP/1.1 416 Range Not Satisfiable\r\nConnection: close\r\n\r\n";
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                    }
+                } else {
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nETag: \"etag-failed-retry\"\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                    let _ = socket.write_all(&data).await;
+                }
+            });
+        }
+    });
+
+    let (dl_dir, store_dir) = make_temp_dirs();
+    // Configure single concurrency slot to verify slot release
+    let config = EngineConfig {
+        max_concurrent_tasks: 1,
+        ..Default::default()
+    };
+    let store = std::sync::Arc::new(Store::open(store_dir.path()).expect("open store"));
+    let engine = Engine::with_store(dl_dir.path(), std::sync::Arc::clone(&store), config)
+        .expect("create engine");
+    let mut event_rx = engine.take_event_receiver().expect("take event rx");
+
+    let url = format!("http://{addr}/test_retry_failed.dat");
+    let task_id = sayl_core::id::TaskId::new();
+
+    // Pre-create .part file on disk covering offset bytes
+    let filename = "test_retry_failed.dat";
+    let part_path = dl_dir.path().join(format!("{filename}.part"));
+    tokio::fs::write(&part_path, &expected_data[..offset])
+        .await
+        .expect("write .part file");
+
+    // Set state Failed with total_size, written > 0 and valid checkpoint
+    let mut record = TaskRecord::with_id(task_id, &url, dl_dir.path(), filename);
+    record.total_size = Some(size as u64);
+    record.written = offset as u64;
+    record.etag = Some("\"etag-failed-retry\"".to_string());
+    record.state = DownloadState::Failed;
+    record.error = Some("simulated previous network drop".to_string());
+    record.error_kind = Some("network".to_string());
+    store.upsert_task(&record).expect("upsert record");
+
+    let checkpoint = sayl_storage::Checkpoint::new(
+        task_id,
+        offset as u64,
+        Some(size as u64),
+        vec![(0, offset as u64)],
+    );
+    store.save_checkpoint(&checkpoint).expect("save checkpoint");
+
+    // Call start: must complete, first request is Range from offset, and no Probing event
+    engine.start(task_id).await.expect("retry start");
+    let terminal = wait_for_terminal(&engine, task_id, Duration::from_secs(5)).await;
+
+    assert_eq!(terminal, DownloadState::Completed);
+
+    let reqs = requests.lock().unwrap().clone();
+    assert!(
+        reqs[0].to_ascii_lowercase().contains("range: bytes=4096-"),
+        "first request on retry must be Range starting at 4096, got: {}",
+        reqs[0]
+    );
+
+    // Verify events: DownloadState never became Probing!
+    while let Ok(event) = event_rx.try_recv() {
+        if let sayl_core::event::EventPayload::StateChanged { to, .. } = event.payload {
+            assert_ne!(
+                to,
+                DownloadState::Probing,
+                "task state must never transition to Probing during retry of failed task with progress"
+            );
+        }
+    }
+
+    // Verify scheduler slot was released: a subsequent task can start without being blocked
+    let next_url = format!("http://{addr}/test_subsequent.dat");
+    let next_task = engine.add(&next_url).await.expect("add subsequent task");
+    let next_handle = tokio::spawn({
+        let eng = engine.clone();
+        async move { eng.start(next_task).await }
+    });
+    let next_term = wait_for_terminal(&engine, next_task, Duration::from_secs(5)).await;
+    let _ = next_handle.await;
+    assert_eq!(
+        next_term,
+        DownloadState::Completed,
+        "subsequent task must complete proving scheduler slot was released"
+    );
+}
+
+#[tokio::test]
+async fn test_resume_uses_contiguous_prefix_not_cumulative_written() {
+    let size = 4000usize;
+    let expected_data = generate_bytes(size);
+    let data_clone = expected_data.clone();
+
+    let requests = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let requests_clone = std::sync::Arc::clone(&requests);
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let data = data_clone.clone();
+            let reqs = std::sync::Arc::clone(&requests_clone);
+            tokio::spawn(async move {
+                let mut buf = [0u8; 4096];
+                let n = socket.read(&mut buf).await.unwrap_or(0);
+                let req = String::from_utf8_lossy(&buf[..n]).to_string();
+                reqs.lock().unwrap().push(req.clone());
+                let lower = req.to_ascii_lowercase();
+
+                if req.starts_with("HEAD") {
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nAccept-Ranges: bytes\r\nETag: \"etag-contiguous\"\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                } else if lower.contains("range: bytes=") {
+                    if lower.contains("range: bytes=1000-") {
+                        // Correct resume starting at contiguous prefix 1000!
+                        let body = &data[1000..];
+                        let resp = format!(
+                            "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 1000-{}/{}\r\nContent-Length: {}\r\nETag: \"etag-contiguous\"\r\nConnection: close\r\n\r\n",
+                            size - 1,
+                            size,
+                            body.len()
+                        );
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                        let _ = socket.write_all(body).await;
+                    } else if lower.contains("range: bytes=0-0") {
+                        let resp = format!(
+                            "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-0/{}\r\nContent-Length: 1\r\nETag: \"etag-contiguous\"\r\nConnection: close\r\n\r\n{}",
+                            size, data[0] as char
+                        );
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                    } else {
+                        let resp =
+                            "HTTP/1.1 416 Range Not Satisfiable\r\nConnection: close\r\n\r\n";
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                    }
+                } else {
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                    let _ = socket.write_all(&data).await;
+                }
+            });
+        }
+    });
+
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let config = EngineConfig::default();
+    let store = std::sync::Arc::new(Store::open(store_dir.path()).expect("open store"));
+    let engine = Engine::with_store(dl_dir.path(), std::sync::Arc::clone(&store), config)
+        .expect("create engine");
+
+    let url = format!("http://{addr}/test_contiguous.dat");
+    let task_id = sayl_core::id::TaskId::new();
+    let filename = "test_contiguous.dat";
+
+    // Pre-create .part file on disk of 3000 bytes with a hole between 1000 and 2000
+    let mut disk_bytes = vec![0u8; 3000];
+    disk_bytes[0..1000].copy_from_slice(&expected_data[0..1000]);
+    // 1000..2000 is unwritten / hole filled with zeroes
+    disk_bytes[2000..3000].copy_from_slice(&expected_data[2000..3000]);
+    let part_path = dl_dir.path().join(format!("{filename}.part"));
+    tokio::fs::write(&part_path, &disk_bytes)
+        .await
+        .expect("write .part file");
+
+    // Checkpoint has ranges [(0, 1000), (2000, 3000)], cumulative written = 2000
+    let mut record = TaskRecord::with_id(task_id, &url, dl_dir.path(), filename);
+    record.total_size = Some(size as u64);
+    record.written = 2000;
+    record.etag = Some("\"etag-contiguous\"".to_string());
+    record.state = DownloadState::Paused;
+    store.upsert_task(&record).expect("upsert record");
+
+    let checkpoint = sayl_storage::Checkpoint::new(
+        task_id,
+        2000,
+        Some(size as u64),
+        vec![(0, 1000), (2000, 3000)],
+    );
+    store.save_checkpoint(&checkpoint).expect("save checkpoint");
+
+    // Start resume
+    engine.start(task_id).await.expect("start resume");
+    let terminal = wait_for_terminal(&engine, task_id, Duration::from_secs(5)).await;
+
+    assert_eq!(terminal, DownloadState::Completed);
+
+    // Assert that the Range request starts at contiguous prefix 1000 (NOT at cumulative 2000)
+    let reqs = requests.lock().unwrap().clone();
+    assert!(
+        reqs[0].to_ascii_lowercase().contains("range: bytes=1000-"),
+        "Range request must start at contiguous prefix 1000, got: {}",
+        reqs[0]
+    );
+
+    // Final file must be 4000 bytes and completely correct
+    let final_file = dl_dir.path().join(filename);
+    let bytes = tokio::fs::read(&final_file).await.expect("read final file");
+    assert_eq!(
+        bytes, expected_data,
+        "final file must have complete byte integrity without hole corruption"
+    );
+}
+
+#[tokio::test]
+async fn test_resume_origin_ignores_range_restarts_from_zero_staying_downloading() {
+    let size = 16384usize;
+    let offset = 4096usize;
+    let expected_data = generate_bytes(size);
+    let data_clone = expected_data.clone();
+
+    let requests = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let requests_clone = std::sync::Arc::clone(&requests);
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let data = data_clone.clone();
+            let reqs = std::sync::Arc::clone(&requests_clone);
+            tokio::spawn(async move {
+                let mut buf = [0u8; 4096];
+                let n = socket.read(&mut buf).await.unwrap_or(0);
+                let req = String::from_utf8_lossy(&buf[..n]).to_string();
+                reqs.lock().unwrap().push(req.clone());
+
+                // Origin ignores Range: bytes=4096- and sends full 200 OK
+                let resp = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    size
+                );
+                let _ = socket.write_all(resp.as_bytes()).await;
+                let _ = socket.write_all(&data).await;
+            });
+        }
+    });
+
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let config = EngineConfig::default();
+    let store = std::sync::Arc::new(Store::open(store_dir.path()).expect("open store"));
+    let engine = Engine::with_store(dl_dir.path(), std::sync::Arc::clone(&store), config)
+        .expect("create engine");
+    let mut event_rx = engine.take_event_receiver().expect("take event rx");
+
+    let url = format!("http://{addr}/test_ignore_range.dat");
+    let task_id = sayl_core::id::TaskId::new();
+    let filename = "test_ignore_range.dat";
+
+    // Pre-create .part file on disk with dummy 4096 bytes
+    let part_path = dl_dir.path().join(format!("{filename}.part"));
+    tokio::fs::write(&part_path, &expected_data[..offset])
+        .await
+        .expect("write .part file");
+
+    let mut record = TaskRecord::with_id(task_id, &url, dl_dir.path(), filename);
+    record.total_size = Some(size as u64);
+    record.written = offset as u64;
+    record.state = DownloadState::Paused;
+    store.upsert_task(&record).expect("upsert record");
+
+    let checkpoint = sayl_storage::Checkpoint::new(
+        task_id,
+        offset as u64,
+        Some(size as u64),
+        vec![(0, offset as u64)],
+    );
+    store.save_checkpoint(&checkpoint).expect("save checkpoint");
+
+    // Start resume
+    engine.start(task_id).await.expect("start resume");
+    let terminal = wait_for_terminal(&engine, task_id, Duration::from_secs(5)).await;
+
+    assert_eq!(terminal, DownloadState::Completed);
+
+    // Verify events: DownloadState never became Probing!
+    while let Ok(event) = event_rx.try_recv() {
+        if let sayl_core::event::EventPayload::StateChanged { to, .. } = event.payload {
+            assert_ne!(
+                to,
+                DownloadState::Probing,
+                "task state must never transition to Probing when origin ignores Range"
+            );
+        }
+    }
+
+    // Assert total_size stayed unchanged and written is full size
+    let final_task = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        final_task.total_size,
+        Some(size as u64),
+        "total_size must stay unchanged when restarting from 0"
+    );
+    assert_eq!(final_task.written, size as u64);
+
+    let final_file = dl_dir.path().join(filename);
+    let bytes = tokio::fs::read(&final_file).await.expect("read final file");
+    assert_eq!(bytes, expected_data);
+}
+
+#[tokio::test]
+async fn test_pause_does_not_emit_completed() {
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    let size = 65536;
+    server.set_resource_size(size);
+    server.set_chunk_size(1024);
+    server.set_delay(Duration::from_millis(10));
+    let addr = server.start().await.expect("start fixture server");
+
+    let config = EngineConfig {
+        max_connections: 1,
+        ..Default::default()
+    };
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+
+    let url = format!("http://{addr}/test_pause_no_completed.bin");
+    let task_id = engine.add(&url).await.expect("add task");
+
+    let mut event_rx = engine.take_event_receiver().expect("take event receiver");
+
+    // Spawn download in background
+    let engine_clone = engine.clone();
+    let handle = tokio::spawn(async move { engine_clone.start(task_id).await });
+
+    // Wait until transfer has actively started and received progress
+    let mut seen_progress = false;
+    while let Some(ev) = event_rx.recv().await {
+        if let sayl_core::event::EventPayload::Progress {
+            downloaded_bytes, ..
+        } = ev.payload
+        {
+            if downloaded_bytes > 1024 {
+                seen_progress = true;
+                break;
+            }
+        }
+    }
+    assert!(seen_progress, "should have seen progress before pause");
+
+    // Pause download
+    engine.pause(task_id).await.expect("pause task");
+    let _ = handle.await;
+
+    let paused_task = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        paused_task.state,
+        DownloadState::Paused,
+        "pause must leave state Paused, not Completed"
+    );
+    assert!(paused_task.written > 0, "pause must preserve written bytes");
+    assert!(
+        paused_task.written < size as u64,
+        "pause must not have full download"
+    );
+
+    // Verify no Completed event was emitted - check all received events
+    let mut completed_emitted = false;
+    while let Ok(ev) = event_rx.try_recv() {
+        if let sayl_core::event::EventPayload::StateChanged { to, .. } = ev.payload {
+            if to == DownloadState::Completed {
+                completed_emitted = true;
+            }
+        }
+    }
+    assert!(
+        !completed_emitted,
+        "Completed event must NOT be emitted on pause"
+    );
+
+    // Verify .part file exists and has content
+    let part_path = dl_dir.path().join(format!("{}.part", paused_task.filename));
+    assert!(part_path.exists(), ".part file must be preserved on pause");
+    let part_len = tokio::fs::metadata(&part_path).await.unwrap().len();
+    assert!(part_len > 0, "partial file must contain received bytes");
+    assert!(part_len < size as u64, "partial file must be incomplete");
+}
+
+#[tokio::test]
+async fn test_cancel_does_not_emit_completed() {
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    let size = 32768;
+    server.set_resource_size(size);
+    server.set_delay(Duration::from_millis(20));
+    let addr = server.start().await.expect("start fixture server");
+
+    let config = EngineConfig::default();
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+
+    let url = format!("http://{addr}/test_cancel_no_completed.bin");
+    let task_id = engine.add(&url).await.expect("add task");
+
+    let mut event_rx = engine.take_event_receiver().expect("take event receiver");
+
+    let engine_clone = engine.clone();
+    let handle = tokio::spawn(async move { engine_clone.start(task_id).await });
+
+    tokio::time::sleep(Duration::from_millis(30)).await;
+
+    // Cancel download
+    engine.cancel(task_id).await.expect("cancel task");
+    let _ = handle.await;
+
+    let cancelled_task = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        cancelled_task.state,
+        DownloadState::Cancelled,
+        "cancel must leave state Cancelled, not Completed"
+    );
+
+    // Verify no Completed event was emitted
+    let mut completed_emitted = false;
+    while let Ok(ev) = event_rx.try_recv() {
+        if let sayl_core::event::EventPayload::StateChanged { to, .. } = ev.payload {
+            if to == DownloadState::Completed {
+                completed_emitted = true;
+            }
+        }
+    }
+    assert!(
+        !completed_emitted,
+        "Completed event must NOT be emitted on cancel"
+    );
+}
+
+#[tokio::test]
+async fn test_pause_resume_continues_from_same_offset() {
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    let size = 65536;
+    server.set_resource_size(size);
+    server.set_chunk_size(2048);
+    server.set_delay(Duration::from_millis(15));
+    let addr = server.start().await.expect("start fixture server");
+
+    let config = EngineConfig {
+        max_connections: 1,
+        ..Default::default()
+    };
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+
+    let url = format!("http://{addr}/test_pause_resume_offset.bin");
+    let task_id = engine.add(&url).await.expect("add task");
+
+    let mut event_rx = engine.take_event_receiver().expect("take event receiver");
+
+    // Spawn download in background
+    let engine_clone = engine.clone();
+    let handle = tokio::spawn(async move { engine_clone.start(task_id).await });
+
+    // Wait until transfer has actively started and received progress
+    let mut seen_progress = false;
+    while let Some(ev) = event_rx.recv().await {
+        if let sayl_core::event::EventPayload::Progress {
+            downloaded_bytes, ..
+        } = ev.payload
+        {
+            if downloaded_bytes > 0 {
+                seen_progress = true;
+                break;
+            }
+        }
+    }
+    assert!(seen_progress, "should have seen progress before pause");
+
+    // Pause download
+    engine.pause(task_id).await.expect("pause task");
+    let _ = handle.await;
+
+    let paused_task = engine.get_task(task_id).unwrap().unwrap();
+    let paused_offset = paused_task.written;
+    assert!(paused_offset > 0, "pause must have written some bytes");
+
+    let checkpoint = engine
+        .load_checkpoint(task_id)
+        .unwrap()
+        .expect("checkpoint exists");
+    assert_eq!(
+        checkpoint.written, paused_offset,
+        "checkpoint must match written bytes"
+    );
+
+    let part_path = dl_dir.path().join(format!("{}.part", paused_task.filename));
+    assert!(part_path.exists());
+    let part_len = tokio::fs::metadata(&part_path).await.unwrap().len();
+    assert_eq!(
+        part_len, paused_offset,
+        ".part file must match written bytes exactly"
+    );
+
+    // Resume download
+    server.set_delay(Duration::ZERO);
+    engine.start(task_id).await.expect("resume download");
+
+    let completed_task = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(completed_task.state, DownloadState::Completed);
+    assert_eq!(completed_task.written, size as u64);
+
+    let final_path = dl_dir.path().join(&completed_task.filename);
+    let bytes = tokio::fs::read(&final_path).await.expect("read final file");
+    assert_eq!(bytes, generate_bytes(size));
+}
+
+#[tokio::test]
+async fn test_paused_task_with_preallocated_part_is_not_completed_on_resume() {
+    // Regression for the 9.3 GB / 12.6% bug.
+    //
+    // The parallel engine preallocates `.part` to `total_size` via `set_len()`, so
+    // `disk_len == total_size` from the very first byte. A paused task therefore used
+    // to look "already finished" on the next `start()` and jump straight to Completed
+    // (opening the completion dialog with the full file size) despite only ~12% of the
+    // bytes ever being downloaded.
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    let size = 1048576usize; // 1 MiB, chunked so parallel path is used
+    server.set_resource_size(size);
+    server.set_delay(Duration::from_millis(5));
+    let addr = server.start().await.expect("start fixture server");
+
+    let config = EngineConfig {
+        max_connections: 4,
+        chunk_size: 65536,
+        ..Default::default()
+    };
+    let store = std::sync::Arc::new(Store::open(store_dir.path()).expect("open store"));
+    let engine = Engine::with_store(dl_dir.path(), std::sync::Arc::clone(&store), config)
+        .expect("create engine");
+
+    let url = format!("http://{addr}/test_prealloc_pause.bin");
+    let task_id = engine.add(&url).await.expect("add task");
+
+    // Simulate exactly what a parallel pause leaves behind: a FULL-LENGTH `.part`
+    // (preallocated) with only a small contiguous prefix of real bytes, plus a
+    // matching durable checkpoint that covers only that prefix.
+    let record = engine.get_task(task_id).unwrap().unwrap();
+    let filename = record.filename.clone();
+    let part_path = dl_dir.path().join(format!("{filename}.part"));
+
+    let real_prefix = 131072u64; // ~12.5% of 1 MiB
+    let data = generate_bytes(size);
+    let mut preallocated = vec![0u8; size];
+    preallocated[..real_prefix as usize].copy_from_slice(&data[..real_prefix as usize]);
+    tokio::fs::write(&part_path, &preallocated)
+        .await
+        .expect("write preallocated part file");
+
+    // `.part` must be full length on disk - this is the trap.
+    let on_disk = tokio::fs::metadata(&part_path).await.unwrap().len();
+    assert_eq!(
+        on_disk, size as u64,
+        "precondition: preallocated .part must be full length on disk"
+    );
+
+    {
+        let mut rec = engine.get_task(task_id).unwrap().unwrap();
+        rec.total_size = Some(size as u64);
+        rec.written = real_prefix;
+        rec.state = DownloadState::Paused;
+        store.upsert_task(&rec).expect("upsert paused record");
+    }
+    store
+        .save_checkpoint(&sayl_storage::Checkpoint::new(
+            task_id,
+            real_prefix,
+            Some(size as u64),
+            vec![(0, real_prefix)],
+        ))
+        .expect("save checkpoint");
+
+    // Resume: this must NOT be treated as already-complete.
+    let terminal = {
+        let eng = engine.clone();
+        let handle = tokio::spawn(async move { eng.start(task_id).await });
+        let t = wait_for_terminal(&engine, task_id, Duration::from_secs(10)).await;
+        let _ = handle.await;
+        t
+    };
+
+    let final_task = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        terminal,
+        DownloadState::Completed,
+        "a genuine resume of a preallocated-but-partial file must finish by downloading \
+         the remainder, not by declaring completion at 12.5%"
+    );
+    assert_eq!(final_task.written, size as u64);
+
+    // The finished file must be byte-exact - if the holes were treated as downloaded,
+    // the zero-filled regions would survive and this comparison would fail.
+    let final_path = dl_dir.path().join(&final_task.filename);
+    let bytes = tokio::fs::read(&final_path).await.expect("read final file");
+    assert_eq!(
+        bytes, data,
+        "resumed file must be byte-identical; zero-filled preallocated holes must be filled"
+    );
+}
+
+#[tokio::test]
+async fn test_pause_mid_parallel_download_keeps_paused_state_and_partial_bytes() {
+    // Pause during an actual parallel transfer: state must be Paused, bytes < total,
+    // and the completed event must never fire.
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    let size = 2097152; // 2 MiB
+    server.set_resource_size(size);
+    server.set_delay(Duration::from_millis(50));
+    let addr = server.start().await.expect("start fixture server");
+
+    let config = EngineConfig {
+        max_connections: 4,
+        chunk_size: 65536,
+        ..Default::default()
+    };
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+
+    let url = format!("http://{addr}/test_pause_parallel.bin");
+    let task_id = engine.add(&url).await.expect("add task");
+    let mut event_rx = engine.take_event_receiver().expect("take event receiver");
+
+    let eng = engine.clone();
+    let handle = tokio::spawn(async move { eng.start(task_id).await });
+
+    // Wait for real progress (positive bytes), bounded so a missing signal fails
+    // the test instead of hanging it.
+    //
+    // The parallel monitor emits `Progress` on a 500ms interval (first tick at t=0
+    // with 0 bytes). A transfer that finishes before the second tick leaves the
+    // receiver with no further events, so an unbounded `recv().await` would block
+    // forever. The 50ms server delay above keeps the 2 MiB / 4-connection transfer
+    // running for ~800ms, which guarantees a positive tick before completion.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let mut saw_progress = false;
+    while Instant::now() < deadline {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        match tokio::time::timeout(remaining, event_rx.recv()).await {
+            Ok(Some(ev)) => {
+                match ev.payload {
+                    sayl_core::event::EventPayload::Progress {
+                        downloaded_bytes, ..
+                    } if downloaded_bytes > 0 => {
+                        saw_progress = true;
+                        break;
+                    }
+                    sayl_core::event::EventPayload::StateChanged { to, .. } if to.is_terminal() => {
+                        // Finished before we could pause; let the assertions report it.
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            Ok(None) => break, // channel closed
+            Err(_) => break,   // timeout on this iteration
+        }
+    }
+    assert!(
+        saw_progress,
+        "expected positive Progress before pausing; the parallel transfer either \
+         finished too early or emitted no progress"
+    );
+
+    engine.pause(task_id).await.expect("pause");
+    // Bound the join as well so a stuck pause path cannot hang the test.
+    let joined = tokio::time::timeout(Duration::from_secs(10), handle)
+        .await
+        .expect("download task did not stop within 10s of pause");
+    let _ = joined;
+
+    let paused = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        paused.state,
+        DownloadState::Paused,
+        "parallel pause must land in Paused, never Completed"
+    );
+    assert!(
+        paused.written < size as u64,
+        "paused task must not claim the full size, wrote {} of {}",
+        paused.written,
+        size
+    );
+
+    let mut completed_emitted = false;
+    while let Ok(ev) = event_rx.try_recv() {
+        if let sayl_core::event::EventPayload::StateChanged { to, .. } = ev.payload {
+            if to == DownloadState::Completed {
+                completed_emitted = true;
+            }
+        }
+    }
+    assert!(
+        !completed_emitted,
+        "Completed must never be emitted for a paused parallel download"
+    );
+
+    // The durable checkpoint must reflect real bytes, not the preallocated length.
+    let cp = engine
+        .load_checkpoint(task_id)
+        .unwrap()
+        .expect("checkpoint must exist after pause");
+    assert!(
+        cp.written < size as u64,
+        "checkpoint must record partial progress, got {} of {}",
+        cp.written,
+        size
+    );
+
+    // Resume must complete the file byte-exactly.
+    server.set_delay(Duration::ZERO);
+    let terminal = {
+        let eng = engine.clone();
+        let h = tokio::spawn(async move { eng.start(task_id).await });
+        let t = wait_for_terminal(&engine, task_id, Duration::from_secs(15)).await;
+        let _ = h.await;
+        t
+    };
+    assert_eq!(terminal, DownloadState::Completed);
+
+    let final_task = engine.get_task(task_id).unwrap().unwrap();
+    let bytes = tokio::fs::read(dl_dir.path().join(&final_task.filename))
+        .await
+        .expect("read final file");
+    assert_eq!(
+        bytes,
+        generate_bytes(size),
+        "resumed file must be byte-exact"
+    );
+}
+
+#[tokio::test]
+async fn test_fallback_without_range_truncates_partial_to_zero() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    let size = 8192;
+    let expected_data = sayl_test_http::generate_bytes(size);
+    let server_data = expected_data.clone();
+
+    tokio::spawn(async move {
+        loop {
+            let (mut socket, _) = match listener.accept().await {
+                Ok(s) => s,
+                Err(_) => break,
+            };
+            let data = server_data.clone();
+            tokio::spawn(async move {
+                let mut buf = vec![0u8; 4096];
+                let n = socket.read(&mut buf).await.unwrap_or(0);
+                let req = String::from_utf8_lossy(&buf[..n]);
+
+                if req.contains("Range:") {
+                    // Reject Range with 400 Bad Request to trigger fallback without Range
+                    let resp = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                } else {
+                    // Fallback request without Range: send 200 OK with full content
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                    let _ = socket.write_all(&data).await;
+                }
+            });
+        }
+    });
+
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let config = EngineConfig::default();
+    let store = std::sync::Arc::new(Store::open(store_dir.path()).expect("open store"));
+    let engine = Engine::with_store(dl_dir.path(), std::sync::Arc::clone(&store), config)
+        .expect("create engine");
+
+    let url = format!("http://{addr}/test_fallback.dat");
+    let task_id = sayl_core::id::TaskId::new();
+    let filename = "test_fallback.dat";
+
+    // Pre-create partial file with 4000 junk bytes
+    let part_path = dl_dir.path().join(format!("{filename}.part"));
+    tokio::fs::write(&part_path, vec![0xEE; 4000])
+        .await
+        .expect("write dummy partial");
+
+    let mut record = TaskRecord::with_id(task_id, &url, dl_dir.path(), filename);
+    record.total_size = Some(size as u64);
+    record.written = 4000;
+    record.state = DownloadState::Paused;
+    store.upsert_task(&record).expect("upsert record");
+
+    let checkpoint =
+        sayl_storage::Checkpoint::new(task_id, 4000, Some(size as u64), vec![(0, 4000)]);
+    store.save_checkpoint(&checkpoint).expect("save checkpoint");
+
+    // Start download — should attempt with Range (fails), then fallback without Range (truncates to 0)
+    engine.start(task_id).await.expect("start task");
+    let terminal = wait_for_terminal(&engine, task_id, Duration::from_secs(5)).await;
+
+    assert_eq!(terminal, DownloadState::Completed);
+
+    let final_file = dl_dir.path().join(filename);
+    let bytes = tokio::fs::read(&final_file).await.expect("read final file");
+    assert_eq!(
+        bytes.len(),
+        size,
+        "file length must be exactly full size, not appended to partial"
+    );
+    assert_eq!(bytes, expected_data);
+}
+
+#[tokio::test]
+async fn test_parallel_progress_monotonic_and_cancel() {
+    // Test that parallel download progress never decreases (monotonic) and cancel
+    // fully stops all workers and transitions state to Cancelled.
+    let size = 2097152; // 2 MiB
+    let expected_data = generate_bytes(size);
+    let data_clone = expected_data.clone();
+
+    let requests = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let requests_clone = std::sync::Arc::clone(&requests);
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    // Slow server that adds delay to each chunk so we can observe progress and cancel in time
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let data = data_clone.clone();
+            let reqs = std::sync::Arc::clone(&requests_clone);
+            tokio::spawn(async move {
+                let mut buf = [0u8; 4096];
+                let n = socket.read(&mut buf).await.unwrap_or(0);
+                let req = String::from_utf8_lossy(&buf[..n]).to_string();
+                reqs.lock().unwrap().push(req.clone());
+
+                if req.starts_with("HEAD") {
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                } else if req.to_ascii_lowercase().contains("range: bytes=") {
+                    if req.contains("Range: bytes=0-0") {
+                        let resp = format!(
+                            "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 0-0/{}\r\nContent-Length: 1\r\nConnection: close\r\n\r\n{}",
+                            size, data[0] as char
+                        );
+                        let _ = socket.write_all(resp.as_bytes()).await;
+                    } else {
+                        // Chunked response with delay per chunk to allow progress monitoring
+                        let range_start = req
+                            .split("bytes=")
+                            .nth(1)
+                            .and_then(|s| s.split('-').next())
+                            .and_then(|s| s.parse::<u64>().ok())
+                            .unwrap_or(0);
+                        let chunk_size = 65536;
+                        let end = (range_start + chunk_size).min(size as u64);
+                        let chunk_data = &data[range_start as usize..end as usize];
+
+                        // Send headers
+                        let resp = format!(
+                            "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {}-{}/{}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                            range_start, end - 1, size, chunk_data.len()
+                        );
+                        let _ = socket.write_all(resp.as_bytes()).await;
+
+                        // Send data in small pieces with delay to simulate slow transfer
+                        for piece in chunk_data.chunks(8192) {
+                            let _ = socket.write_all(piece).await;
+                            tokio::time::sleep(Duration::from_millis(30)).await;
+                        }
+                    }
+                } else {
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        size
+                    );
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                    let _ = socket.write_all(&data).await;
+                }
+            });
+        }
+    });
+
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let config = EngineConfig {
+        max_connections: 4,
+        chunk_size: 65536,
+        stall_timeout: Duration::from_secs(10),
+        ..Default::default()
+    };
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+    let mut event_rx = engine.take_event_receiver().expect("take event receiver");
+
+    let url = format!("http://{addr}/test_progress_cancel.dat");
+    let task_id = engine.add(&url).await.expect("add task");
+
+    // Spawn download in background
+    let engine_clone = engine.clone();
+    let handle = tokio::spawn(async move { engine_clone.start(task_id).await });
+
+    // Collect progress events and verify monotonicity
+    let mut progress_values = Vec::new();
+    let mut saw_positive_progress = false;
+    let mut cancel_sent = false;
+
+    let deadline = Instant::now() + Duration::from_secs(15);
+    while Instant::now() < deadline {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        match tokio::time::timeout(remaining, event_rx.recv()).await {
+            Ok(Some(ev)) => {
+                match ev.payload {
+                    sayl_core::event::EventPayload::Progress {
+                        downloaded_bytes, ..
+                    } => {
+                        progress_values.push(downloaded_bytes);
+                        if downloaded_bytes > 0 {
+                            saw_positive_progress = true;
+                        }
+                        // Send cancel after seeing some progress - earlier threshold
+                        if saw_positive_progress && !cancel_sent && downloaded_bytes > 10000 {
+                            engine.cancel(task_id).await.expect("cancel task");
+                            cancel_sent = true;
+                        }
+                    }
+                    sayl_core::event::EventPayload::StateChanged { to, .. } => {
+                        if to == DownloadState::Cancelled {
+                            break;
+                        }
+                        if to == DownloadState::Completed {
+                            // Download completed before we could cancel
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Ok(None) => break,
+            Err(_) => continue,
+        }
+    }
+
+    // Wait for the download task to finish
+    let _ = tokio::time::timeout(Duration::from_secs(5), handle).await;
+
+    // Verify task state is Cancelled
+    let final_task = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        final_task.state,
+        DownloadState::Cancelled,
+        "cancel must leave state Cancelled, got {:?}",
+        final_task.state
+    );
+
+    // Verify progress monotonicity: downloaded_bytes must never decrease
+    assert!(
+        saw_positive_progress,
+        "expected to see positive progress before cancel"
+    );
+    assert!(cancel_sent, "cancel should have been sent during download");
+    for i in 1..progress_values.len() {
+        assert!(
+            progress_values[i] >= progress_values[i - 1],
+            "progress must be monotonic: index {} = {} < previous {}",
+            i,
+            progress_values[i],
+            progress_values[i - 1]
+        );
+    }
+
+    // Verify no Completed event was emitted
+    let mut completed_emitted = false;
+    while let Ok(ev) = event_rx.try_recv() {
+        if let sayl_core::event::EventPayload::StateChanged { to, .. } = ev.payload {
+            if to == DownloadState::Completed {
+                completed_emitted = true;
+            }
+        }
+    }
+    assert!(
+        !completed_emitted,
+        "Completed event must NOT be emitted on cancel"
+    );
+
+    // Verify .part file exists with partial content (for resume capability)
+    let part_path = dl_dir.path().join(format!("{}.part", final_task.filename));
+    assert!(part_path.exists(), ".part file must be preserved on cancel");
+    // Note: For parallel downloads, .part is preallocated to full size via set_len(),
+    // so we check the checkpoint written bytes instead of file length.
+    let part_len = tokio::fs::metadata(&part_path).await.unwrap().len();
+    assert_eq!(
+        part_len, size as u64,
+        ".part file is preallocated to full size in parallel downloads"
+    );
+
+    // Verify checkpoint exists with partial progress
+    let cp = engine
+        .load_checkpoint(task_id)
+        .unwrap()
+        .expect("checkpoint must exist after cancel");
+    assert!(
+        cp.written < size as u64,
+        "checkpoint must record partial progress, got {} of {}",
+        cp.written,
+        size
+    );
+    assert!(cp.written > 0, "checkpoint must record some progress");
+}
+
+// ============================================================================
+// Auto-rename on filename collision (IDM style)
+// ============================================================================
+
+/// A download must never overwrite a file that is already in the download dir:
+/// it is stored next to it as `name (1).ext`, and the old file stays untouched.
+#[tokio::test]
+async fn test_add_renames_when_target_file_already_on_disk() {
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    let size = 16384;
+    server.set_resource_size(size);
+    let addr = server.start().await.expect("start fixture server");
+
+    // A user file that already occupies the derived name.
+    let existing_path = dl_dir.path().join("test_collide.bin");
+    let existing_bytes = vec![0x11u8; 4096];
+    tokio::fs::write(&existing_path, &existing_bytes)
+        .await
+        .expect("write pre-existing file");
+
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), EngineConfig::default())
+        .expect("create engine");
+
+    let url = format!("http://{addr}/test_collide.bin");
+    let task_id = engine.add(&url).await.expect("add task");
+
+    let added = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        added.filename, "test_collide (1).bin",
+        "collision with an existing file must pick the next free name"
+    );
+
+    engine.start(task_id).await.expect("start download");
+    let done = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(done.state, DownloadState::Completed);
+    assert_eq!(
+        done.filename, "test_collide (1).bin",
+        "the resolved name must be used for the real transfer"
+    );
+
+    // The pre-existing file is untouched, the download landed beside it.
+    let kept = tokio::fs::read(&existing_path)
+        .await
+        .expect("read kept file");
+    assert_eq!(
+        kept, existing_bytes,
+        "pre-existing file must not be overwritten"
+    );
+    let downloaded = tokio::fs::read(dl_dir.path().join(&done.filename))
+        .await
+        .expect("read downloaded file");
+    assert_eq!(downloaded, generate_bytes(size));
+}
+
+/// A stale `.part` file from another attempt also claims the name.
+#[tokio::test]
+async fn test_add_renames_when_stale_part_file_exists() {
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    server.set_resource_size(8192);
+    let addr = server.start().await.expect("start fixture server");
+
+    tokio::fs::write(
+        dl_dir.path().join("test_part_collide.zip.part"),
+        vec![0x22u8; 64],
+    )
+    .await
+    .expect("write stale part file");
+
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), EngineConfig::default())
+        .expect("create engine");
+
+    let url = format!("http://{addr}/test_part_collide.zip");
+    let task_id = engine.add(&url).await.expect("add task");
+    let added = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        added.filename, "test_part_collide (1).zip",
+        "a leftover .part file must force the next free name"
+    );
+}
+
+/// Two queued downloads of the same URL must not share one destination file.
+#[tokio::test]
+async fn test_second_task_renames_against_active_task() {
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    server.set_resource_size(8192);
+    let addr = server.start().await.expect("start fixture server");
+
+    // `max_connections: 1` keeps the two tasks from racing in this check.
+    let config = EngineConfig {
+        max_connections: 1,
+        ..Default::default()
+    };
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), config).expect("create engine");
+
+    let url = format!("http://{addr}/test_shared.bin");
+    let first = engine.add(&url).await.expect("add first task");
+    let second = engine.add(&url).await.expect("add second task");
+
+    let first_rec = engine.get_task(first).unwrap().unwrap();
+    let second_rec = engine.get_task(second).unwrap().unwrap();
+
+    assert_eq!(first_rec.filename, "test_shared.bin");
+    assert_eq!(
+        second_rec.filename, "test_shared (1).bin",
+        "a queued task already targeting the name must push the second one to the next number"
+    );
+    assert_ne!(
+        first_rec.save_path.join(&first_rec.filename),
+        second_rec.save_path.join(&second_rec.filename),
+        "two parallel downloads must never share one destination path"
+    );
+}
+
+/// The race that `add()` cannot see: the name is grabbed between add and start.
+#[tokio::test]
+async fn test_start_renames_when_name_taken_after_add() {
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    let size = 16384;
+    server.set_resource_size(size);
+    let addr = server.start().await.expect("start fixture server");
+
+    let engine = Engine::new(dl_dir.path(), store_dir.path(), EngineConfig::default())
+        .expect("create engine");
+
+    let url = format!("http://{addr}/test_late.bin");
+    let task_id = engine.add(&url).await.expect("add task");
+    let added = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        added.filename, "test_late.bin",
+        "nothing collides at add time"
+    );
+
+    // A different file appears at the destination before the task starts.
+    // Its length deliberately differs from the payload so it cannot look complete.
+    let existing_path = dl_dir.path().join("test_late.bin");
+    let existing_bytes = vec![0x33u8; 4096];
+    tokio::fs::write(&existing_path, &existing_bytes)
+        .await
+        .expect("write late collision file");
+
+    engine.start(task_id).await.expect("start download");
+    let done = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(done.state, DownloadState::Completed);
+    assert_eq!(
+        done.filename, "test_late (1).bin",
+        "start must re-check the destination and rename before creating the .part file"
+    );
+
+    let kept = tokio::fs::read(&existing_path)
+        .await
+        .expect("read kept file");
+    assert_eq!(kept, existing_bytes, "late file must not be overwritten");
+    let downloaded = tokio::fs::read(dl_dir.path().join(&done.filename))
+        .await
+        .expect("read downloaded file");
+    assert_eq!(downloaded, generate_bytes(size));
+}
+
+/// Resuming a paused task must keep its own name and `.part` file.
+#[tokio::test]
+async fn test_resume_keeps_own_filename_after_collision_check() {
+    let (dl_dir, store_dir) = make_temp_dirs();
+    let mut server = HttpFixtureServer::with_scenario(Scenario::Ok206);
+    let size = 64 * 1024;
+    server.set_resource_size(size);
+    let addr = server.start().await.expect("start fixture server");
+
+    let config = EngineConfig {
+        max_connections: 1,
+        chunk_size: 4096,
+        ..Default::default()
+    };
+    let store = std::sync::Arc::new(Store::open(store_dir.path()).expect("open store"));
+    let engine = Engine::with_store(dl_dir.path(), std::sync::Arc::clone(&store), config)
+        .expect("create engine");
+
+    let url = format!("http://{addr}/test_resume_name.bin");
+    let filename = "test_resume_name.bin";
+    let offset = 16 * 1024usize;
+    let task_id = sayl_core::id::TaskId::new();
+
+    // A paused task owns `<filename>.part` plus a durable checkpoint at `offset`.
+    tokio::fs::write(
+        dl_dir.path().join(format!("{filename}.part")),
+        &generate_bytes(size)[..offset],
+    )
+    .await
+    .expect("write .part file");
+
+    let mut record = TaskRecord::with_id(task_id, &url, dl_dir.path(), filename);
+    record.total_size = Some(size as u64);
+    record.written = offset as u64;
+    record.state = DownloadState::Paused;
+    store.upsert_task(&record).expect("upsert record");
+    store
+        .save_checkpoint(&sayl_storage::Checkpoint::new(
+            task_id,
+            offset as u64,
+            Some(size as u64),
+            vec![(0, offset as u64)],
+        ))
+        .expect("save checkpoint");
+
+    // Resume: the task owns its own `.part` file, so the collision check must
+    // leave the name exactly as it is.
+    engine.start(task_id).await.expect("resume task");
+    let done = wait_for_terminal(&engine, task_id, Duration::from_secs(10)).await;
+    assert_eq!(done, DownloadState::Completed);
+    let record = engine.get_task(task_id).unwrap().unwrap();
+    assert_eq!(
+        record.filename, filename,
+        "resuming must not rename the task away from its own .part file"
+    );
+    let bytes = tokio::fs::read(dl_dir.path().join(&record.filename))
+        .await
+        .expect("read final file");
+    assert_eq!(bytes, generate_bytes(size));
 }

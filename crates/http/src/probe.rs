@@ -59,6 +59,8 @@ pub struct ProbeOptions {
     pub custom_headers: HeaderMap,
     /// Default filename fallback.
     pub filename_fallback: Option<String>,
+    /// Bounded timeout for probe requests (default: 10s).
+    pub timeout: std::time::Duration,
 }
 
 impl Default for ProbeOptions {
@@ -68,6 +70,7 @@ impl Default for ProbeOptions {
             user_agent: Some("SAYL/0.1.0".to_string()),
             custom_headers: HeaderMap::new(),
             filename_fallback: None,
+            timeout: std::time::Duration::from_secs(10),
         }
     }
 }
@@ -86,7 +89,8 @@ pub async fn probe_with_options(
     url: Url,
     options: ProbeOptions,
 ) -> Result<ProbeResult, HttpError> {
-    let mut tracker = RedirectTracker::with_policy(options.redirect_policy, url)?;
+    let initial_url = url.clone();
+    let mut tracker = RedirectTracker::with_policy(options.redirect_policy.clone(), url)?;
     let mut headers = options.custom_headers.clone();
 
     if let Some(ua) = &options.user_agent {
@@ -95,31 +99,36 @@ pub async fn probe_with_options(
         }
     }
 
-    // Step 1: Attempt HEAD request first
-    let (head_res, head_rejected) = match execute_head_with_redirects(client, &mut tracker, &headers).await {
-        Ok(res) => {
+    // Step 1: Attempt HEAD request first with bounded timeout (10s default via tokio::time::timeout)
+    let head_attempt = tokio::time::timeout(
+        options.timeout,
+        execute_head_with_redirects(client, &mut tracker, &headers),
+    )
+    .await;
+
+    // On ANY error from HEAD (connection failure, timeout, 403, 400, 404, 500, 503, 405, 501),
+    // FALL BACK TO GET! Do not abort early with Err on client/server errors during HEAD probe.
+    let head_res = match head_attempt {
+        Ok(Ok(res)) => {
             let status = res.status();
-            if status == StatusCode::METHOD_NOT_ALLOWED || status == StatusCode::NOT_IMPLEMENTED {
-                // Origin rejected HEAD with 405 or 501
-                (None, true)
-            } else if status.is_client_error() || status.is_server_error() {
-                return Err(HttpError::status(
-                    status.as_u16(),
-                    format!("HEAD probe rejected: {status}"),
-                    None,
-                ));
+            if status.is_client_error()
+                || status.is_server_error()
+                || status == StatusCode::METHOD_NOT_ALLOWED
+                || status == StatusCode::NOT_IMPLEMENTED
+            {
+                None
             } else {
-                (Some(res), false)
+                Some(res)
             }
         }
-        Err(err) => {
-            // If connection/network failed, return error
-            if err.is_fatal() {
-                return Err(err);
-            }
-            (None, true)
-        }
+        Ok(Err(_)) => None,
+        Err(_) => None,
     };
+
+    // If HEAD failed or was rejected, reset tracker to start GET from initial URL
+    if head_res.is_none() {
+        tracker = RedirectTracker::with_policy(options.redirect_policy, initial_url)?;
+    }
 
     // Step 2: Analyze HEAD response if available
     let mut content_length = None;
@@ -146,20 +155,33 @@ pub async fn probe_with_options(
             }
         }
 
-        etag = hdrs.get(ETAG).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
-        last_modified = hdrs.get(LAST_MODIFIED).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
-        content_type = hdrs.get(CONTENT_TYPE).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
-        content_disposition = hdrs.get(CONTENT_DISPOSITION).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
+        etag = hdrs
+            .get(ETAG)
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+        last_modified = hdrs
+            .get(LAST_MODIFIED)
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+        content_type = hdrs
+            .get(CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+        content_disposition = hdrs
+            .get(CONTENT_DISPOSITION)
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
 
         // We need ranged GET if:
         // 1. Content-Length was missing
         // 2. Or to actually verify range support (when advertised or size > 0)
         content_length.is_none() || (content_length != Some(0))
     } else {
-        head_rejected
+        // HEAD failed, timed out, or returned client/server error: always fall back to GET
+        true
     };
 
-    // Step 3: Perform GET Range: bytes=0-0 verification when needed
+    // Step 3: Perform GET Range: bytes=0-0 verification when needed (with bounded timeout)
     let mut final_status = StatusCode::OK;
     let mut range_support = RangeSupport::Unknown;
 
@@ -167,22 +189,58 @@ pub async fn probe_with_options(
         let mut range_headers = headers.clone();
         range_headers.insert(RANGE, HeaderValue::from_static("bytes=0-0"));
 
-        let get_res = execute_get_with_redirects(client, &mut tracker, &range_headers).await?;
+        let get_attempt = tokio::time::timeout(
+            options.timeout,
+            execute_get_with_redirects(client, &mut tracker, &range_headers),
+        )
+        .await;
+
+        let get_res = match get_attempt {
+            Ok(Ok(res)) => res,
+            Ok(Err(err)) => return Err(err),
+            Err(_) => {
+                return Err(HttpError::status(
+                    StatusCode::REQUEST_TIMEOUT.as_u16(),
+                    "Probe GET request timed out",
+                    None,
+                ));
+            }
+        };
+
         final_status = get_res.status();
+        if final_status.is_client_error() || final_status.is_server_error() {
+            return Err(HttpError::status(
+                final_status.as_u16(),
+                format!("HTTP {final_status}"),
+                None,
+            ));
+        }
         let hdrs = get_res.headers();
 
         // Update headers from GET response if missing
         if etag.is_none() {
-            etag = hdrs.get(ETAG).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
+            etag = hdrs
+                .get(ETAG)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
         }
         if last_modified.is_none() {
-            last_modified = hdrs.get(LAST_MODIFIED).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
+            last_modified = hdrs
+                .get(LAST_MODIFIED)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
         }
         if content_type.is_none() {
-            content_type = hdrs.get(CONTENT_TYPE).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
+            content_type = hdrs
+                .get(CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
         }
         if content_disposition.is_none() {
-            content_disposition = hdrs.get(CONTENT_DISPOSITION).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
+            content_disposition = hdrs
+                .get(CONTENT_DISPOSITION)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
         }
 
         if let Some(ar_val) = hdrs.get(ACCEPT_RANGES) {
@@ -276,7 +334,9 @@ async fn execute_head_with_redirects(
 
         if status.is_redirection() {
             let Some(loc_val) = res.headers().get(reqwest::header::LOCATION) else {
-                return Err(HttpError::redirect("redirect response missing Location header"));
+                return Err(HttpError::redirect(
+                    "redirect response missing Location header",
+                ));
             };
             let loc_str = loc_val.to_str().map_err(|_| {
                 HttpError::redirect("Location header contains non-ASCII characters")
@@ -309,7 +369,9 @@ async fn execute_get_with_redirects(
 
         if status.is_redirection() {
             let Some(loc_val) = res.headers().get(reqwest::header::LOCATION) else {
-                return Err(HttpError::redirect("redirect response missing Location header"));
+                return Err(HttpError::redirect(
+                    "redirect response missing Location header",
+                ));
             };
             let loc_str = loc_val.to_str().map_err(|_| {
                 HttpError::redirect("Location header contains non-ASCII characters")

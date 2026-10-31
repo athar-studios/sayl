@@ -30,6 +30,8 @@ impl Dispatcher for EchoDispatcher {
                 Response::Pong {
                     version: PROTOCOL_VERSION,
                     app_version: env!("CARGO_PKG_VERSION").to_string(),
+                    app_connected: None,
+                    app_error: None,
                 }
             }
             _ => Response::error("not_implemented", "this dispatcher only answers Ping"),
@@ -113,6 +115,10 @@ mod tests {
     use crate::message::Response;
     use std::io::Cursor;
 
+    /// Recording dispatcher kept for tests that need to observe the framed
+    /// requests the host reads. It is unused by the current tests, so it is
+    /// marked dead code instead of being deleted (a later session test can use it).
+    #[allow(dead_code)]
     struct Recorder {
         seen: Vec<Request>,
         response: Option<Response>,
