@@ -849,7 +849,7 @@
 
     const start = startClick();
     try {
-      await invoke("delete_tasks", { ids, delete_files: deleteFiles });
+      await invoke("delete_tasks", { ids, deleteFiles, delete_files: deleteFiles });
       const idSet = new Set(ids);
       tasks = tasks.filter((t) => !idSet.has(t.id));
       selectedIds = selectedIds.filter((id) => !idSet.has(id));
@@ -1293,7 +1293,7 @@
     dismissCaptureOffer();
     if (!taskId) return;
     try {
-      await invoke("delete_task", { id: taskId, delete_files: false });
+      await invoke("delete_task", { id: taskId, deleteFiles: false, delete_files: false });
       await loadTasks();
     } catch (_) {}
   }
