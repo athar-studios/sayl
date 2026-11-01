@@ -11,6 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.1] - 2026-11-01
+
+> **Status:** Patch release (Windows-only). Fixes the reported bug: choosing «حذف مع الملف» (delete the task together with its file) removed the task from the list but left the file on disk.
+
+### Fixed
+
+#### «حذف المهمة مع الملف» لم يكن يحذف الملف من القرص — delete-with-file left the file on disk
+Fix commit: [`6f8caf4`](https://github.com/athar-studios/sayl/commit/6f8caf4873e5cae835866fae09a2ee5e624b1ef7)
+
+Four independent causes, all addressed in `6f8caf4`:
+
+1. **`delete_files` / `deleteFiles` mismatch under Tauri v2** — `apps/desktop/src/App.svelte` sent `delete_files:` while Tauri v2 deserializes command arguments as `camelCase`, so `delete_files: Option<bool>` in `apps/desktop/src-tauri/src/lib.rs` received `None` and `.unwrap_or(false)` silently turned the user's choice into "remove only". The invoke payload now sends both spellings, so the flag reaches the backend on every path (`delete_tasks` and `delete_task`).
+2. **Relative paths with `FOF_ALLOWUNDO`** — `send_to_recycle_bin` in `apps/desktop/src-tauri/src/delete.rs` passed the path straight to `SHFileOperationW`, which needs a fully-qualified path; a relative path made the recycle call a silent no-op. Paths are now made absolute and stripped of the `\\?\` / `\\?\UNC\` extended prefixes before the Win32 call.
+3. **`.part` file still locked after cancel** — deleting an active/paused task raced the engine while it was still closing the transfer handle, so the recycle call failed on the locked `.part` file. `execute_delete_tasks_with_recycler` now retries each target up to 6 times (50 ms apart) after the cancellation wait.
+4. **Record filename out of sync after `Content-Disposition`** — `crates/app/src/engine.rs` only rewrote `record.filename` inside the collision branch, so a server-supplied name that did not collide was never persisted and the delete step then looked for the wrong file. The resolved name is now written back to the record unconditionally, keeping the journal, the store and the file on disk in agreement.
+
+Also: a permanent-delete fallback for volumes or file systems where the Recycle Bin is unavailable, and a regression test (`test_delete_scenario_6_duplicate_numbered_filename`) covering a duplicate/numbered name such as `report (1).pdf`.
+
+---
+
 ## [0.1.0] - (Windows-only, unreleased / in-progress)
 
 > **Status:** In active development (Windows-only). Not released. Packaging and installers are blocked pending Windows SDK availability.

@@ -3460,7 +3460,7 @@ dependencies = [
 
 [[package]]
 name = "sayl-app"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bytes",
  "chrono",
@@ -3483,7 +3483,7 @@ dependencies = [
 
 [[package]]
 name = "sayl-bench"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bytes",
  "futures-util",
@@ -3497,7 +3497,7 @@ dependencies = [
 
 [[package]]
 name = "sayl-bridge"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "chrono",
  "reqwest 0.12.28",
@@ -3515,7 +3515,7 @@ dependencies = [
 
 [[package]]
 name = "sayl-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "assert_cmd",
  "chrono",
@@ -3539,7 +3539,7 @@ dependencies = [
 
 [[package]]
 name = "sayl-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bytes",
  "chrono",
@@ -3554,7 +3554,7 @@ dependencies = [
 
 [[package]]
 name = "sayl-desktop"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "getrandom 0.3.4",
  "sayl-app",
@@ -3578,7 +3578,7 @@ dependencies = [
 
 [[package]]
 name = "sayl-http"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bytes",
  "chrono",
@@ -3599,15 +3599,15 @@ dependencies = [
 
 [[package]]
 name = "sayl-media"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "sayl-plugin-host"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "sayl-storage"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "chrono",
  "sayl-core",
@@ -3621,7 +3621,7 @@ dependencies = [
 
 [[package]]
 name = "sayl-test-http"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bytes",
  "chrono",
@@ -3634,7 +3634,7 @@ dependencies = [
 
 [[package]]
 name = "sayl-torrent"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "schannel"
